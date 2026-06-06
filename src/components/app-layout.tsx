@@ -106,6 +106,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <main className="lg:pl-64 min-h-screen">
         <div className="px-4 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto">{children}</div>
       </main>
+
+      <WelcomeModal />
+      <GuidedTour />
     </div>
   );
 }
