@@ -162,6 +162,8 @@ export const getInsights = createServerFn({ method: "GET" })
   });
 
 // ============ FILA / KANBAN ============
+export type OsStatus = "aguardando" | "em_lavagem" | "finalizacao" | "pronto" | "entregue";
+
 export const getFila = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -177,7 +179,7 @@ export const getFila = createServerFn({ method: "GET" })
         funcionarios:funcionario_id(nome)
       `)
       .eq("owner_id", userId)
-      .in("status", ["aguardando", "em_andamento", "pronto", "entregue"])
+      .in("status", ["aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"])
       .order("posicao", { ascending: true });
     if (error) throw error;
     return { ordens: data ?? [] };
@@ -185,11 +187,11 @@ export const getFila = createServerFn({ method: "GET" })
 
 export const updateOrdemStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; status: "aguardando" | "em_andamento" | "pronto" | "entregue" }) => d)
+  .inputValidator((d: { id: string; status: OsStatus }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const patch: any = { status: data.status };
-    if (data.status === "em_andamento") patch.iniciado_em = new Date().toISOString();
+    if (data.status === "em_lavagem") patch.iniciado_em = new Date().toISOString();
     if (data.status === "pronto") patch.finalizado_em = new Date().toISOString();
     if (data.status === "entregue") patch.entregue_em = new Date().toISOString();
     const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", userId);
