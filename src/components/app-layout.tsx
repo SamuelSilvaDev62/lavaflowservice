@@ -7,21 +7,23 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { WelcomeModal } from "@/components/welcome-modal";
+import { GuidedTour } from "@/components/guided-tour";
 
-const groups: Array<{ label: string; items: Array<{ to: string; label: string; icon: any }> }> = [
+const groups: Array<{ label: string; items: Array<{ to: string; label: string; icon: any; tour?: string }> }> = [
   { label: "Visão", items: [
-    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { to: "/oportunidades", label: "Oportunidades", icon: Sparkles },
-    { to: "/assistente", label: "Assistente", icon: Bot },
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tour: "dashboard" },
+    { to: "/oportunidades", label: "Oportunidades", icon: Sparkles, tour: "oportunidades" },
+    { to: "/assistente", label: "Assistente", icon: Bot, tour: "assistente" },
   ]},
   { label: "Operação", items: [
     { to: "/fila", label: "Fila", icon: ListChecks },
     { to: "/ordens", label: "Ordens de serviço", icon: ClipboardList },
   ]},
   { label: "Crescimento", items: [
-    { to: "/clientes", label: "Clientes", icon: Users },
+    { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes" },
     { to: "/clientes/inativos", label: "Inativos", icon: UserMinus },
-    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard },
+    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas" },
     { to: "/fidelidade", label: "Fidelidade", icon: Award },
   ]},
   { label: "Gestão", items: [
@@ -78,7 +80,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
                   const active = pathname === it.to || (it.to !== "/dashboard" && pathname.startsWith(it.to));
                   return (
                     <li key={it.to}>
-                      <Link to={it.to} className={cn(
+                      <Link to={it.to} data-tour={it.tour} className={cn(
                         "flex items-center gap-3 px-3 py-2 rounded-md text-sm font-medium transition-colors",
                         active ? "bg-sidebar-accent text-sidebar-accent-foreground" : "text-sidebar-foreground/80 hover:bg-sidebar-accent/60 hover:text-sidebar-accent-foreground",
                       )}>
@@ -104,6 +106,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
       <main className="lg:pl-64 min-h-screen">
         <div className="px-4 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto">{children}</div>
       </main>
+
+      <WelcomeModal />
+      <GuidedTour />
     </div>
   );
 }
