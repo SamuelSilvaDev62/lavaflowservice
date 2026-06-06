@@ -87,7 +87,7 @@ function ServicosTab() {
       </div>
       <form onSubmit={(e) => { e.preventDefault(); mut.mutate({ ...novo, ativo: true }); }} className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
         <div><Label>Novo serviço</Label><Input required value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} /></div>
-        <div><Label>Preço</Label><Input type="number" step="0.01" required value={novo.preco_padrao} onChange={(e) => setNovo({ ...novo, preco_padrao: Number(e.target.value) })} className="w-24" /></div>
+        <div><Label>Preço</Label><Input type="number" step="0.01" inputMode="decimal" placeholder="0,00" required value={novo.preco_padrao === 0 ? "" : novo.preco_padrao} onChange={(e) => setNovo({ ...novo, preco_padrao: e.target.value === "" ? 0 : Number(e.target.value) })} className="w-24" /></div>
         <Button type="submit">Adicionar</Button>
       </form>
     </CardContent></Card>

@@ -46,8 +46,8 @@ function Page() {
         <CardContent className="p-5">
           <h3 className="font-display font-semibold mb-4 flex items-center gap-2"><Award className="h-4 w-4 text-primary" />Configuração</h3>
           <div className="grid sm:grid-cols-2 gap-3 mb-4">
-            <div><Label>Pontos por lavagem</Label><Input type="number" value={cfg.pontos_por_lavagem} onChange={(e) => setCfg({ ...cfg, pontos_por_lavagem: Number(e.target.value) })} /></div>
-            <div><Label>Pontos por R$ gasto</Label><Input type="number" step="0.1" value={cfg.pontos_por_real} onChange={(e) => setCfg({ ...cfg, pontos_por_real: Number(e.target.value) })} /></div>
+            <div><Label>Pontos por lavagem</Label><Input type="number" inputMode="numeric" placeholder="0" value={cfg.pontos_por_lavagem === 0 ? "" : cfg.pontos_por_lavagem} onChange={(e) => setCfg({ ...cfg, pontos_por_lavagem: e.target.value === "" ? 0 : Number(e.target.value) })} /></div>
+            <div><Label>Pontos por R$ gasto</Label><Input type="number" step="0.1" inputMode="decimal" placeholder="0" value={cfg.pontos_por_real === 0 ? "" : cfg.pontos_por_real} onChange={(e) => setCfg({ ...cfg, pontos_por_real: e.target.value === "" ? 0 : Number(e.target.value) })} /></div>
           </div>
           <Button onClick={() => cfgMut.mutate()} disabled={cfgMut.isPending}>Salvar</Button>
         </CardContent>
@@ -64,7 +64,7 @@ function Page() {
                   <DialogHeader><DialogTitle>Nova recompensa</DialogTitle></DialogHeader>
                   <form onSubmit={(e) => { e.preventDefault(); recMut.mutate(); }} className="space-y-3">
                     <div><Label>Nome</Label><Input required value={rec.nome} onChange={(e) => setRec({ ...rec, nome: e.target.value })} /></div>
-                    <div><Label>Custo (pontos)</Label><Input type="number" required value={rec.custo_pontos} onChange={(e) => setRec({ ...rec, custo_pontos: Number(e.target.value) })} /></div>
+                    <div><Label>Custo (pontos)</Label><Input type="number" inputMode="numeric" placeholder="0" required value={rec.custo_pontos === 0 ? "" : rec.custo_pontos} onChange={(e) => setRec({ ...rec, custo_pontos: e.target.value === "" ? 0 : Number(e.target.value) })} /></div>
                     <Button type="submit" className="w-full" disabled={recMut.isPending}>Criar</Button>
                   </form>
                 </DialogContent>
