@@ -9,38 +9,176 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedOrdensRouteImport } from './routes/_authenticated/ordens'
+import { Route as AuthenticatedOportunidadesRouteImport } from './routes/_authenticated/oportunidades'
+import { Route as AuthenticatedFilaRouteImport } from './routes/_authenticated/fila'
+import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedAssistenteRouteImport } from './routes/_authenticated/assistente'
+import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes/index'
+import { Route as AuthenticatedClientesInativosRouteImport } from './routes/_authenticated/clientes/inativos'
+import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes/$id'
 
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedOrdensRoute = AuthenticatedOrdensRouteImport.update({
+  id: '/ordens',
+  path: '/ordens',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedOportunidadesRoute =
+  AuthenticatedOportunidadesRouteImport.update({
+    id: '/oportunidades',
+    path: '/oportunidades',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedFilaRoute = AuthenticatedFilaRouteImport.update({
+  id: '/fila',
+  path: '/fila',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
+  id: '/dashboard',
+  path: '/dashboard',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAssistenteRoute = AuthenticatedAssistenteRouteImport.update({
+  id: '/assistente',
+  path: '/assistente',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedClientesIndexRoute =
+  AuthenticatedClientesIndexRouteImport.update({
+    id: '/clientes/',
+    path: '/clientes/',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClientesInativosRoute =
+  AuthenticatedClientesInativosRouteImport.update({
+    id: '/clientes/inativos',
+    path: '/clientes/inativos',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedClientesIdRoute = AuthenticatedClientesIdRouteImport.update({
+  id: '/clientes/$id',
+  path: '/clientes/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/assistente': typeof AuthenticatedAssistenteRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/fila': typeof AuthenticatedFilaRoute
+  '/oportunidades': typeof AuthenticatedOportunidadesRoute
+  '/ordens': typeof AuthenticatedOrdensRoute
+  '/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
+  '/clientes/': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
+  '/assistente': typeof AuthenticatedAssistenteRoute
+  '/dashboard': typeof AuthenticatedDashboardRoute
+  '/fila': typeof AuthenticatedFilaRoute
+  '/oportunidades': typeof AuthenticatedOportunidadesRoute
+  '/ordens': typeof AuthenticatedOrdensRoute
+  '/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
+  '/clientes': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
+  '/_authenticated/assistente': typeof AuthenticatedAssistenteRoute
+  '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
+  '/_authenticated/fila': typeof AuthenticatedFilaRoute
+  '/_authenticated/oportunidades': typeof AuthenticatedOportunidadesRoute
+  '/_authenticated/ordens': typeof AuthenticatedOrdensRoute
+  '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
+  '/_authenticated/clientes/inativos': typeof AuthenticatedClientesInativosRoute
+  '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/assistente'
+    | '/dashboard'
+    | '/fila'
+    | '/oportunidades'
+    | '/ordens'
+    | '/clientes/$id'
+    | '/clientes/inativos'
+    | '/clientes/'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/auth'
+    | '/assistente'
+    | '/dashboard'
+    | '/fila'
+    | '/oportunidades'
+    | '/ordens'
+    | '/clientes/$id'
+    | '/clientes/inativos'
+    | '/clientes'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/_authenticated/assistente'
+    | '/_authenticated/dashboard'
+    | '/_authenticated/fila'
+    | '/_authenticated/oportunidades'
+    | '/_authenticated/ordens'
+    | '/_authenticated/clientes/$id'
+    | '/_authenticated/clientes/inativos'
+    | '/_authenticated/clientes/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,12 +186,105 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/ordens': {
+      id: '/_authenticated/ordens'
+      path: '/ordens'
+      fullPath: '/ordens'
+      preLoaderRoute: typeof AuthenticatedOrdensRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/oportunidades': {
+      id: '/_authenticated/oportunidades'
+      path: '/oportunidades'
+      fullPath: '/oportunidades'
+      preLoaderRoute: typeof AuthenticatedOportunidadesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/fila': {
+      id: '/_authenticated/fila'
+      path: '/fila'
+      fullPath: '/fila'
+      preLoaderRoute: typeof AuthenticatedFilaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/dashboard': {
+      id: '/_authenticated/dashboard'
+      path: '/dashboard'
+      fullPath: '/dashboard'
+      preLoaderRoute: typeof AuthenticatedDashboardRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/assistente': {
+      id: '/_authenticated/assistente'
+      path: '/assistente'
+      fullPath: '/assistente'
+      preLoaderRoute: typeof AuthenticatedAssistenteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/clientes/': {
+      id: '/_authenticated/clientes/'
+      path: '/clientes'
+      fullPath: '/clientes/'
+      preLoaderRoute: typeof AuthenticatedClientesIndexRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/clientes/inativos': {
+      id: '/_authenticated/clientes/inativos'
+      path: '/clientes/inativos'
+      fullPath: '/clientes/inativos'
+      preLoaderRoute: typeof AuthenticatedClientesInativosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/clientes/$id': {
+      id: '/_authenticated/clientes/$id'
+      path: '/clientes/$id'
+      fullPath: '/clientes/$id'
+      preLoaderRoute: typeof AuthenticatedClientesIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedAssistenteRoute: typeof AuthenticatedAssistenteRoute
+  AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
+  AuthenticatedFilaRoute: typeof AuthenticatedFilaRoute
+  AuthenticatedOportunidadesRoute: typeof AuthenticatedOportunidadesRoute
+  AuthenticatedOrdensRoute: typeof AuthenticatedOrdensRoute
+  AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRoute
+  AuthenticatedClientesInativosRoute: typeof AuthenticatedClientesInativosRoute
+  AuthenticatedClientesIndexRoute: typeof AuthenticatedClientesIndexRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedAssistenteRoute: AuthenticatedAssistenteRoute,
+  AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
+  AuthenticatedFilaRoute: AuthenticatedFilaRoute,
+  AuthenticatedOportunidadesRoute: AuthenticatedOportunidadesRoute,
+  AuthenticatedOrdensRoute: AuthenticatedOrdensRoute,
+  AuthenticatedClientesIdRoute: AuthenticatedClientesIdRoute,
+  AuthenticatedClientesInativosRoute: AuthenticatedClientesInativosRoute,
+  AuthenticatedClientesIndexRoute: AuthenticatedClientesIndexRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
+
+import type { getRouter } from './router.tsx'
+import type { startInstance } from './start.ts'
+declare module '@tanstack/react-start' {
+  interface Register {
+    ssr: true
+    router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
+  }
+}
