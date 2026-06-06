@@ -40,14 +40,29 @@ function KPI({ label, value, delta, icon: Icon, accent }: { label: string; value
 function Dashboard() {
   const fetchMetrics = useServerFn(getDashboardMetrics);
   const fetchOps = useServerFn(getOportunidades);
+  const fetchState = useServerFn(getOnboardingState);
   const { data: m, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fetchMetrics() });
   const { data: ops } = useQuery({ queryKey: ["oportunidades"], queryFn: () => fetchOps() });
+  const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
 
   if (isLoading || !m) return <div className="space-y-4">{[1,2,3,4].map(i => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}</div>;
+
+  const isEmpty = state && state.counts.clientes === 0 && state.counts.ordens === 0;
+
+  if (isEmpty) {
+    return (
+      <>
+        <PageHeader title="Visão geral" subtitle="Acompanhe o crescimento do seu lava-rápido em tempo real." />
+        <SetupChecklist />
+        <EmptyDashboard />
+      </>
+    );
+  }
 
   return (
     <>
       <PageHeader title="Visão geral" subtitle="Acompanhe o crescimento do seu lava-rápido em tempo real." />
+      <SetupChecklist />
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
         <KPI label="Faturamento do mês" value={brl(m.faturamentoMes)} delta={{ value: m.crescimento, positive: m.crescimento >= 0 }} icon={DollarSign} accent="bg-primary/10 text-primary" />
