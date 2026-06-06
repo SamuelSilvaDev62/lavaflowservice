@@ -88,3 +88,30 @@ function Page() {
     </>
   );
 }
+
+const STATUS_OPTIONS: OsStatus[] = ["aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"];
+
+function OrdemRow({ o }: { o: any }) {
+  const upd = useServerFn(updateOrdemStatus);
+  const qc = useQueryClient();
+  const mut = useMutation({
+    mutationFn: (status: OsStatus) => upd({ data: { id: o.id, status } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ordens"] }); qc.invalidateQueries({ queryKey: ["fila"] }); toast.success("Status atualizado"); },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao atualizar"),
+  });
+  return (
+    <div className="p-4 flex items-center justify-between gap-3 flex-wrap">
+      <div className="min-w-0 flex-1">
+        <p className="font-medium truncate">{o.clientes?.nome ?? "—"} <span className="text-xs text-muted-foreground font-mono">{o.veiculos?.placa ?? ""}</span></p>
+        <p className="text-xs text-muted-foreground">{o.servicos?.nome ?? "Serviço"} · {o.funcionarios?.nome ?? "Sem responsável"} · {dateTimeBr(o.created_at)}</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <p className="font-semibold">{brl(o.valor)}</p>
+        <Select value={o.status} onValueChange={(v) => mut.mutate(v as OsStatus)}>
+          <SelectTrigger className={`h-8 w-[140px] text-xs ${statusColor[o.status]}`}><SelectValue /></SelectTrigger>
+          <SelectContent>{STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s.replace("_", " ")}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+    </div>
+  );
+}
