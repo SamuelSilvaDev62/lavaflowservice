@@ -148,9 +148,12 @@ export type Database = {
           instagram: string | null
           logo_url: string | null
           nome_fantasia: string
+          onboarding_completed_steps: string[]
+          onboarding_status: string
           owner_id: string
           razao_social: string | null
           telefone: string | null
+          tour_completed_at: string | null
           website: string | null
           whatsapp: string | null
         }
@@ -164,9 +167,12 @@ export type Database = {
           instagram?: string | null
           logo_url?: string | null
           nome_fantasia?: string
+          onboarding_completed_steps?: string[]
+          onboarding_status?: string
           owner_id: string
           razao_social?: string | null
           telefone?: string | null
+          tour_completed_at?: string | null
           website?: string | null
           whatsapp?: string | null
         }
@@ -180,9 +186,12 @@ export type Database = {
           instagram?: string | null
           logo_url?: string | null
           nome_fantasia?: string
+          onboarding_completed_steps?: string[]
+          onboarding_status?: string
           owner_id?: string
           razao_social?: string | null
           telefone?: string | null
+          tour_completed_at?: string | null
           website?: string | null
           whatsapp?: string | null
         }
