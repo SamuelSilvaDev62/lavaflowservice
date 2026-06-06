@@ -44,8 +44,8 @@ function Page() {
               <form onSubmit={(e) => { e.preventDefault(); mut.mutate(); }} className="space-y-3">
                 <div><Label>Nome</Label><Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
                 <div className="grid grid-cols-2 gap-3">
-                  <div><Label>Valor mensal</Label><Input type="number" step="0.01" required value={form.valor_mensal} onChange={(e) => setForm({ ...form, valor_mensal: Number(e.target.value) })} /></div>
-                  <div><Label>Lavagens/mês</Label><Input type="number" required value={form.quantidade_lavagens} onChange={(e) => setForm({ ...form, quantidade_lavagens: Number(e.target.value) })} /></div>
+                  <div><Label>Valor mensal</Label><Input type="number" step="0.01" inputMode="decimal" placeholder="0,00" required value={form.valor_mensal === 0 ? "" : form.valor_mensal} onChange={(e) => setForm({ ...form, valor_mensal: e.target.value === "" ? 0 : Number(e.target.value) })} /></div>
+                  <div><Label>Lavagens/mês</Label><Input type="number" inputMode="numeric" placeholder="0" required value={form.quantidade_lavagens === 0 ? "" : form.quantidade_lavagens} onChange={(e) => setForm({ ...form, quantidade_lavagens: e.target.value === "" ? 0 : Number(e.target.value) })} /></div>
                 </div>
                 <div><Label>Benefícios (1 por linha)</Label><Textarea rows={3} value={form.beneficios} onChange={(e) => setForm({ ...form, beneficios: e.target.value })} /></div>
                 <Button type="submit" className="w-full" disabled={mut.isPending}>Criar plano</Button>

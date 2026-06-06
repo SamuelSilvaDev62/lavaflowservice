@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { listOrdens, createOrdem, listClientes, listServicos, listFuncionarios } from "@/lib/lavaflow.functions";
+import { listOrdens, createOrdem, listClientes, listServicos, listFuncionarios, updateOrdemStatus, type OsStatus } from "@/lib/lavaflow.functions";
 import { brl, dateTimeBr } from "@/lib/format";
 import { Plus } from "lucide-react";
 import { toast } from "sonner";
@@ -71,7 +71,7 @@ function Page() {
                     <SelectContent>{func?.funcionarios.map((f: any) => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}</SelectContent>
                   </Select>
                 </div>
-                <div><Label>Valor (R$)</Label><Input type="number" step="0.01" value={form.valor} onChange={(e) => setForm({ ...form, valor: Number(e.target.value) })} /></div>
+                <div><Label>Valor (R$)</Label><Input type="number" step="0.01" inputMode="decimal" placeholder="0,00" value={form.valor === 0 ? "" : form.valor} onChange={(e) => setForm({ ...form, valor: e.target.value === "" ? 0 : Number(e.target.value) })} /></div>
                 <Button type="submit" className="w-full" disabled={mut.isPending}>Criar</Button>
               </form>
             </DialogContent>
@@ -81,21 +81,37 @@ function Page() {
       {isLoading && <div className="h-64 rounded-xl bg-muted animate-pulse" />}
       <Card><CardContent className="p-0">
         <div className="divide-y">
-          {data?.ordens.map((o: any) => (
-            <div key={o.id} className="p-4 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <p className="font-medium truncate">{o.clientes?.nome ?? "—"} <span className="text-xs text-muted-foreground font-mono">{o.veiculos?.placa ?? ""}</span></p>
-                <p className="text-xs text-muted-foreground">{o.servicos?.nome ?? "Serviço"} · {o.funcionarios?.nome ?? "Sem responsável"} · {dateTimeBr(o.created_at)}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="font-semibold">{brl(o.valor)}</p>
-                <Badge variant="outline" className={statusColor[o.status]}>{o.status.replace("_", " ")}</Badge>
-              </div>
-            </div>
-          ))}
+          {data?.ordens.map((o: any) => <OrdemRow key={o.id} o={o} />)}
           {data?.ordens.length === 0 && <p className="p-10 text-center text-muted-foreground text-sm">Nenhuma ordem ainda.</p>}
         </div>
       </CardContent></Card>
     </>
+  );
+}
+
+const STATUS_OPTIONS: OsStatus[] = ["aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"];
+
+function OrdemRow({ o }: { o: any }) {
+  const upd = useServerFn(updateOrdemStatus);
+  const qc = useQueryClient();
+  const mut = useMutation({
+    mutationFn: (status: OsStatus) => upd({ data: { id: o.id, status } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ordens"] }); qc.invalidateQueries({ queryKey: ["fila"] }); toast.success("Status atualizado"); },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao atualizar"),
+  });
+  return (
+    <div className="p-4 flex items-center justify-between gap-3 flex-wrap">
+      <div className="min-w-0 flex-1">
+        <p className="font-medium truncate">{o.clientes?.nome ?? "—"} <span className="text-xs text-muted-foreground font-mono">{o.veiculos?.placa ?? ""}</span></p>
+        <p className="text-xs text-muted-foreground">{o.servicos?.nome ?? "Serviço"} · {o.funcionarios?.nome ?? "Sem responsável"} · {dateTimeBr(o.created_at)}</p>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        <p className="font-semibold">{brl(o.valor)}</p>
+        <Select value={o.status} onValueChange={(v) => mut.mutate(v as OsStatus)}>
+          <SelectTrigger className={`h-8 w-[140px] text-xs ${statusColor[o.status]}`}><SelectValue /></SelectTrigger>
+          <SelectContent>{STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s.replace("_", " ")}</SelectItem>)}</SelectContent>
+        </Select>
+      </div>
+    </div>
   );
 }
