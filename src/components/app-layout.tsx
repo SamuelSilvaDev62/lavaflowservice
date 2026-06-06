@@ -7,6 +7,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { WelcomeModal } from "@/components/welcome-modal";
+import { GuidedTour } from "@/components/guided-tour";
 
 const groups: Array<{ label: string; items: Array<{ to: string; label: string; icon: any }> }> = [
   { label: "Visão", items: [
