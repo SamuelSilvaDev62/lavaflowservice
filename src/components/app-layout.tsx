@@ -10,20 +10,20 @@ import { Button } from "@/components/ui/button";
 import { WelcomeModal } from "@/components/welcome-modal";
 import { GuidedTour } from "@/components/guided-tour";
 
-const groups: Array<{ label: string; items: Array<{ to: string; label: string; icon: any }> }> = [
+const groups: Array<{ label: string; items: Array<{ to: string; label: string; icon: any; tour?: string }> }> = [
   { label: "Visão", items: [
-    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-    { to: "/oportunidades", label: "Oportunidades", icon: Sparkles },
-    { to: "/assistente", label: "Assistente", icon: Bot },
+    { to: "/dashboard", label: "Dashboard", icon: LayoutDashboard, tour: "dashboard" },
+    { to: "/oportunidades", label: "Oportunidades", icon: Sparkles, tour: "oportunidades" },
+    { to: "/assistente", label: "Assistente", icon: Bot, tour: "assistente" },
   ]},
   { label: "Operação", items: [
     { to: "/fila", label: "Fila", icon: ListChecks },
     { to: "/ordens", label: "Ordens de serviço", icon: ClipboardList },
   ]},
   { label: "Crescimento", items: [
-    { to: "/clientes", label: "Clientes", icon: Users },
+    { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes" },
     { to: "/clientes/inativos", label: "Inativos", icon: UserMinus },
-    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard },
+    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas" },
     { to: "/fidelidade", label: "Fidelidade", icon: Award },
   ]},
   { label: "Gestão", items: [
