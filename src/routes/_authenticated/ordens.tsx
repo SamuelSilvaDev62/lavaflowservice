@@ -12,8 +12,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { listOrdens, createOrdem, listClientes, listServicos, listFuncionarios, updateOrdemStatus, type OsStatus } from "@/lib/lavaflow.functions";
 import { brl, dateTimeBr } from "@/lib/format";
-import { Plus } from "lucide-react";
+import { Plus, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/empty-state";
 
 export const Route = createFileRoute("/_authenticated/ordens")({
   component: Page,
@@ -79,12 +80,21 @@ function Page() {
         }
       />
       {isLoading && <div className="h-64 rounded-xl bg-muted animate-pulse" />}
-      <Card><CardContent className="p-0">
-        <div className="divide-y">
-          {data?.ordens.map((o: any) => <OrdemRow key={o.id} o={o} />)}
-          {data?.ordens.length === 0 && <p className="p-10 text-center text-muted-foreground text-sm">Nenhuma ordem ainda.</p>}
-        </div>
-      </CardContent></Card>
+      {!isLoading && (data?.ordens.length ?? 0) === 0 ? (
+        <EmptyState
+          icon={ClipboardList}
+          title="Registre sua primeira lavagem"
+          description="Cada ordem alimenta seu painel, métricas, fidelidade e o assistente — é o coração do LavaFlow."
+          highlight="Registrar todas as OS revela exatamente quanto você fatura por dia"
+          ctas={[{ label: "Criar primeira OS", onClick: () => setOpen(true) }]}
+        />
+      ) : (
+        <Card><CardContent className="p-0">
+          <div className="divide-y">
+            {data?.ordens.map((o: any) => <OrdemRow key={o.id} o={o} />)}
+          </div>
+        </CardContent></Card>
+      )}
     </>
   );
 }
