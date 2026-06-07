@@ -21,7 +21,16 @@ function Page() {
     <>
       <PageHeader title="Relatórios" subtitle="Últimos 90 dias." />
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
-      {data && (
+      {data && data.qtd === 0 && (
+        <EmptyState
+          icon={BarChart3}
+          title="Seus relatórios aparecem quando você operar"
+          description="Registre ordens de serviço para visualizar receita por serviço, por funcionário e tendências de crescimento."
+          highlight="Lava-rápidos que analisam relatórios mensais crescem 2× mais rápido"
+          ctas={[{ label: "Registrar primeira OS", to: "/ordens" }]}
+        />
+      )}
+      {data && data.qtd > 0 && (
         <>
           <div className="grid grid-cols-3 gap-3 mb-6">
             <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Faturamento</p><p className="font-display text-2xl font-bold">{brl(data.total)}</p></CardContent></Card>
