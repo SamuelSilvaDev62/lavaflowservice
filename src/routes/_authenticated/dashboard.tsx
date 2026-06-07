@@ -169,7 +169,7 @@ function Dashboard() {
       </div>
 
       {/* Oportunidades de Hoje */}
-      <Card className="mb-4 overflow-hidden">
+      <Card data-tour="dash-oportunidades" className="mb-4 overflow-hidden scroll-mt-20">
         <CardContent className="p-4 sm:p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
