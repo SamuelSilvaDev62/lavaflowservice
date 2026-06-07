@@ -173,11 +173,18 @@ export const getInsights = createServerFn({ method: "GET" })
     const porDia = Array(7).fill(0);
     const labels = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
     ordens.forEach((o) => { porDia[new Date(o.created_at).getDay()] += Number(o.valor ?? 0); });
-    const melhor = porDia.indexOf(Math.max(...porDia));
-    const pior = porDia.indexOf(Math.min(...porDia.filter((v) => v > 0)));
-    insights.push({ id: "best-day", tipo: "positivo", titulo: `Seu melhor dia é ${labels[melhor]}`, descricao: `Concentre promoções em ${labels[melhor]} para crescer ainda mais.` });
-    if (pior >= 0 && porDia[pior] < porDia[melhor] * 0.4) {
-      insights.push({ id: "weak-day", tipo: "alerta", titulo: `${labels[pior]} está fraco`, descricao: "Considere descontos ou pacotes para movimentar esse dia.", acao: "Criar campanha" });
+    const maxValor = Math.max(...porDia);
+    if (maxValor > 0) {
+      const melhor = porDia.indexOf(maxValor);
+      insights.push({ id: "best-day", tipo: "positivo", titulo: `Seu melhor dia é ${labels[melhor]}`, descricao: `Concentre promoções em ${labels[melhor]} para crescer ainda mais.` });
+      const positivos = porDia.filter((v) => v > 0);
+      if (positivos.length > 1) {
+        const minValor = Math.min(...positivos);
+        const pior = porDia.indexOf(minValor);
+        if (pior >= 0 && minValor < maxValor * 0.4) {
+          insights.push({ id: "weak-day", tipo: "alerta", titulo: `${labels[pior]} está fraco`, descricao: "Considere descontos ou pacotes para movimentar esse dia.", acao: "Criar campanha" });
+        }
+      }
     }
 
     // Ticket médio
