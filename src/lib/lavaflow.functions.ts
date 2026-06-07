@@ -60,9 +60,39 @@ export const getDashboardMetrics = createServerFn({ method: "GET" })
       serie.push({ dia: d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" }), valor: total });
     }
 
+    // Novos clientes no mês
+    const novosClientesMes = (clientes ?? []).filter((c) => c.created_at >= startOfMonth).length;
+
+    // Receita recuperável = clientes inativos (>30d) × ticket médio estimado
+    const ticketEstimado = ticketMedio || 50;
+    const receitaRecuperavel = inativos * ticketEstimado;
+
+    // Score de saúde do negócio (0-100)
+    const sRetencao = retencao * 40;
+    const sCrescimento = Math.max(0, Math.min(30, (crescimento + 0.1) * 150));
+    const sMrr = mrr > 0 ? 15 : 0;
+    const sTicket = ticketMedio >= 40 ? 15 : (ticketMedio / 40) * 15;
+    const scoreSaude = Math.round(Math.max(0, Math.min(100, sRetencao + sCrescimento + sMrr + sTicket)));
+
+    // Resumo do Assistente — 1 frase de impacto
+    const fmtBrl = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+    let resumoAssistente = "Cadastre clientes e ordens para receber recomendações inteligentes.";
+    if (lavagensMes > 0) {
+      if (receitaRecuperavel > 0 && inativos >= 3) {
+        resumoAssistente = `Você tem ${inativos} clientes inativos — recuperar metade vale ${fmtBrl(receitaRecuperavel * 0.5)} esse mês.`;
+      } else if (crescimento < 0) {
+        resumoAssistente = `Seu faturamento caiu ${Math.abs(crescimento * 100).toFixed(0)}% vs mês passado. Veja oportunidades para reagir.`;
+      } else if (mrr === 0 && totalClientes >= 5) {
+        resumoAssistente = `Você ainda não tem receita recorrente. Criar 1 plano de assinatura pode transformar seu mês.`;
+      } else {
+        resumoAssistente = `Tudo no rumo certo — faturamento ${crescimento >= 0 ? "subiu" : "caiu"} ${Math.abs(crescimento * 100).toFixed(0)}% e você tem ${assinantes} assinantes ativos.`;
+      }
+    }
+
     return {
       faturamentoMes, faturamentoLast, crescimento, mrr, assinantes,
       lavagensMes, ticketMedio, retencao, totalClientes, inativos,
+      novosClientesMes, receitaRecuperavel, scoreSaude, resumoAssistente,
       porDia, serie,
     };
   });
