@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/app-layout";
@@ -54,7 +54,7 @@ function FilaPage() {
             <CardContent className="p-6 text-center">
               <p className="font-display font-semibold">Fila vazia 🧼</p>
               <p className="text-sm text-muted-foreground mt-1">Nenhum carro em atendimento agora. Cada nova OS aparece aqui automaticamente.</p>
-              <Button asChild size="sm" className="mt-3"><a href="/ordens">Criar nova OS</a></Button>
+              <Button asChild size="sm" className="mt-3"><Link to="/ordens">Criar nova OS</Link></Button>
             </CardContent>
           </Card>
         </div>
