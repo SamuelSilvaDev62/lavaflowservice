@@ -126,8 +126,8 @@ function Dashboard() {
       </Card>
 
       {/* Score + KPIs de receita — destaque máximo */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-        <Card className={`border-${scoreColor}/30`}>
+      <div data-tour="dash-kpis" className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3 scroll-mt-20">
+        <Card data-tour="dash-score" className={`border-${scoreColor}/30`}>
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-center gap-3">
               <ScoreRing score={m.scoreSaude} />
