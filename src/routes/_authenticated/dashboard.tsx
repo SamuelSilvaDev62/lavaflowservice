@@ -100,7 +100,7 @@ function Dashboard() {
       <SetupChecklist />
 
       {/* Card do Assistente — destaque no topo */}
-      <Card className="mb-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
+      <Card data-tour="dash-assistente" className="mb-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent scroll-mt-20">
         <CardContent className="p-4 sm:p-5">
           <div className="flex items-start gap-3 sm:gap-4">
             <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary text-primary-foreground grid place-content-center shrink-0">
