@@ -11,7 +11,7 @@ import { WelcomeModal } from "@/components/welcome-modal";
 import { GuidedTour } from "@/components/guided-tour";
 
 const groups: Array<{ label: string; items: Array<{ to: string; label: string; icon: any; tour?: string }> }> = [
-  { label: "Crescimento", items: [
+  { label: "Visão", items: [
     { to: "/dashboard", label: "Painel Executivo", icon: LayoutDashboard, tour: "dashboard" },
     { to: "/oportunidades", label: "Oportunidades", icon: Sparkles, tour: "oportunidades" },
     { to: "/assistente", label: "Assistente LavaFlow", icon: Bot, tour: "assistente" },
