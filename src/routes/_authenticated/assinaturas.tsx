@@ -14,6 +14,7 @@ import { getAssinaturas, upsertPlano } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { Plus, Repeat, Users, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/empty-state";
 
 export const Route = createFileRoute("/_authenticated/assinaturas")({
   component: Page,
@@ -63,22 +64,34 @@ function Page() {
 
       {isLoading && <div className="h-64 rounded-xl bg-muted animate-pulse" />}
 
-      <h3 className="font-display font-semibold mb-3">Planos</h3>
-      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
-        {data?.planos.map((p: any) => (
-          <Card key={p.id} className="overflow-hidden">
-            <CardContent className="p-5">
-              <div className="flex items-start justify-between mb-2">
-                <h4 className="font-display font-bold">{p.nome}</h4>
-                {p.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Pausado</Badge>}
-              </div>
-              <p className="font-display text-3xl font-bold text-primary">{brl(p.valor_mensal)}<span className="text-xs text-muted-foreground">/mês</span></p>
-              <p className="text-sm text-muted-foreground mt-1">{p.quantidade_lavagens} lavagens/mês</p>
-              <ul className="mt-3 space-y-1 text-sm">{(p.beneficios ?? []).map((b: string, i: number) => <li key={i}>· {b}</li>)}</ul>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {!isLoading && (data?.planos.length ?? 0) === 0 ? (
+        <EmptyState
+          icon={Repeat}
+          title="Crie seu primeiro plano de assinatura"
+          description="Assinaturas garantem receita previsível todo mês — sem depender só do movimento do dia."
+          highlight="1 plano de R$ 99/mês × 30 assinantes = R$ 2.970 fixos por mês"
+          ctas={[{ label: "Criar primeiro plano", onClick: () => setOpen(true) }]}
+        />
+      ) : (
+        <>
+          <h3 className="font-display font-semibold mb-3">Planos</h3>
+          <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-3 mb-8">
+            {data?.planos.map((p: any) => (
+              <Card key={p.id} className="overflow-hidden">
+                <CardContent className="p-5">
+                  <div className="flex items-start justify-between mb-2">
+                    <h4 className="font-display font-bold">{p.nome}</h4>
+                    {p.ativo ? <Badge>Ativo</Badge> : <Badge variant="outline">Pausado</Badge>}
+                  </div>
+                  <p className="font-display text-3xl font-bold text-primary">{brl(p.valor_mensal)}<span className="text-xs text-muted-foreground">/mês</span></p>
+                  <p className="text-sm text-muted-foreground mt-1">{p.quantidade_lavagens} lavagens/mês</p>
+                  <ul className="mt-3 space-y-1 text-sm">{(p.beneficios ?? []).map((b: string, i: number) => <li key={i}>· {b}</li>)}</ul>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        </>
+      )}
 
       <h3 className="font-display font-semibold mb-3">Assinantes ativos</h3>
       <Card><CardContent className="p-0"><div className="divide-y">

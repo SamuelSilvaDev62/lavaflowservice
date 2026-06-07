@@ -43,10 +43,22 @@ function FilaPage() {
     mut.mutate({ id, status });
   }
 
+  const totalFila = data?.ordens.length ?? 0;
   return (
     <>
       <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa." />
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
+      {!isLoading && totalFila === 0 && (
+        <div className="mb-4">
+          <Card className="border-dashed">
+            <CardContent className="p-6 text-center">
+              <p className="font-display font-semibold">Fila vazia 🧼</p>
+              <p className="text-sm text-muted-foreground mt-1">Nenhum carro em atendimento agora. Cada nova OS aparece aqui automaticamente.</p>
+              <Button asChild size="sm" className="mt-3"><a href="/ordens">Criar nova OS</a></Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
           {columns.map((c) => {

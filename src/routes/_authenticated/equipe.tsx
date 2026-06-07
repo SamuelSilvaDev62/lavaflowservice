@@ -11,8 +11,9 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Badge } from "@/components/ui/badge";
 import { listFuncionarios, upsertFuncionario } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
-import { Plus, Trophy } from "lucide-react";
+import { Plus, Trophy, UsersRound } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/empty-state";
 
 export const Route = createFileRoute("/_authenticated/equipe")({
   component: Page,
@@ -52,24 +53,33 @@ function Page() {
         }
       />
       {isLoading && <div className="h-64 rounded-xl bg-muted animate-pulse" />}
-      <div className="space-y-2">
-        {sorted.map((f, i) => (
-          <Card key={f.id}><CardContent className="p-4 flex items-center gap-4">
-            <div className={`h-10 w-10 rounded-lg grid place-content-center font-display font-bold ${i === 0 ? "bg-warning/20 text-warning-foreground" : "bg-muted text-muted-foreground"}`}>
-              {i === 0 ? <Trophy className="h-5 w-5" /> : `#${i + 1}`}
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-medium">{f.nome} {!f.ativo && <Badge variant="outline" className="ml-2">Inativo</Badge>}</p>
-              <p className="text-xs text-muted-foreground">{f.cargo ?? "—"}</p>
-            </div>
-            <div className="text-right">
-              <p className="font-display font-bold">{brl(f.receita_mes)}</p>
-              <p className="text-xs text-muted-foreground">{f.lavagens_mes} lavagens (30d)</p>
-            </div>
-          </CardContent></Card>
-        ))}
-        {sorted.length === 0 && <p className="text-center text-muted-foreground text-sm py-10">Cadastre sua equipe para começar.</p>}
-      </div>
+      {!isLoading && sorted.length === 0 ? (
+        <EmptyState
+          icon={UsersRound}
+          title="Cadastre sua equipe"
+          description="Acompanhe quem traz mais receita, quantas lavagens cada funcionário entrega e quem precisa de apoio."
+          highlight="Equipes monitoradas produzem em média 20% mais"
+          ctas={[{ label: "Adicionar funcionário", onClick: () => setOpen(true) }]}
+        />
+      ) : (
+        <div className="space-y-2">
+          {sorted.map((f, i) => (
+            <Card key={f.id}><CardContent className="p-4 flex items-center gap-4">
+              <div className={`h-10 w-10 rounded-lg grid place-content-center font-display font-bold ${i === 0 ? "bg-warning/20 text-warning-foreground" : "bg-muted text-muted-foreground"}`}>
+                {i === 0 ? <Trophy className="h-5 w-5" /> : `#${i + 1}`}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium">{f.nome} {!f.ativo && <Badge variant="outline" className="ml-2">Inativo</Badge>}</p>
+                <p className="text-xs text-muted-foreground">{f.cargo ?? "—"}</p>
+              </div>
+              <div className="text-right">
+                <p className="font-display font-bold">{brl(f.receita_mes)}</p>
+                <p className="text-xs text-muted-foreground">{f.lavagens_mes} lavagens (30d)</p>
+              </div>
+            </CardContent></Card>
+          ))}
+        </div>
+      )}
     </>
   );
 }
