@@ -10,8 +10,9 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { listClientes, createCliente } from "@/lib/lavaflow.functions";
 import { brl, dateBr, daysBetween } from "@/lib/format";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Users } from "lucide-react";
 import { toast } from "sonner";
+import { EmptyState } from "@/components/empty-state";
 
 export const Route = createFileRoute("/_authenticated/clientes/")({
   component: Page,
@@ -60,24 +61,36 @@ function Page() {
 
       {isLoading && <div className="h-64 rounded-xl bg-muted animate-pulse" />}
 
-      <Card><CardContent className="p-0"><div className="divide-y">
-        {filtered.map((c) => {
-          const dias = c.ultima_visita ? daysBetween(c.ultima_visita) : null;
-          return (
-            <Link key={c.id} to="/clientes/$id" params={{ id: c.id }} className="p-4 flex items-center justify-between gap-3 hover:bg-accent/40 transition-colors">
-              <div className="min-w-0">
-                <p className="font-medium truncate">{c.nome}</p>
-                <p className="text-xs text-muted-foreground">{c.telefone ?? "sem telefone"} · {c.visitas} visitas · {brl(c.total_gasto)}</p>
-              </div>
-              <div className="text-right shrink-0">
-                <p className="text-xs text-muted-foreground">{dias == null ? "Nunca" : `${dias}d atrás`}</p>
-                <p className="text-xs font-mono text-primary">{c.pontos_saldo} pts</p>
-              </div>
-            </Link>
-          );
-        })}
-        {filtered.length === 0 && <p className="p-10 text-center text-muted-foreground text-sm">Nenhum cliente.</p>}
-      </div></CardContent></Card>
+      {!isLoading && (data?.clientes.length ?? 0) === 0 ? (
+        <EmptyState
+          icon={Users}
+          title="Sua base de clientes começa aqui"
+          description="Cada cliente cadastrado vira histórico, fidelidade e oportunidade de receita recorrente."
+          highlight="Lava-rápidos com base ativa faturam até 3× mais com retorno"
+          ctas={[
+            { label: "Cadastrar primeiro cliente", onClick: () => setOpen(true) },
+          ]}
+        />
+      ) : (
+        <Card><CardContent className="p-0"><div className="divide-y">
+          {filtered.map((c) => {
+            const dias = c.ultima_visita ? daysBetween(c.ultima_visita) : null;
+            return (
+              <Link key={c.id} to="/clientes/$id" params={{ id: c.id }} className="p-4 flex items-center justify-between gap-3 hover:bg-accent/40 transition-colors">
+                <div className="min-w-0">
+                  <p className="font-medium truncate">{c.nome}</p>
+                  <p className="text-xs text-muted-foreground">{c.telefone ?? "sem telefone"} · {c.visitas} visitas · {brl(c.total_gasto)}</p>
+                </div>
+                <div className="text-right shrink-0">
+                  <p className="text-xs text-muted-foreground">{dias == null ? "Nunca" : `${dias}d atrás`}</p>
+                  <p className="text-xs font-mono text-primary">{c.pontos_saldo} pts</p>
+                </div>
+              </Link>
+            );
+          })}
+          {filtered.length === 0 && <p className="p-10 text-center text-muted-foreground text-sm">Nenhum cliente encontrado.</p>}
+        </div></CardContent></Card>
+      )}
     </>
   );
 }
