@@ -70,15 +70,23 @@ function Page() {
                 </DialogContent>
               </Dialog>
             </div>
-            <div className="space-y-2">
-              {data?.recompensas.map((r: any) => (
-                <div key={r.id} className="flex items-center justify-between p-3 bg-muted rounded-md">
-                  <span className="font-medium">{r.nome}</span>
-                  <span className="text-sm font-mono text-primary">{r.custo_pontos} pts</span>
-                </div>
-              ))}
-              {data?.recompensas.length === 0 && <p className="text-sm text-muted-foreground">Crie recompensas para engajar.</p>}
-            </div>
+            {data?.recompensas.length === 0 ? (
+              <div className="text-center py-6 px-2 rounded-lg border-dashed border-2 border-muted">
+                <Award className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
+                <p className="text-sm font-medium">Nenhuma recompensa ativa</p>
+                <p className="text-xs text-muted-foreground mt-1 mb-3">Dê motivos para o cliente voltar.</p>
+                <Button size="sm" onClick={() => setOpen(true)}><Plus className="h-3 w-3 mr-1" />Criar primeira recompensa</Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                {data?.recompensas.map((r: any) => (
+                  <div key={r.id} className="flex items-center justify-between p-3 bg-muted rounded-md">
+                    <span className="font-medium">{r.nome}</span>
+                    <span className="text-sm font-mono text-primary">{r.custo_pontos} pts</span>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
 

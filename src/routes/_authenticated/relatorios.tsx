@@ -6,6 +6,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { getRelatorios } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from "recharts";
+import { EmptyState } from "@/components/empty-state";
+import { BarChart3 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
   component: Page,
