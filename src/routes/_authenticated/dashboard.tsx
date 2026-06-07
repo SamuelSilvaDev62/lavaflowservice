@@ -97,7 +97,9 @@ function Dashboard() {
     <>
       <PageHeader title="Painel Executivo" subtitle="Seu consultor de crescimento em tempo real." />
 
-      <SetupChecklist />
+      <div data-tour="dash-checklist" className="scroll-mt-20">
+        <SetupChecklist />
+      </div>
 
       {/* Card do Assistente — destaque no topo */}
       <Card data-tour="dash-assistente" className="mb-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent scroll-mt-20">
