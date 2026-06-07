@@ -97,10 +97,12 @@ function Dashboard() {
     <>
       <PageHeader title="Painel Executivo" subtitle="Seu consultor de crescimento em tempo real." />
 
-      <SetupChecklist />
+      <div data-tour="dash-checklist" className="scroll-mt-20">
+        <SetupChecklist />
+      </div>
 
       {/* Card do Assistente — destaque no topo */}
-      <Card className="mb-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent">
+      <Card data-tour="dash-assistente" className="mb-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent scroll-mt-20">
         <CardContent className="p-4 sm:p-5">
           <div className="flex items-start gap-3 sm:gap-4">
             <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary text-primary-foreground grid place-content-center shrink-0">
@@ -126,8 +128,8 @@ function Dashboard() {
       </Card>
 
       {/* Score + KPIs de receita — destaque máximo */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3">
-        <Card className={`border-${scoreColor}/30`}>
+      <div data-tour="dash-kpis" className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3 scroll-mt-20">
+        <Card data-tour="dash-score" className={`border-${scoreColor}/30`}>
           <CardContent className="p-4 sm:p-5">
             <div className="flex items-center gap-3">
               <ScoreRing score={m.scoreSaude} />
@@ -169,7 +171,7 @@ function Dashboard() {
       </div>
 
       {/* Oportunidades de Hoje */}
-      <Card className="mb-4 overflow-hidden">
+      <Card data-tour="dash-oportunidades" className="mb-4 overflow-hidden scroll-mt-20">
         <CardContent className="p-4 sm:p-5">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
