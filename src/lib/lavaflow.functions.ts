@@ -227,7 +227,7 @@ export const getFila = createServerFn({ method: "GET" })
 
 export const updateOrdemStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { id: string; status: OsStatus }) => d)
+  .inputValidator((d) => z.object({ id: z.string().uuid(), status: z.enum(["aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"]) }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const patch: any = { status: data.status };
@@ -237,6 +237,39 @@ export const updateOrdemStatus = createServerFn({ method: "POST" })
     const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", userId);
     if (error) throw error;
     return { ok: true };
+  });
+
+export const logWhatsappEnvio = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    cliente_id: z.string().uuid(),
+    descricao: z.string().min(1).max(500),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error } = await supabase.from("interacoes_clientes").insert({
+      owner_id: userId,
+      cliente_id: data.cliente_id,
+      tipo: "whatsapp",
+      descricao: data.descricao,
+    });
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const getWhatsappLogs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { data, error } = await supabase
+      .from("interacoes_clientes")
+      .select("id, descricao, created_at, cliente_id, clientes:cliente_id(nome)")
+      .eq("owner_id", userId)
+      .eq("tipo", "whatsapp")
+      .order("created_at", { ascending: false })
+      .limit(20);
+    if (error) throw error;
+    return { logs: data ?? [] };
   });
 
 // ============ ORDENS ============
