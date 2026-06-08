@@ -19,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/fila")({
 const columns: Array<{ key: OsStatus; label: string; color: string }> = [
   { key: "aguardando", label: "Aguardando", color: "bg-muted" },
   { key: "em_lavagem", label: "Em lavagem", color: "bg-primary/10" },
+  { key: "finalizacao", label: "Finalização", color: "bg-warning/10" },
   { key: "pronto", label: "Pronto", color: "bg-success/10" },
   { key: "entregue", label: "Entregue", color: "bg-accent" },
 ];
