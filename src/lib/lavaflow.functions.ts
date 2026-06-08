@@ -116,6 +116,10 @@ export const getOportunidades = createServerFn({ method: "GET" })
       countByCliente.set(o.cliente_id, (countByCliente.get(o.cliente_id) ?? 0) + 1);
     });
 
+    // Ticket médio real (últimos 90d). Fallback razoável quando ainda não há dados.
+    const totalReceita = (ordens ?? []).reduce((s, o) => s + Number(o.valor ?? 0), 0);
+    const ticketMedio = (ordens && ordens.length > 0) ? totalReceita / ordens.length : 50;
+
     const oportunidades: Array<{
       id: string; tipo: string; prioridade: number; titulo: string; descricao: string;
       cliente_id: string; cliente_nome: string; telefone: string | null; receitaPotencial: number;
@@ -125,7 +129,6 @@ export const getOportunidades = createServerFn({ method: "GET" })
       const last = lastByCliente.get(c.id);
       if (!last) return;
       const days = Math.floor((Date.now() - new Date(last).getTime()) / 86_400_000);
-      const ticketMedio = 50;
       if (days >= 90) {
         oportunidades.push({ id: `r90-${c.id}`, tipo: "reativacao_90", prioridade: 4, titulo: "Cliente sumiu há 90+ dias",
           descricao: `${c.nome} não retorna há ${days} dias. Enviar oferta agressiva.`, cliente_id: c.id, cliente_nome: c.nome, telefone: c.telefone, receitaPotencial: ticketMedio });
