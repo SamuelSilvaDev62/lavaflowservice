@@ -19,6 +19,7 @@ export const Route = createFileRoute("/_authenticated/fila")({
 const columns: Array<{ key: OsStatus; label: string; color: string }> = [
   { key: "aguardando", label: "Aguardando", color: "bg-muted" },
   { key: "em_lavagem", label: "Em lavagem", color: "bg-primary/10" },
+  { key: "finalizacao", label: "Finalização", color: "bg-warning/10" },
   { key: "pronto", label: "Pronto", color: "bg-success/10" },
   { key: "entregue", label: "Entregue", color: "bg-accent" },
 ];
@@ -60,7 +61,7 @@ function FilaPage() {
         </div>
       )}
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           {columns.map((c) => {
             const items = data?.ordens.filter((o) => o.status === c.key) ?? [];
             return <Column key={c.key} col={c} items={items} onAdvance={(id, s) => mut.mutate({ id, status: s })} />;

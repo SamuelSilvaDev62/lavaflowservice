@@ -38,14 +38,17 @@ function Page() {
     setSelected(next);
   }
 
-  function sendAll() {
-    const items = (data?.inativos ?? []).filter((c) => selected.has(c.id) && c.telefone);
-    items.forEach((c, i) => {
-      setTimeout(() => {
-        const url = waLink(c.telefone!, renderTemplate(template, { nome: c.nome.split(" ")[0] }));
-        window.open(url, "_blank");
-      }, i * 400);
-    });
+  const selecionadosComTel = (data?.inativos ?? []).filter((c) => selected.has(c.id) && c.telefone);
+  const proximo = selecionadosComTel[0];
+
+  function sendProximo() {
+    if (!proximo) return;
+    const url = waLink(proximo.telefone!, renderTemplate(template, { nome: proximo.nome.split(" ")[0] }));
+    window.open(url, "_blank", "noopener,noreferrer");
+    // remove do conjunto para avançar
+    const next = new Set(selected);
+    next.delete(proximo.id);
+    setSelected(next);
   }
 
   return (
@@ -70,10 +73,18 @@ function Page() {
         </TabsList>
       </Tabs>
 
-      <div className="flex items-center justify-between mb-3">
-        <p className="text-sm text-muted-foreground">{data?.inativos.length ?? 0} clientes · {selected.size} selecionados</p>
-        <Button size="sm" disabled={selected.size === 0} onClick={sendAll}><MessageCircle className="h-4 w-4 mr-1" /> Enviar para selecionados</Button>
+      <div className="flex items-center justify-between mb-3 gap-2 flex-wrap">
+        <p className="text-sm text-muted-foreground">{data?.inativos.length ?? 0} clientes · {selecionadosComTel.length} na fila</p>
+        <Button size="sm" disabled={!proximo} onClick={sendProximo}>
+          <MessageCircle className="h-4 w-4 mr-1" />
+          {proximo ? `Enviar para ${proximo.nome.split(" ")[0]}` : "Selecione clientes"}
+        </Button>
       </div>
+      {selecionadosComTel.length > 1 && (
+        <p className="text-xs text-muted-foreground -mt-1 mb-3">
+          💡 O WhatsApp bloqueia envio em massa automático. Clique uma vez para cada cliente — leva poucos segundos.
+        </p>
+      )}
 
       {isLoading && <div className="h-64 rounded-xl bg-muted animate-pulse" />}
 
