@@ -61,7 +61,7 @@ function FilaPage() {
         </div>
       )}
       <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
           {columns.map((c) => {
             const items = data?.ordens.filter((o) => o.status === c.key) ?? [];
             return <Column key={c.key} col={c} items={items} onAdvance={(id, s) => mut.mutate({ id, status: s })} />;
