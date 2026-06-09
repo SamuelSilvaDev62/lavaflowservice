@@ -15,6 +15,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedOrdensRouteImport } from './routes/_authenticated/ordens'
 import { Route as AuthenticatedOportunidadesRouteImport } from './routes/_authenticated/oportunidades'
+import { Route as AuthenticatedMeuTrabalhoRouteImport } from './routes/_authenticated/meu-trabalho'
 import { Route as AuthenticatedFilaRouteImport } from './routes/_authenticated/fila'
 import { Route as AuthenticatedFidelidadeRouteImport } from './routes/_authenticated/fidelidade'
 import { Route as AuthenticatedEquipeRouteImport } from './routes/_authenticated/equipe'
@@ -54,6 +55,12 @@ const AuthenticatedOportunidadesRoute =
   AuthenticatedOportunidadesRouteImport.update({
     id: '/oportunidades',
     path: '/oportunidades',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const AuthenticatedMeuTrabalhoRoute =
+  AuthenticatedMeuTrabalhoRouteImport.update({
+    id: '/meu-trabalho',
+    path: '/meu-trabalho',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
 const AuthenticatedFilaRoute = AuthenticatedFilaRouteImport.update({
@@ -121,6 +128,7 @@ export interface FileRoutesByFullPath {
   '/equipe': typeof AuthenticatedEquipeRoute
   '/fidelidade': typeof AuthenticatedFidelidadeRoute
   '/fila': typeof AuthenticatedFilaRoute
+  '/meu-trabalho': typeof AuthenticatedMeuTrabalhoRoute
   '/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/ordens': typeof AuthenticatedOrdensRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -138,6 +146,7 @@ export interface FileRoutesByTo {
   '/equipe': typeof AuthenticatedEquipeRoute
   '/fidelidade': typeof AuthenticatedFidelidadeRoute
   '/fila': typeof AuthenticatedFilaRoute
+  '/meu-trabalho': typeof AuthenticatedMeuTrabalhoRoute
   '/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/ordens': typeof AuthenticatedOrdensRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -157,6 +166,7 @@ export interface FileRoutesById {
   '/_authenticated/equipe': typeof AuthenticatedEquipeRoute
   '/_authenticated/fidelidade': typeof AuthenticatedFidelidadeRoute
   '/_authenticated/fila': typeof AuthenticatedFilaRoute
+  '/_authenticated/meu-trabalho': typeof AuthenticatedMeuTrabalhoRoute
   '/_authenticated/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/_authenticated/ordens': typeof AuthenticatedOrdensRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
@@ -176,6 +186,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/fidelidade'
     | '/fila'
+    | '/meu-trabalho'
     | '/oportunidades'
     | '/ordens'
     | '/relatorios'
@@ -193,6 +204,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/fidelidade'
     | '/fila'
+    | '/meu-trabalho'
     | '/oportunidades'
     | '/ordens'
     | '/relatorios'
@@ -211,6 +223,7 @@ export interface FileRouteTypes {
     | '/_authenticated/equipe'
     | '/_authenticated/fidelidade'
     | '/_authenticated/fila'
+    | '/_authenticated/meu-trabalho'
     | '/_authenticated/oportunidades'
     | '/_authenticated/ordens'
     | '/_authenticated/relatorios'
@@ -267,6 +280,13 @@ declare module '@tanstack/react-router' {
       path: '/oportunidades'
       fullPath: '/oportunidades'
       preLoaderRoute: typeof AuthenticatedOportunidadesRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/meu-trabalho': {
+      id: '/_authenticated/meu-trabalho'
+      path: '/meu-trabalho'
+      fullPath: '/meu-trabalho'
+      preLoaderRoute: typeof AuthenticatedMeuTrabalhoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/fila': {
@@ -350,6 +370,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedEquipeRoute: typeof AuthenticatedEquipeRoute
   AuthenticatedFidelidadeRoute: typeof AuthenticatedFidelidadeRoute
   AuthenticatedFilaRoute: typeof AuthenticatedFilaRoute
+  AuthenticatedMeuTrabalhoRoute: typeof AuthenticatedMeuTrabalhoRoute
   AuthenticatedOportunidadesRoute: typeof AuthenticatedOportunidadesRoute
   AuthenticatedOrdensRoute: typeof AuthenticatedOrdensRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
@@ -366,6 +387,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedEquipeRoute: AuthenticatedEquipeRoute,
   AuthenticatedFidelidadeRoute: AuthenticatedFidelidadeRoute,
   AuthenticatedFilaRoute: AuthenticatedFilaRoute,
+  AuthenticatedMeuTrabalhoRoute: AuthenticatedMeuTrabalhoRoute,
   AuthenticatedOportunidadesRoute: AuthenticatedOportunidadesRoute,
   AuthenticatedOrdensRoute: AuthenticatedOrdensRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
@@ -385,13 +407,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

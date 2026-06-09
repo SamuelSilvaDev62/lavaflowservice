@@ -2,7 +2,7 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Sparkles, Bot, ListChecks, ClipboardList, Users, UserMinus,
-  CreditCard, Award, UsersRound, BarChart3, Settings, Menu, X, LogOut, Car,
+  CreditCard, Award, UsersRound, BarChart3, Settings, Menu, X, LogOut, Car, Briefcase,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { WelcomeModal } from "@/components/welcome-modal";
 import { GuidedTour } from "@/components/guided-tour";
 
-const groups: Array<{ label: string; items: Array<{ to: string; label: string; icon: any; tour?: string }> }> = [
+const ownerGroups: Array<{ label: string; items: Array<{ to: string; label: string; icon: any; tour?: string }> }> = [
   { label: "Visão", items: [
     { to: "/dashboard", label: "Painel Executivo", icon: LayoutDashboard, tour: "dashboard" },
     { to: "/oportunidades", label: "Oportunidades", icon: Sparkles, tour: "oportunidades" },
@@ -33,23 +33,42 @@ const groups: Array<{ label: string; items: Array<{ to: string; label: string; i
   ]},
 ];
 
+const colabGroups = [
+  { label: "Operação", items: [
+    { to: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase },
+  ]},
+];
+
 export function AppLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [isColab, setIsColab] = useState<boolean | null>(null);
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => setOpen(false), [pathname]);
+
+  useEffect(() => {
+    (async () => {
+      const { data: u } = await supabase.auth.getUser();
+      if (!u.user) return;
+      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
+      const colab = (roles ?? []).some((r: any) => r.role === "colaborador") &&
+                    !(roles ?? []).some((r: any) => r.role === "owner");
+      setIsColab(colab);
+    })();
+  }, []);
 
   async function signOut() {
     await supabase.auth.signOut();
     router.navigate({ to: "/auth", replace: true });
   }
 
+  const groups = isColab ? colabGroups : ownerGroups;
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Mobile top bar */}
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-background/80 backdrop-blur px-4 h-14">
-        <Link to="/dashboard" className="font-display text-lg font-bold tracking-tight">
+        <Link to={isColab ? "/meu-trabalho" : "/dashboard"} className="font-display text-lg font-bold tracking-tight">
           Lava<span className="text-primary">Flow</span>
         </Link>
         <button onClick={() => setOpen(!open)} className="p-2 rounded-md hover:bg-accent" aria-label="Menu">
@@ -57,7 +76,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </button>
       </header>
 
-      {/* Sidebar */}
       <aside className={cn(
         "fixed inset-y-0 left-0 z-40 w-64 border-r bg-sidebar text-sidebar-foreground transform transition-transform lg:translate-x-0",
         open ? "translate-x-0" : "-translate-x-full",
@@ -66,7 +84,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 grid place-content-center">
             <Car className="h-4 w-4 text-primary-foreground" />
           </div>
-          <Link to="/dashboard" className="font-display text-lg font-bold tracking-tight">
+          <Link to={isColab ? "/meu-trabalho" : "/dashboard"} className="font-display text-lg font-bold tracking-tight">
             Lava<span className="text-primary">Flow</span>
           </Link>
         </div>
@@ -75,7 +93,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <div key={g.label}>
               <p className="px-3 pb-2 text-[10px] font-semibold tracking-widest uppercase text-muted-foreground">{g.label}</p>
               <ul className="space-y-0.5">
-                {g.items.map((it) => {
+                {g.items.map((it: any) => {
                   const Icon = it.icon;
                   const active = pathname === it.to || (it.to !== "/dashboard" && pathname.startsWith(it.to));
                   return (
@@ -107,8 +125,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="px-4 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto">{children}</div>
       </main>
 
-      <WelcomeModal />
-      <GuidedTour />
+      {!isColab && <WelcomeModal />}
+      {!isColab && <GuidedTour />}
     </div>
   );
 }

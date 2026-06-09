@@ -137,6 +137,51 @@ export type Database = {
         }
         Relationships: []
       }
+      comissoes: {
+        Row: {
+          created_at: string
+          funcionario_id: string
+          id: string
+          ordem_id: string
+          owner_id: string
+          tipo: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          funcionario_id: string
+          id?: string
+          ordem_id: string
+          owner_id: string
+          tipo: string
+          valor?: number
+        }
+        Update: {
+          created_at?: string
+          funcionario_id?: string
+          id?: string
+          ordem_id?: string
+          owner_id?: string
+          tipo?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comissoes_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissoes_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: true
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       empresa: {
         Row: {
           created_at: string
@@ -221,7 +266,11 @@ export type Database = {
       funcionarios: {
         Row: {
           ativo: boolean
+          auth_user_id: string | null
           cargo: string | null
+          comissao_tipo: string
+          comissao_valor: number
+          email: string | null
           id: string
           nome: string
           owner_id: string
@@ -229,7 +278,11 @@ export type Database = {
         }
         Insert: {
           ativo?: boolean
+          auth_user_id?: string | null
           cargo?: string | null
+          comissao_tipo?: string
+          comissao_valor?: number
+          email?: string | null
           id?: string
           nome: string
           owner_id: string
@@ -237,7 +290,11 @@ export type Database = {
         }
         Update: {
           ativo?: boolean
+          auth_user_id?: string | null
           cargo?: string | null
+          comissao_tipo?: string
+          comissao_valor?: number
+          email?: string | null
           id?: string
           nome?: string
           owner_id?: string
@@ -483,6 +540,30 @@ export type Database = {
         }
         Relationships: []
       }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
       veiculos: {
         Row: {
           cliente_id: string
@@ -523,9 +604,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_owner_id: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      vincular_colaborador: {
+        Args: { _email: string; _funcionario_id: string }
+        Returns: undefined
+      }
     }
     Enums: {
+      app_role: "owner" | "colaborador"
       assinatura_status: "ativa" | "pausada" | "cancelada"
       interacao_tipo:
         | "whatsapp"
@@ -668,6 +761,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: ["owner", "colaborador"],
       assinatura_status: ["ativa", "pausada", "cancelada"],
       interacao_tipo: [
         "whatsapp",

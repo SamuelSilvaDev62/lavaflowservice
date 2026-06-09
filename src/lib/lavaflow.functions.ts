@@ -588,3 +588,193 @@ export const getRelatorios = createServerFn({ method: "GET" })
       porFuncionario: Array.from(porFunc, ([nome, valor]) => ({ nome, valor })).sort((a, b) => b.valor - a.valor),
     };
   });
+
+// ============ COLABORADORES / MEU TRABALHO ============
+async function getOwnerScope(supabase: any, userId: string) {
+  const { data } = await supabase.from("user_roles").select("owner_id, role").eq("user_id", userId);
+  const colab = (data ?? []).find((r: any) => r.role === "colaborador");
+  const isOwner = (data ?? []).some((r: any) => r.role === "owner");
+  return { ownerId: colab?.owner_id ?? userId, role: colab && !isOwner ? "colaborador" : "owner" as "owner" | "colaborador" };
+}
+
+export const getMyRole = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const scope = await getOwnerScope(context.supabase, context.userId);
+    return scope;
+  });
+
+export const vincularColaborador = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    funcionario_id: z.string().uuid(),
+    email: z.string().email().max(160),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.rpc("vincular_colaborador", {
+      _funcionario_id: data.funcionario_id,
+      _email: data.email,
+    });
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
+export const upsertFuncionarioFull = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    id: z.string().uuid().optional(),
+    nome: z.string().min(1).max(80),
+    cargo: z.string().max(40).optional().nullable(),
+    telefone: z.string().max(20).optional().nullable(),
+    email: z.string().email().max(160).optional().nullable().or(z.literal("")),
+    comissao_tipo: z.enum(["fixo", "percentual"]).default("fixo"),
+    comissao_valor: z.number().min(0).max(10000).default(0),
+    ativo: z.boolean().default(true),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const row: any = { ...data, owner_id: context.userId };
+    if (row.email === "") row.email = null;
+    const { error } = data.id
+      ? await context.supabase.from("funcionarios").update(row).eq("id", data.id).eq("owner_id", context.userId)
+      : await context.supabase.from("funcionarios").insert(row);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const getMeuTrabalho = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const { data: meFunc } = await supabase
+      .from("funcionarios")
+      .select("*")
+      .eq("auth_user_id", userId)
+      .maybeSingle();
+
+    const startToday = new Date(); startToday.setHours(0,0,0,0);
+    const startWeek = new Date(); startWeek.setDate(startWeek.getDate() - 7);
+    const startMonth = new Date(); startMonth.setDate(1); startMonth.setHours(0,0,0,0);
+
+    const [{ data: ordens }, { data: comissoesMes }] = await Promise.all([
+      supabase
+        .from("ordens_servico")
+        .select(`id, status, valor, created_at, iniciado_em, finalizado_em, entregue_em, funcionario_id,
+                 clientes:cliente_id(nome, telefone), veiculos:veiculo_id(placa, modelo), servicos:servico_id(nome)`)
+        .eq("owner_id", ownerId)
+        .in("status", ["aguardando", "em_lavagem"])
+        .order("created_at", { ascending: true }),
+      meFunc?.id
+        ? supabase.from("comissoes").select("valor, created_at").eq("funcionario_id", meFunc.id).gte("created_at", startMonth.toISOString())
+        : Promise.resolve({ data: [] as any[] }),
+    ]);
+
+    // Métricas próprias
+    const { data: minhasOs } = meFunc?.id
+      ? await supabase
+          .from("ordens_servico")
+          .select("status, valor, iniciado_em, finalizado_em, entregue_em, created_at")
+          .eq("funcionario_id", meFunc.id)
+          .gte("created_at", startWeek.toISOString())
+      : { data: [] as any[] };
+
+    const hoje = (minhasOs ?? []).filter(o => o.entregue_em && new Date(o.entregue_em) >= startToday);
+    const semana = (minhasOs ?? []).filter(o => o.entregue_em);
+    const tempos = (minhasOs ?? [])
+      .filter(o => o.iniciado_em && o.finalizado_em)
+      .map(o => (new Date(o.finalizado_em!).getTime() - new Date(o.iniciado_em!).getTime()) / 60000);
+    const tempoMedio = tempos.length ? Math.round(tempos.reduce((s, t) => s + t, 0) / tempos.length) : 0;
+    const comissaoMes = (comissoesMes ?? []).reduce((s: number, c: any) => s + Number(c.valor ?? 0), 0);
+
+    return {
+      funcionario: meFunc,
+      cards: {
+        concluidasHoje: hoje.length,
+        tempoMedioMin: tempoMedio,
+        comissaoMes,
+        lavagensSemana: semana.length,
+      },
+      fila: ordens ?? [],
+    };
+  });
+
+export const iniciarOs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: meFunc } = await supabase.from("funcionarios").select("id").eq("auth_user_id", userId).maybeSingle();
+    const patch: any = { status: "em_lavagem", iniciado_em: new Date().toISOString() };
+    if (meFunc?.id) patch.funcionario_id = meFunc.id;
+    const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const finalizarOs = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase
+      .from("ordens_servico")
+      .update({ status: "pronto", finalizado_em: new Date().toISOString() })
+      .eq("id", data.id);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const getEquipeMetrics = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { periodo: "hoje" | "semana" | "mes" }) => d)
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const now = new Date();
+    const start = new Date();
+    if (data.periodo === "hoje") start.setHours(0, 0, 0, 0);
+    else if (data.periodo === "semana") start.setDate(now.getDate() - 7);
+    else { start.setDate(1); start.setHours(0, 0, 0, 0); }
+    const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+
+    const [{ data: ordens }, { data: func }, { data: comissoes }] = await Promise.all([
+      supabase.from("ordens_servico")
+        .select("id, valor, status, funcionario_id, iniciado_em, finalizado_em, entregue_em, created_at")
+        .eq("owner_id", userId)
+        .gte("created_at", start.toISOString()),
+      supabase.from("funcionarios").select("id, nome, ativo").eq("owner_id", userId),
+      supabase.from("comissoes").select("funcionario_id, valor, created_at").eq("owner_id", userId).gte("created_at", start.toISOString()),
+    ]);
+
+    const lavadosHoje = (ordens ?? []).filter(o => o.entregue_em && new Date(o.entregue_em) >= startToday).length;
+    const colabAtivosHoje = new Set(
+      (ordens ?? [])
+        .filter(o => o.iniciado_em && new Date(o.iniciado_em) >= startToday && o.funcionario_id)
+        .map(o => o.funcionario_id)
+    ).size;
+    const tempos = (ordens ?? [])
+      .filter(o => o.iniciado_em && o.finalizado_em)
+      .map(o => (new Date(o.finalizado_em!).getTime() - new Date(o.iniciado_em!).getTime()) / 60000);
+    const tempoMedio = tempos.length ? Math.round(tempos.reduce((s, t) => s + t, 0) / tempos.length) : 0;
+    const valorEquipe = (ordens ?? []).filter(o => o.status === "entregue").reduce((s, o) => s + Number(o.valor ?? 0), 0);
+
+    const byFunc = new Map<string, { lavagens: number; receita: number; comissao: number }>();
+    (func ?? []).forEach(f => byFunc.set(f.id, { lavagens: 0, receita: 0, comissao: 0 }));
+    (ordens ?? []).forEach(o => {
+      if (!o.funcionario_id || o.status !== "entregue") return;
+      const cur = byFunc.get(o.funcionario_id) ?? { lavagens: 0, receita: 0, comissao: 0 };
+      cur.lavagens += 1; cur.receita += Number(o.valor ?? 0);
+      byFunc.set(o.funcionario_id, cur);
+    });
+    (comissoes ?? []).forEach(c => {
+      const cur = byFunc.get(c.funcionario_id) ?? { lavagens: 0, receita: 0, comissao: 0 };
+      cur.comissao += Number(c.valor ?? 0);
+      byFunc.set(c.funcionario_id, cur);
+    });
+
+    const ranking = (func ?? []).map(f => ({ id: f.id, nome: f.nome, ...byFunc.get(f.id)! }))
+      .sort((a, b) => b.lavagens - a.lavagens);
+
+    return {
+      cards: { lavadosHoje, colabAtivosHoje, tempoMedio, valorEquipe },
+      ranking,
+    };
+  });

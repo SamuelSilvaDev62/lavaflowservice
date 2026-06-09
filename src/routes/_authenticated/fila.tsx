@@ -84,9 +84,25 @@ function FilaPage() {
   }
 
   const totalFila = data?.ordens.length ?? 0;
+  const ordensList = data?.ordens ?? [];
+  const naFila = ordensList.filter(o => o.status === "aguardando").length;
+  const emAndamento = ordensList.filter(o => o.status === "em_lavagem" || o.status === "finalizacao").length;
+  const prontos = ordensList.filter(o => o.status === "pronto").length;
+  const receitaProducao = ordensList
+    .filter(o => o.status === "em_lavagem" || o.status === "finalizacao" || o.status === "pronto")
+    .reduce((s, o) => s + Number(o.valor ?? 0), 0);
+
   return (
     <>
       <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', o WhatsApp dispara automaticamente." />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+        <QuickCard label="🚗 Na fila" value={String(naFila)} />
+        <QuickCard label="🔄 Em andamento" value={String(emAndamento)} />
+        <QuickCard label="✅ Prontos" value={String(prontos)} />
+        <QuickCard label="💰 Em produção" value={brl(receitaProducao)} />
+      </div>
+
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
       {!isLoading && totalFila === 0 && (
         <div className="mb-4">
@@ -148,6 +164,29 @@ function Column({ col, items, onAdvance, onReenviar }: { col: { key: OsStatus; l
   );
 }
 
+function QuickCard({ label, value }: { label: string; value: string }) {
+  return (
+    <Card>
+      <CardContent className="p-3">
+        <p className="text-xs text-muted-foreground">{label}</p>
+        <p className="font-display font-bold text-xl mt-1">{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function tempoNaEtapa(ordem: any): string {
+  const ref = ordem.status === "em_lavagem" ? ordem.iniciado_em
+    : ordem.status === "pronto" ? ordem.finalizado_em
+    : ordem.status === "entregue" ? ordem.entregue_em
+    : ordem.created_at;
+  if (!ref) return "—";
+  const mins = Math.floor((Date.now() - new Date(ref).getTime()) / 60000);
+  if (mins < 60) return `${mins} min`;
+  const h = Math.floor(mins / 60); const m = mins % 60;
+  return m ? `${h}h ${m}min` : `${h}h`;
+}
+
 function OrdemCard({ ordem, status, onAdvance, onReenviar }: { ordem: any; status: OsStatus; onAdvance: (id: string, s: OsStatus) => void; onReenviar: (o: any) => void }) {
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({ id: ordem.id });
   const style = transform ? { transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`, zIndex: 50 } : undefined;
@@ -163,8 +202,11 @@ function OrdemCard({ ordem, status, onAdvance, onReenviar }: { ordem: any; statu
         <span className="text-xs font-mono text-muted-foreground">{placa}</span>
       </div>
       <p className="text-xs text-muted-foreground">{ordem.servicos?.nome ?? "Serviço"} · {brl(ordem.valor)}</p>
-      <p className="text-[10px] text-muted-foreground mt-1">Entrada: {dateTimeBr(ordem.created_at)}</p>
-      {ordem.funcionarios?.nome && <p className="text-[10px] text-muted-foreground">👤 {ordem.funcionarios.nome}</p>}
+      <div className="flex items-center justify-between text-[10px] text-muted-foreground mt-1">
+        <span>Entrada: {dateTimeBr(ordem.created_at)}</span>
+        <span className="font-medium">⏱ {tempoNaEtapa(ordem)}</span>
+      </div>
+      {ordem.funcionarios?.nome && <p className="text-[10px] text-muted-foreground mt-0.5">👤 {ordem.funcionarios.nome}</p>}
 
       {status === "pronto" && (
         <div className="flex gap-1 mt-3" onPointerDown={(e) => e.stopPropagation()}>
