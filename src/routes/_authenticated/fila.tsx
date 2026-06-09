@@ -84,9 +84,25 @@ function FilaPage() {
   }
 
   const totalFila = data?.ordens.length ?? 0;
+  const ordensList = data?.ordens ?? [];
+  const naFila = ordensList.filter(o => o.status === "aguardando").length;
+  const emAndamento = ordensList.filter(o => o.status === "em_lavagem" || o.status === "finalizacao").length;
+  const prontos = ordensList.filter(o => o.status === "pronto").length;
+  const receitaProducao = ordensList
+    .filter(o => o.status === "em_lavagem" || o.status === "finalizacao" || o.status === "pronto")
+    .reduce((s, o) => s + Number(o.valor ?? 0), 0);
+
   return (
     <>
       <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', o WhatsApp dispara automaticamente." />
+
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+        <QuickCard label="🚗 Na fila" value={String(naFila)} />
+        <QuickCard label="🔄 Em andamento" value={String(emAndamento)} />
+        <QuickCard label="✅ Prontos" value={String(prontos)} />
+        <QuickCard label="💰 Em produção" value={brl(receitaProducao)} />
+      </div>
+
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
       {!isLoading && totalFila === 0 && (
         <div className="mb-4">
