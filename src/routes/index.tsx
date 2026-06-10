@@ -1,17 +1,26 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
-import { Car, TrendingUp, Sparkles, Users, MessageCircle, Award, BarChart3, Repeat } from "lucide-react";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import {
+  Car, TrendingUp, Sparkles, MessageCircle, Award, Repeat, Users,
+  Check, X, ArrowRight, Star, Zap, BarChart3, Trophy, Clock, DollarSign,
+  Instagram, Phone, ChevronRight, Bot, Smartphone,
+} from "lucide-react";
 
 export const Route = createFileRoute("/")({
   ssr: false,
   head: () => ({
     meta: [
-      { title: "LavaFlow — Aumente o faturamento do seu lava-rápido" },
-      { name: "description", content: "Plataforma de crescimento para lava-rápidos: recupere clientes, crie receita recorrente e tome decisões com dados." },
+      { title: "LavaFlow — O sistema que faz seu lava-rápido faturar mais" },
+      { name: "description", content: "Recupere clientes, automatize o WhatsApp, crie assinaturas e acompanhe sua equipe. A plataforma de crescimento dos lava-rápidos." },
       { property: "og:title", content: "LavaFlow — Aumente o faturamento do seu lava-rápido" },
-      { property: "og:description", content: "Recupere clientes, fidelize e crie receita recorrente." },
+      { property: "og:description", content: "Recupere clientes, automatize processos e crie receita recorrente com o LavaFlow." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
   component: Landing,
@@ -26,56 +35,638 @@ function Landing() {
   }, [navigate]);
 
   return (
-    <div className="min-h-screen bg-background">
-      <header className="border-b">
-        <div className="max-w-6xl mx-auto px-4 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 grid place-content-center">
-              <Car className="h-4 w-4 text-primary-foreground" />
-            </div>
-            <span className="font-display text-lg font-bold">Lava<span className="text-primary">Flow</span></span>
+    <div className="min-h-screen bg-background text-foreground">
+      <Nav />
+      <Hero />
+      <LogosStrip />
+      <Benefits />
+      <MockupShowcase />
+      <ProblemSolution />
+      <Assistant />
+      <TeamSection />
+      <Loyalty />
+      <Testimonials />
+      <Pricing />
+      <Faq />
+      <FinalCta />
+      <Footer />
+    </div>
+  );
+}
+
+/* ---------------- NAV ---------------- */
+function Nav() {
+  return (
+    <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/80 border-b">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <Link to="/" className="flex items-center gap-2">
+          <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/50 grid place-content-center shadow-lg shadow-primary/30">
+            <Car className="h-4 w-4 text-primary-foreground" />
           </div>
-          <Button asChild size="sm"><Link to="/auth">Entrar</Link></Button>
+          <span className="font-display text-lg font-bold tracking-tight">Lava<span className="text-primary">Flow</span></span>
+        </Link>
+        <nav className="hidden md:flex items-center gap-7 text-sm text-muted-foreground">
+          <a href="#beneficios" className="hover:text-foreground transition">Funcionalidades</a>
+          <a href="#planos" className="hover:text-foreground transition">Planos</a>
+          <a href="#faq" className="hover:text-foreground transition">FAQ</a>
+          <a href="#contato" className="hover:text-foreground transition">Contato</a>
+        </nav>
+        <div className="flex items-center gap-2">
+          <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex"><Link to="/auth">Entrar</Link></Button>
+          <Button asChild size="sm" className="shadow-sm"><a href="#planos">Começar grátis<ArrowRight className="h-3.5 w-3.5 ml-1" /></a></Button>
         </div>
-      </header>
+      </div>
+    </header>
+  );
+}
 
-      <section className="max-w-6xl mx-auto px-4 py-16 lg:py-28 text-center">
-        <p className="inline-block px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold tracking-wide uppercase mb-6">Crescimento para lava-rápidos</p>
-        <h1 className="font-display text-4xl lg:text-6xl font-bold tracking-tight max-w-3xl mx-auto leading-[1.05]">
-          O sistema que <span className="text-primary">aumenta o faturamento</span> do seu lava-rápido.
-        </h1>
-        <p className="mt-6 text-lg text-muted-foreground max-w-2xl mx-auto">
-          Recupere clientes perdidos, crie receita recorrente com assinaturas e descubra oportunidades de venda automaticamente.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3 justify-center">
-          <Button asChild size="lg"><Link to="/auth">Começar grátis</Link></Button>
-          <Button asChild size="lg" variant="outline"><a href="#features">Ver recursos</a></Button>
+/* ---------------- HERO ---------------- */
+function Hero() {
+  return (
+    <section className="relative overflow-hidden">
+      {/* background glow */}
+      <div className="absolute inset-0 -z-10">
+        <div className="absolute top-[-10%] left-1/2 -translate-x-1/2 h-[600px] w-[900px] rounded-full bg-primary/20 blur-[120px] opacity-60" />
+        <div className="absolute top-40 right-0 h-[400px] w-[400px] rounded-full bg-primary/10 blur-[100px]" />
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 pt-14 lg:pt-24 pb-16 lg:pb-24 grid lg:grid-cols-2 gap-12 items-center">
+        <div className="animate-fade-in">
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/10 text-primary text-xs font-semibold uppercase tracking-wider mb-6">
+            <Sparkles className="h-3 w-3" /> Plataforma de crescimento
+          </span>
+          <h1 className="font-display text-4xl sm:text-5xl lg:text-6xl font-bold tracking-tight leading-[1.05]">
+            Aumente o <span className="text-primary">faturamento</span> do seu lava-rápido.
+          </h1>
+          <p className="mt-6 text-base sm:text-lg text-muted-foreground max-w-xl">
+            Recupere clientes, automatize o atendimento, acompanhe sua equipe e transforme sua operação em uma máquina de crescimento.
+          </p>
+          <div className="mt-8 flex flex-wrap gap-3">
+            <Button asChild size="lg" className="shadow-lg shadow-primary/30">
+              <a href="#contato">Solicitar Demonstração <ArrowRight className="h-4 w-4 ml-1" /></a>
+            </Button>
+            <Button asChild size="lg" variant="outline">
+              <a href="#beneficios">Conhecer o Sistema</a>
+            </Button>
+          </div>
+          <div className="mt-8 flex items-center gap-6 text-xs text-muted-foreground">
+            <div className="flex items-center gap-1"><Check className="h-4 w-4 text-primary" />7 dias grátis</div>
+            <div className="flex items-center gap-1"><Check className="h-4 w-4 text-primary" />Sem cartão</div>
+            <div className="flex items-center gap-1"><Check className="h-4 w-4 text-primary" />Cancele quando quiser</div>
+          </div>
         </div>
-      </section>
 
-      <section id="features" className="max-w-6xl mx-auto px-4 py-16 grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="relative flex justify-center lg:justify-end animate-fade-in">
+          <PhoneMockup />
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------- Reusable phone mockup ---------- */
+function PhoneMockup({ variant = "dashboard" }: { variant?: "dashboard" | "assistant" | "kanban" }) {
+  return (
+    <div className="relative">
+      {/* floating mini cards */}
+      <div className="hidden sm:block absolute -left-8 top-24 z-20 animate-fade-in">
+        <Card className="shadow-xl border-primary/10">
+          <CardContent className="p-3 flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-success/15 text-success grid place-content-center"><TrendingUp className="h-4 w-4" /></div>
+            <div>
+              <p className="text-[10px] text-muted-foreground">Receita hoje</p>
+              <p className="font-display font-bold text-sm">R$ 1.840</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+      <div className="hidden sm:block absolute -right-6 bottom-16 z-20 animate-fade-in">
+        <Card className="shadow-xl border-primary/10">
+          <CardContent className="p-3 flex items-center gap-2">
+            <div className="h-8 w-8 rounded-lg bg-primary/15 text-primary grid place-content-center"><Bot className="h-4 w-4" /></div>
+            <div>
+              <p className="text-[10px] text-muted-foreground">Assistente</p>
+              <p className="font-medium text-xs">12 oportunidades</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="relative w-[280px] h-[570px] rounded-[40px] bg-foreground p-3 shadow-2xl shadow-primary/20">
+        <div className="absolute top-2 left-1/2 -translate-x-1/2 h-5 w-24 bg-foreground rounded-b-2xl z-10" />
+        <div className="w-full h-full rounded-[32px] bg-background overflow-hidden relative">
+          {variant === "dashboard" && <FakeDashboard />}
+          {variant === "assistant" && <FakeAssistant />}
+          {variant === "kanban" && <FakeKanban />}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function FakeDashboard() {
+  return (
+    <div className="p-3 pt-7 text-[10px]">
+      <div className="flex items-center justify-between mb-3">
+        <div>
+          <p className="text-muted-foreground">Bom dia 👋</p>
+          <p className="font-display font-bold text-sm">Painel Executivo</p>
+        </div>
+        <div className="h-7 w-7 rounded-full bg-primary/15 grid place-content-center text-primary"><BarChart3 className="h-3.5 w-3.5" /></div>
+      </div>
+      <div className="grid grid-cols-2 gap-2 mb-3">
         {[
-          { icon: TrendingUp, t: "Painel de crescimento", d: "MRR, retenção e ticket médio em tempo real." },
-          { icon: Sparkles, t: "Oportunidades automáticas", d: "Saiba exatamente qual cliente abordar hoje." },
-          { icon: MessageCircle, t: "Reativação por WhatsApp", d: "Envie mensagens em massa para inativos." },
-          { icon: Repeat, t: "Assinaturas mensais", d: "Crie planos e ganhe receita previsível." },
-          { icon: Award, t: "Fidelidade automática", d: "Pontos creditados a cada lavagem entregue." },
-          { icon: BarChart3, t: "Decisões com dados", d: "Relatórios de receita por serviço e equipe." },
-        ].map((f) => (
-          <div key={f.t} className="p-6 rounded-xl border bg-card">
-            <div className="h-10 w-10 rounded-lg bg-primary/10 text-primary grid place-content-center mb-3"><f.icon className="h-5 w-5" /></div>
-            <h3 className="font-display font-semibold">{f.t}</h3>
-            <p className="text-sm text-muted-foreground mt-1">{f.d}</p>
+          { l: "Faturamento", v: "R$ 18.4k", c: "text-success" },
+          { l: "Clientes", v: "184", c: "text-primary" },
+          { l: "Ticket médio", v: "R$ 64", c: "text-foreground" },
+          { l: "MRR", v: "R$ 2.1k", c: "text-success" },
+        ].map((k) => (
+          <div key={k.l} className="rounded-lg border bg-card p-2">
+            <p className="text-muted-foreground text-[9px]">{k.l}</p>
+            <p className={`font-display font-bold text-xs ${k.c}`}>{k.v}</p>
           </div>
         ))}
-      </section>
+      </div>
+      <div className="rounded-lg border p-2 mb-2">
+        <p className="font-semibold text-[10px] mb-2">Receita últimos 7 dias</p>
+        <div className="flex items-end gap-1 h-14">
+          {[40, 60, 35, 78, 55, 88, 70].map((h, i) => (
+            <div key={i} className="flex-1 rounded-t bg-gradient-to-t from-primary to-primary/40" style={{ height: `${h}%` }} />
+          ))}
+        </div>
+      </div>
+      <div className="rounded-lg border bg-primary/5 p-2 flex items-center gap-2">
+        <Sparkles className="h-3 w-3 text-primary" />
+        <p className="text-[9px]"><b>+24%</b> vs semana anterior</p>
+      </div>
+    </div>
+  );
+}
 
-      <footer className="border-t mt-16">
-        <div className="max-w-6xl mx-auto px-4 py-8 text-sm text-muted-foreground flex flex-col sm:flex-row gap-2 justify-between">
-          <span>© LavaFlow</span>
+function FakeAssistant() {
+  return (
+    <div className="p-3 pt-7 text-[10px] h-full flex flex-col">
+      <div className="flex items-center gap-2 mb-3">
+        <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-primary/40 grid place-content-center text-primary-foreground"><Bot className="h-4 w-4" /></div>
+        <div>
+          <p className="font-display font-bold text-sm">Assistente</p>
+          <p className="text-muted-foreground text-[9px]">Análise em tempo real</p>
+        </div>
+      </div>
+      <div className="space-y-2 flex-1">
+        {[
+          { i: TrendingUp, t: "Oportunidade detectada", d: "23 clientes inativos podem voltar essa semana.", c: "bg-success/10 text-success" },
+          { i: Repeat, t: "Upsell de assinatura", d: "11 clientes elegíveis ao plano mensal.", c: "bg-primary/10 text-primary" },
+          { i: Award, t: "Top dia da semana", d: "Sábado gera 38% da sua receita.", c: "bg-warning/10 text-warning" },
+        ].map((o) => (
+          <div key={o.t} className="rounded-lg border p-2">
+            <div className="flex items-center gap-1.5 mb-0.5">
+              <span className={`h-4 w-4 rounded grid place-content-center ${o.c}`}><o.i className="h-2.5 w-2.5" /></span>
+              <p className="font-semibold text-[9.5px]">{o.t}</p>
+            </div>
+            <p className="text-muted-foreground text-[9px] leading-tight">{o.d}</p>
+          </div>
+        ))}
+      </div>
+      <div className="rounded-full border px-3 py-1.5 mt-2 text-muted-foreground text-[9px]">Pergunte algo ao assistente…</div>
+    </div>
+  );
+}
+
+function FakeKanban() {
+  const cols = [
+    { t: "Fila", c: "bg-muted", items: [{ n: "Civic 2022", s: "Lavagem completa" }, { n: "HB20", s: "Externa" }] },
+    { t: "Em lavagem", c: "bg-primary/20", items: [{ n: "Corolla", s: "Detalhamento" }] },
+    { t: "Prontos", c: "bg-success/20", items: [{ n: "Onix", s: "Simples" }] },
+  ];
+  return (
+    <div className="p-3 pt-7 text-[10px]">
+      <p className="font-display font-bold text-sm mb-3">Kanban</p>
+      <div className="space-y-2">
+        {cols.map((c) => (
+          <div key={c.t}>
+            <div className="flex items-center justify-between mb-1">
+              <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${c.c}`}>{c.t}</span>
+              <span className="text-muted-foreground text-[9px]">{c.items.length}</span>
+            </div>
+            <div className="space-y-1">
+              {c.items.map((i) => (
+                <div key={i.n} className="rounded-lg border p-1.5">
+                  <p className="font-semibold text-[10px]">{i.n}</p>
+                  <p className="text-muted-foreground text-[9px]">{i.s}</p>
+                </div>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- LOGOS / TRUST ---------------- */
+function LogosStrip() {
+  return (
+    <div className="border-y bg-muted/30">
+      <div className="max-w-6xl mx-auto px-4 py-6 flex flex-wrap items-center justify-center gap-x-10 gap-y-3 text-muted-foreground text-xs uppercase tracking-widest">
+        <span>Feito para</span>
+        <span className="font-display font-bold">Lava-rápidos</span>
+        <span>·</span>
+        <span className="font-display font-bold">Lava-jatos</span>
+        <span>·</span>
+        <span className="font-display font-bold">Estéticas Automotivas</span>
+        <span>·</span>
+        <span className="font-display font-bold">Detalhamento</span>
+      </div>
+    </div>
+  );
+}
+
+/* ---------------- BENEFITS ---------------- */
+function Benefits() {
+  const items = [
+    { e: "🚗", t: "Organize sua operação", d: "Controle veículos, clientes e serviços em tempo real." },
+    { e: "💰", t: "Aumente seu faturamento", d: "Descubra oportunidades de crescimento automaticamente." },
+    { e: "🔄", t: "Crie receita recorrente", d: "Venda planos de assinatura para seus clientes." },
+    { e: "🎯", t: "Fidelize clientes", d: "Programa de pontos integrado e automático." },
+    { e: "📱", t: "WhatsApp automatizado", d: "Avise clientes quando o veículo estiver pronto." },
+    { e: "👥", t: "Controle sua equipe", d: "Acompanhe produtividade e desempenho." },
+  ];
+  return (
+    <section id="beneficios" className="max-w-6xl mx-auto px-4 py-20 lg:py-28">
+      <div className="text-center max-w-2xl mx-auto mb-14">
+        <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Funcionalidades</p>
+        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Tudo o que você precisa para crescer.</h2>
+        <p className="mt-4 text-muted-foreground">Cada recurso foi pensado para gerar mais receita e menos trabalho operacional.</p>
+      </div>
+      <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        {items.map((i) => (
+          <Card key={i.t} className="group hover:shadow-xl hover:-translate-y-1 transition-all duration-300 border-border/60">
+            <CardContent className="p-6">
+              <div className="h-12 w-12 rounded-xl bg-primary/10 text-2xl grid place-content-center mb-4 group-hover:scale-110 transition-transform">{i.e}</div>
+              <h3 className="font-display font-semibold text-lg">{i.t}</h3>
+              <p className="text-sm text-muted-foreground mt-1">{i.d}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- MOCKUP SHOWCASE (carousel) ---------------- */
+function MockupShowcase() {
+  const slides = [
+    { k: "dashboard" as const, t: "Painel Executivo", d: "Indicadores em tempo real, receita por período e ticket médio." },
+    { k: "assistant" as const, t: "Assistente LavaFlow", d: "Inteligência que aponta exatamente onde está sua próxima venda." },
+    { k: "kanban" as const, t: "Kanban Operacional", d: "Veja cada veículo na esteira de produção em um toque." },
+  ];
+  const [i, setI] = useState(0);
+  useEffect(() => { const id = setInterval(() => setI((x) => (x + 1) % slides.length), 4500); return () => clearInterval(id); }, []);
+  const s = slides[i];
+  return (
+    <section className="relative bg-gradient-to-b from-muted/30 to-background border-y">
+      <div className="max-w-6xl mx-auto px-4 py-20 lg:py-28">
+        <div className="text-center mb-12">
+          <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Demonstração</p>
+          <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Visualize o LavaFlow em ação</h2>
+        </div>
+        <div className="grid lg:grid-cols-2 gap-12 items-center">
+          <div className="flex justify-center order-2 lg:order-1">
+            <div key={s.k} className="animate-fade-in"><PhoneMockup variant={s.k} /></div>
+          </div>
+          <div className="order-1 lg:order-2">
+            <div className="space-y-3">
+              {slides.map((sl, idx) => (
+                <button key={sl.k} onClick={() => setI(idx)} className={`w-full text-left p-5 rounded-2xl border transition-all ${idx === i ? "bg-card shadow-lg border-primary/30" : "bg-card/40 hover:bg-card"}`}>
+                  <div className="flex items-center gap-3">
+                    <div className={`h-10 w-10 rounded-xl grid place-content-center ${idx === i ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
+                      {sl.k === "dashboard" ? <BarChart3 className="h-5 w-5" /> : sl.k === "assistant" ? <Bot className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+                    </div>
+                    <div className="flex-1">
+                      <p className="font-display font-semibold">{sl.t}</p>
+                      <p className="text-xs text-muted-foreground">{sl.d}</p>
+                    </div>
+                    <ChevronRight className={`h-4 w-4 transition-transform ${idx === i ? "translate-x-1 text-primary" : "text-muted-foreground"}`} />
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- PROBLEM vs SOLUTION ---------------- */
+function ProblemSolution() {
+  const before = ["Clientes esquecem de retornar", "Controle feito em papel", "Falta de organização", "Nenhuma previsibilidade de receita", "Equipe sem métricas"];
+  const after = ["Clientes fidelizados", "Operação organizada", "Receita recorrente", "Produtividade monitorada", "Crescimento baseado em dados"];
+  return (
+    <section className="max-w-6xl mx-auto px-4 py-20 lg:py-28">
+      <div className="text-center max-w-2xl mx-auto mb-12">
+        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Do caos ao controle.</h2>
+        <p className="mt-4 text-muted-foreground">Veja a transformação que o LavaFlow gera na operação do seu lava-rápido.</p>
+      </div>
+      <div className="grid md:grid-cols-2 gap-4">
+        <Card className="border-destructive/30 bg-destructive/5">
+          <CardContent className="p-6">
+            <Badge variant="outline" className="mb-4 border-destructive/40 text-destructive">Antes do LavaFlow</Badge>
+            <ul className="space-y-3">
+              {before.map((b) => (<li key={b} className="flex items-start gap-2 text-sm"><X className="h-4 w-4 text-destructive mt-0.5 shrink-0" />{b}</li>))}
+            </ul>
+          </CardContent>
+        </Card>
+        <Card className="border-primary/30 bg-primary/5">
+          <CardContent className="p-6">
+            <Badge className="mb-4 bg-primary text-primary-foreground">Depois do LavaFlow</Badge>
+            <ul className="space-y-3">
+              {after.map((a) => (<li key={a} className="flex items-start gap-2 text-sm"><Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />{a}</li>))}
+            </ul>
+          </CardContent>
+        </Card>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- ASSISTANT ---------------- */
+function Assistant() {
+  const ex = ["Clientes inativos", "Oportunidades de upsell", "Queda de faturamento", "Clientes elegíveis para assinatura", "Melhor dia para promoções"];
+  return (
+    <section className="relative overflow-hidden bg-foreground text-background">
+      <div className="absolute inset-0 -z-0">
+        <div className="absolute top-0 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/30 blur-[120px]" />
+      </div>
+      <div className="relative max-w-6xl mx-auto px-4 py-20 lg:py-28 grid lg:grid-cols-2 gap-12 items-center">
+        <div>
+          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-semibold uppercase tracking-wider mb-6">
+            <Bot className="h-3 w-3" /> Assistente LavaFlow
+          </span>
+          <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Seu consultor de crescimento integrado.</h2>
+          <p className="mt-5 opacity-80">O Assistente LavaFlow analisa automaticamente sua operação e identifica oportunidades para aumentar o faturamento.</p>
+          <ul className="mt-6 space-y-2">
+            {ex.map((e) => (<li key={e} className="flex items-center gap-2 text-sm"><Zap className="h-4 w-4 text-primary" />{e}</li>))}
+          </ul>
+        </div>
+        <div className="flex justify-center"><PhoneMockup variant="assistant" /></div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- TEAM ---------------- */
+function TeamSection() {
+  const ranking = [
+    { n: "Carlos M.", l: 142, r: "R$ 8.520", c: "R$ 426" },
+    { n: "Bruno S.", l: 128, r: "R$ 7.680", c: "R$ 384" },
+    { n: "Diego R.", l: 96, r: "R$ 5.760", c: "R$ 288" },
+    { n: "Felipe A.", l: 71, r: "R$ 4.260", c: "R$ 213" },
+  ];
+  return (
+    <section className="max-w-6xl mx-auto px-4 py-20 lg:py-28 grid lg:grid-cols-2 gap-12 items-center">
+      <Card className="shadow-xl border-primary/10 order-2 lg:order-1">
+        <CardContent className="p-6">
+          <div className="flex items-center gap-2 mb-4"><Trophy className="h-5 w-5 text-warning" /><p className="font-display font-bold">Ranking da equipe</p></div>
+          <div className="space-y-2">
+            {ranking.map((r, i) => (
+              <div key={r.n} className="flex items-center gap-3 p-3 rounded-xl border bg-card">
+                <div className={`h-9 w-9 rounded-lg grid place-content-center font-bold ${i === 0 ? "bg-warning/20" : i === 1 ? "bg-muted" : i === 2 ? "bg-accent" : "bg-muted/50"}`}>
+                  {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `#${i + 1}`}
+                </div>
+                <div className="flex-1">
+                  <p className="font-semibold text-sm">{r.n}</p>
+                  <p className="text-xs text-muted-foreground">{r.l} lavagens</p>
+                </div>
+                <div className="text-right">
+                  <p className="font-display font-bold text-sm">{r.r}</p>
+                  <p className="text-[10px] text-success">{r.c} com.</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+      <div className="order-1 lg:order-2">
+        <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Equipe</p>
+        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Saiba exatamente quem está produzindo.</h2>
+        <p className="mt-5 text-muted-foreground">Cada colaborador tem seu próprio app. Você acompanha ranking, produtividade, lavagens realizadas e comissão acumulada em tempo real.</p>
+        <div className="mt-6 grid grid-cols-2 gap-3">
+          {[
+            { i: Users, t: "Acesso individual" },
+            { i: Clock, t: "Tempo por etapa" },
+            { i: DollarSign, t: "Comissão automática" },
+            { i: TrendingUp, t: "Produtividade" },
+          ].map((b) => (
+            <div key={b.t} className="flex items-center gap-2 p-3 rounded-xl border">
+              <b.i className="h-4 w-4 text-primary" /><span className="text-sm">{b.t}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- LOYALTY ---------------- */
+function Loyalty() {
+  const items = [
+    { i: Award, t: "Programa de pontos", d: "Cada lavagem credita pontos automaticamente." },
+    { i: Repeat, t: "Assinaturas mensais", d: "Crie planos e ganhe receita previsível." },
+    { i: MessageCircle, t: "Recuperação por WhatsApp", d: "Mensagens automáticas para inativos." },
+  ];
+  return (
+    <section className="bg-muted/30 border-y">
+      <div className="max-w-6xl mx-auto px-4 py-20 lg:py-28">
+        <div className="text-center max-w-2xl mx-auto mb-12">
+          <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Fidelização</p>
+          <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Transforme clientes ocasionais em clientes recorrentes.</h2>
+        </div>
+        <div className="grid md:grid-cols-3 gap-4">
+          {items.map((it) => (
+            <Card key={it.t} className="hover:shadow-lg transition-shadow">
+              <CardContent className="p-6">
+                <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-content-center mb-4"><it.i className="h-6 w-6" /></div>
+                <h3 className="font-display font-semibold">{it.t}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{it.d}</p>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- TESTIMONIALS ---------------- */
+function Testimonials() {
+  const t = [
+    { n: "Marcos Pereira", c: "São Paulo · SP", e: "Lava Express", q: "Em 2 meses recuperei 38 clientes inativos. O sistema se pagou na primeira semana." },
+    { n: "Juliana Santos", c: "Belo Horizonte · MG", e: "Brilho Auto Estética", q: "As assinaturas mudaram meu negócio. Hoje tenho previsibilidade de receita todo mês." },
+    { n: "Rafael Costa", c: "Curitiba · PR", e: "Costa Detalhamento", q: "Meu time virou outro depois que cada um passou a ver sua própria produção e comissão." },
+  ];
+  return (
+    <section className="max-w-6xl mx-auto px-4 py-20 lg:py-28">
+      <div className="text-center mb-12">
+        <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Quem usa, recomenda</p>
+        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Resultados reais.</h2>
+      </div>
+      <div className="grid md:grid-cols-3 gap-4">
+        {t.map((it) => (
+          <Card key={it.n}>
+            <CardContent className="p-6">
+              <div className="flex gap-0.5 mb-3">{[0,1,2,3,4].map((s) => <Star key={s} className="h-4 w-4 fill-warning text-warning" />)}</div>
+              <p className="text-sm leading-relaxed">"{it.q}"</p>
+              <div className="mt-5 flex items-center gap-3 pt-4 border-t">
+                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/40 grid place-content-center text-primary-foreground font-display font-bold">{it.n[0]}</div>
+                <div>
+                  <p className="font-semibold text-sm">{it.n}</p>
+                  <p className="text-[11px] text-muted-foreground">{it.e} · {it.c}</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- PRICING ---------------- */
+function Pricing() {
+  const plans = [
+    { n: "Inicial", p: "49,90", d: "Para quem está começando.", f: ["Até 100 clientes", "1 colaborador", "Kanban e ordens", "Cadastro de serviços"], hl: false },
+    { n: "Growth", p: "99,90", d: "Para crescer com previsibilidade.", f: ["Clientes ilimitados", "Até 5 colaboradores", "Assistente LavaFlow", "Programa de fidelidade", "WhatsApp automatizado"], hl: true },
+    { n: "Pro", p: "149,90", d: "Para operações em alta escala.", f: ["Tudo do Growth", "Assinaturas mensais", "Relatórios avançados", "Multi-unidades", "Suporte prioritário"], hl: false },
+  ];
+  return (
+    <section id="planos" className="max-w-6xl mx-auto px-4 py-20 lg:py-28">
+      <div className="text-center mb-12">
+        <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Planos</p>
+        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Escolha o plano do seu crescimento.</h2>
+        <p className="mt-4 text-muted-foreground">Sempre atualizando com novas funcionalidades. Sem fidelidade.</p>
+      </div>
+      <div className="grid md:grid-cols-3 gap-4 items-stretch">
+        {plans.map((p) => (
+          <Card key={p.n} className={`relative flex flex-col ${p.hl ? "border-primary shadow-2xl shadow-primary/20 lg:-translate-y-4 scale-[1.02]" : ""}`}>
+            {p.hl && <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground">Mais popular</Badge>}
+            <CardContent className="p-6 flex flex-col flex-1">
+              <p className="font-display font-bold text-lg">{p.n}</p>
+              <p className="text-xs text-muted-foreground mt-1">{p.d}</p>
+              <div className="my-5">
+                <span className="text-xs text-muted-foreground">R$</span>
+                <span className="font-display font-bold text-4xl">{p.p}</span>
+                <span className="text-xs text-muted-foreground">/mês</span>
+              </div>
+              <ul className="space-y-2 flex-1">
+                {p.f.map((f) => (<li key={f} className="flex items-start gap-2 text-sm"><Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />{f}</li>))}
+              </ul>
+              <Button asChild className="mt-6 w-full" variant={p.hl ? "default" : "outline"}>
+                <a href="#contato">Começar agora</a>
+              </Button>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- FAQ ---------------- */
+function Faq() {
+  const items = [
+    { q: "O sistema funciona no celular?", a: "Sim. O LavaFlow é 100% responsivo e otimizado para smartphones, tablets e desktops." },
+    { q: "Preciso instalar algo?", a: "Não. Tudo roda direto no navegador, sem download ou instalação." },
+    { q: "Posso usar WhatsApp?", a: "Sim. Avisos automáticos quando o veículo está pronto e campanhas de recuperação de inativos." },
+    { q: "Meus funcionários podem acessar?", a: "Sim. Cada colaborador tem o próprio acesso ao app Meu Trabalho com produtividade e comissão." },
+    { q: "Existe fidelidade?", a: "Não. Você pode cancelar quando quiser, sem multa." },
+    { q: "Como funciona o teste?", a: "São 7 dias grátis com acesso a todas as funcionalidades, sem cobrança de cartão." },
+  ];
+  return (
+    <section id="faq" className="bg-muted/30 border-y">
+      <div className="max-w-3xl mx-auto px-4 py-20 lg:py-28">
+        <div className="text-center mb-10">
+          <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">FAQ</p>
+          <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Perguntas frequentes</h2>
+        </div>
+        <Accordion type="single" collapsible className="space-y-2">
+          {items.map((it, i) => (
+            <AccordionItem key={i} value={`i${i}`} className="border rounded-xl px-4 bg-card">
+              <AccordionTrigger className="text-left">{it.q}</AccordionTrigger>
+              <AccordionContent className="text-muted-foreground">{it.a}</AccordionContent>
+            </AccordionItem>
+          ))}
+        </Accordion>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- FINAL CTA ---------------- */
+function FinalCta() {
+  return (
+    <section id="contato" className="max-w-6xl mx-auto px-4 py-20 lg:py-28">
+      <div className="relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary via-primary to-primary/70 p-10 lg:p-16 text-center text-primary-foreground shadow-2xl shadow-primary/30">
+        <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_30%,white,transparent_60%)]" />
+        <div className="relative">
+          <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight max-w-2xl mx-auto">Pronto para aumentar o faturamento do seu lava-rápido?</h2>
+          <p className="mt-4 opacity-90 max-w-xl mx-auto">Comece hoje. Em poucos minutos seu lava-rápido está digital.</p>
+          <div className="mt-8 flex flex-wrap gap-3 justify-center">
+            <Button asChild size="lg" variant="secondary" className="shadow-lg">
+              <Link to="/auth">Solicitar Demonstração <ArrowRight className="h-4 w-4 ml-1" /></Link>
+            </Button>
+            <Button asChild size="lg" variant="outline" className="bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10">
+              <a href="https://wa.me/" target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />Falar no WhatsApp</a>
+            </Button>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/* ---------------- FOOTER ---------------- */
+function Footer() {
+  return (
+    <footer className="border-t">
+      <div className="max-w-6xl mx-auto px-4 py-12 grid sm:grid-cols-2 lg:grid-cols-4 gap-8">
+        <div>
+          <div className="flex items-center gap-2 mb-3">
+            <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/50 grid place-content-center"><Car className="h-4 w-4 text-primary-foreground" /></div>
+            <span className="font-display text-lg font-bold">Lava<span className="text-primary">Flow</span></span>
+          </div>
+          <p className="text-sm text-muted-foreground">A plataforma de crescimento dos lava-rápidos.</p>
+        </div>
+        <div>
+          <p className="font-display font-semibold mb-3 text-sm">Produto</p>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li><a href="#beneficios" className="hover:text-foreground">Funcionalidades</a></li>
+            <li><a href="#planos" className="hover:text-foreground">Planos</a></li>
+            <li><a href="#faq" className="hover:text-foreground">FAQ</a></li>
+          </ul>
+        </div>
+        <div>
+          <p className="font-display font-semibold mb-3 text-sm">Conta</p>
+          <ul className="space-y-2 text-sm text-muted-foreground">
+            <li><Link to="/auth" className="hover:text-foreground">Login</Link></li>
+            <li><a href="#contato" className="hover:text-foreground">Contato</a></li>
+          </ul>
+        </div>
+        <div>
+          <p className="font-display font-semibold mb-3 text-sm">Redes</p>
+          <div className="flex gap-2">
+            <a href="https://wa.me/" target="_blank" rel="noreferrer" className="h-9 w-9 rounded-lg border grid place-content-center hover:bg-muted transition"><Phone className="h-4 w-4" /></a>
+            <a href="https://instagram.com" target="_blank" rel="noreferrer" className="h-9 w-9 rounded-lg border grid place-content-center hover:bg-muted transition"><Instagram className="h-4 w-4" /></a>
+          </div>
+        </div>
+      </div>
+      <div className="border-t">
+        <div className="max-w-6xl mx-auto px-4 py-4 text-xs text-muted-foreground flex flex-col sm:flex-row justify-between gap-2">
+          <span>© {new Date().getFullYear()} LavaFlow · Todos os direitos reservados</span>
           <span>Feito para crescer com você</span>
         </div>
-      </footer>
-    </div>
+      </div>
+    </footer>
   );
 }
