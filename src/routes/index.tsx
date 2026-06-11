@@ -129,7 +129,7 @@ function Hero() {
         </div>
 
         <div className="relative flex justify-center lg:justify-end animate-fade-in">
-          <PhoneMockup />
+          <PhoneMockup eager />
         </div>
       </div>
     </section>
