@@ -137,7 +137,8 @@ function Hero() {
 }
 
 /* ---------- Reusable phone mockup ---------- */
-function PhoneMockup({ variant = "dashboard" }: { variant?: "dashboard" | "assistant" | "kanban" }) {
+function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dashboard" | "assistant" | "kanban"; eager?: boolean }) {
+  const shot = SHOTS[variant];
   return (
     <div className="relative">
       {/* floating mini cards */}
@@ -167,110 +168,17 @@ function PhoneMockup({ variant = "dashboard" }: { variant?: "dashboard" | "assis
       <div className="relative w-[280px] h-[570px] rounded-[40px] bg-foreground p-3 shadow-2xl shadow-primary/20">
         <div className="absolute top-2 left-1/2 -translate-x-1/2 h-5 w-24 bg-foreground rounded-b-2xl z-10" />
         <div className="w-full h-full rounded-[32px] bg-background overflow-hidden relative">
-          {variant === "dashboard" && <FakeDashboard />}
-          {variant === "assistant" && <FakeAssistant />}
-          {variant === "kanban" && <FakeKanban />}
+          <img
+            src={shot.url}
+            alt={shot.alt}
+            width={390}
+            height={844}
+            loading={eager ? "eager" : "lazy"}
+            decoding="async"
+            {...(eager ? { fetchPriority: "high" as const } : {})}
+            className="block w-full h-full object-cover object-top"
+          />
         </div>
-      </div>
-    </div>
-  );
-}
-
-function FakeDashboard() {
-  return (
-    <div className="p-3 pt-7 text-[10px]">
-      <div className="flex items-center justify-between mb-3">
-        <div>
-          <p className="text-muted-foreground">Bom dia 👋</p>
-          <p className="font-display font-bold text-sm">Painel Executivo</p>
-        </div>
-        <div className="h-7 w-7 rounded-full bg-primary/15 grid place-content-center text-primary"><BarChart3 className="h-3.5 w-3.5" /></div>
-      </div>
-      <div className="grid grid-cols-2 gap-2 mb-3">
-        {[
-          { l: "Faturamento", v: "R$ 18.4k", c: "text-success" },
-          { l: "Clientes", v: "184", c: "text-primary" },
-          { l: "Ticket médio", v: "R$ 64", c: "text-foreground" },
-          { l: "MRR", v: "R$ 2.1k", c: "text-success" },
-        ].map((k) => (
-          <div key={k.l} className="rounded-lg border bg-card p-2">
-            <p className="text-muted-foreground text-[9px]">{k.l}</p>
-            <p className={`font-display font-bold text-xs ${k.c}`}>{k.v}</p>
-          </div>
-        ))}
-      </div>
-      <div className="rounded-lg border p-2 mb-2">
-        <p className="font-semibold text-[10px] mb-2">Receita últimos 7 dias</p>
-        <div className="flex items-end gap-1 h-14">
-          {[40, 60, 35, 78, 55, 88, 70].map((h, i) => (
-            <div key={i} className="flex-1 rounded-t bg-gradient-to-t from-primary to-primary/40" style={{ height: `${h}%` }} />
-          ))}
-        </div>
-      </div>
-      <div className="rounded-lg border bg-primary/5 p-2 flex items-center gap-2">
-        <Sparkles className="h-3 w-3 text-primary" />
-        <p className="text-[9px]"><b>+24%</b> vs semana anterior</p>
-      </div>
-    </div>
-  );
-}
-
-function FakeAssistant() {
-  return (
-    <div className="p-3 pt-7 text-[10px] h-full flex flex-col">
-      <div className="flex items-center gap-2 mb-3">
-        <div className="h-8 w-8 rounded-xl bg-gradient-to-br from-primary to-primary/40 grid place-content-center text-primary-foreground"><Bot className="h-4 w-4" /></div>
-        <div>
-          <p className="font-display font-bold text-sm">Assistente</p>
-          <p className="text-muted-foreground text-[9px]">Análise em tempo real</p>
-        </div>
-      </div>
-      <div className="space-y-2 flex-1">
-        {[
-          { i: TrendingUp, t: "Oportunidade detectada", d: "23 clientes inativos podem voltar essa semana.", c: "bg-success/10 text-success" },
-          { i: Repeat, t: "Upsell de assinatura", d: "11 clientes elegíveis ao plano mensal.", c: "bg-primary/10 text-primary" },
-          { i: Award, t: "Top dia da semana", d: "Sábado gera 38% da sua receita.", c: "bg-warning/10 text-warning" },
-        ].map((o) => (
-          <div key={o.t} className="rounded-lg border p-2">
-            <div className="flex items-center gap-1.5 mb-0.5">
-              <span className={`h-4 w-4 rounded grid place-content-center ${o.c}`}><o.i className="h-2.5 w-2.5" /></span>
-              <p className="font-semibold text-[9.5px]">{o.t}</p>
-            </div>
-            <p className="text-muted-foreground text-[9px] leading-tight">{o.d}</p>
-          </div>
-        ))}
-      </div>
-      <div className="rounded-full border px-3 py-1.5 mt-2 text-muted-foreground text-[9px]">Pergunte algo ao assistente…</div>
-    </div>
-  );
-}
-
-function FakeKanban() {
-  const cols = [
-    { t: "Fila", c: "bg-muted", items: [{ n: "Civic 2022", s: "Lavagem completa" }, { n: "HB20", s: "Externa" }] },
-    { t: "Em lavagem", c: "bg-primary/20", items: [{ n: "Corolla", s: "Detalhamento" }] },
-    { t: "Prontos", c: "bg-success/20", items: [{ n: "Onix", s: "Simples" }] },
-  ];
-  return (
-    <div className="p-3 pt-7 text-[10px]">
-      <p className="font-display font-bold text-sm mb-3">Kanban</p>
-      <div className="space-y-2">
-        {cols.map((c) => (
-          <div key={c.t}>
-            <div className="flex items-center justify-between mb-1">
-              <span className={`px-1.5 py-0.5 rounded text-[9px] font-semibold ${c.c}`}>{c.t}</span>
-              <span className="text-muted-foreground text-[9px]">{c.items.length}</span>
-            </div>
-            <div className="space-y-1">
-              {c.items.map((i) => (
-                <div key={i.n} className="rounded-lg border p-1.5">
-                  <p className="font-semibold text-[10px]">{i.n}</p>
-                  <p className="text-muted-foreground text-[9px]">{i.s}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        ))}
       </div>
     </div>
   );
