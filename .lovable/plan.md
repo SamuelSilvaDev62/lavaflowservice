@@ -1,112 +1,61 @@
 
-# Módulo de Agendamento Inteligente
+# Redesign Mobile — Agendamentos
 
-Decisões padrão (sem bloqueios):
-- Página pública `/agendar/{slug}` incluída nesta entrega (slug derivado da empresa).
-- Conflito de horário valida pela capacidade configurada (bloqueia com aviso explicativo).
-- Lembretes manuais via botão WhatsApp (sem cron) — simples e alinhado ao restante.
+Foco: tornar a tela `/agendamentos` mais prática no celular, mantendo a identidade visual moderna do LavaFlow (cards arredondados, tipografia atual, cores semânticas).
 
----
-
-## 1. Banco de dados (1 migration)
-
-**Tabela `agendamentos`**
-- `id`, `owner_id`, `cliente_id`, `veiculo_id` (nullable), `servico_id` (nullable)
-- `data_agendada` (date), `hora_agendada` (time)
-- `status` enum `agendamento_status`: agendado | confirmado | em_andamento | concluido | cancelado | nao_compareceu
-- `observacoes` text, `ordem_id` (fk para OS criada)
-- `created_at`, `confirmado_em`, `cancelado_em`, `concluido_em`
-- Índices: (owner_id, data_agendada), (owner_id, status)
-
-**Tabela `agenda_config`** (1 linha por owner)
-- `owner_id` PK, `hora_inicio` (default 08:00), `hora_fim` (18:00), `dias_semana` int[] (1-6), `intervalo_min` (30), `capacidade_simultanea` (1)
-
-**`empresa`**: adicionar `slug` text unique (gerado a partir de `nome_fantasia` no bootstrap; backfill com unaccent+lower+regex).
-
-GRANTs para `authenticated` e `service_role`. RLS com `current_owner_id()` igual ao padrão. Para `agenda_config`/`empresa` por slug, criar função `public.get_empresa_by_slug(slug)` SECURITY DEFINER retornando apenas campos públicos (id, nome, telefone, slug) para a página pública.
-
-Bootstrap: estender `tg_bootstrap_new_user` para inserir `agenda_config` default e gerar `slug`.
+Observação sobre "arrastar não funciona": hoje a tela não tem swipe/drag — só botões. Vou adicionar gestos reais (swipe horizontal no card para ações rápidas) e melhorar a navegação por data via swipe entre dias.
 
 ---
 
-## 2. Server functions (`src/lib/lavaflow.functions.ts`)
+## Mudanças
 
-- `listAgendamentos({ date?, range?, status? })`
-- `createAgendamento(input)` — valida capacidade contra `agenda_config`
-- `updateAgendamentoStatus({ id, status })`
-- `iniciarAtendimento({ id })` — cria OS (`ordens_servico` aguardando), grava `ordem_id`, status → `em_andamento`
-- `getAgendaConfig` / `updateAgendaConfig`
-- `agendamentoStats()` — hoje, confirmados, em atendimento, no-show; usado no dashboard e cards
+### 1. Header compacto + ação flutuante
+- "Nova reserva" deixa de ser botão largo no topo → vira **FAB** (botão flutuante circular no canto inferior direito), padrão mobile-first.
+- Subtítulo some no mobile (libera espaço); fica só "Agendamentos".
 
-Página pública usa server fn sem auth:
-- `getEmpresaPublica({ slug })` — chama RPC `get_empresa_by_slug`
-- `getHorariosDisponiveis({ slug, data })` — calcula slots a partir de `agenda_config` − ocupação
-- `solicitarAgendamentoPublico({ slug, nome, telefone, veiculo, servico_id, data, hora, obs })` — usa `supabaseAdmin` (import dentro do handler), cria/upserta cliente, insere agendamento `agendado`
+### 2. KPIs em scroll horizontal
+- Em vez de grid 2x2 ocupando ~50% da tela, vira **carrossel horizontal** de chips/mini-cards (snap-scroll), altura ~72px.
+- Quatro métricas continuam visíveis com swipe lateral.
 
----
+### 3. Bloco "Link público" recolhível
+- Vira um card colapsável (accordion fechado por padrão) com ícone de compartilhar — só abre se o usuário tocar. Libera muito espaço.
 
-## 3. Rotas
+### 4. Seletor de data como faixa de dias (swipe)
+- Substitui o `<input type="date">` por uma **faixa horizontal de 7 dias** (hoje + próximos 6) com swipe e tap. Botão "calendário" abre o date picker completo para datas distantes.
+- Indicador do dia ativo com cor primária.
 
-- `src/routes/_authenticated/agendamentos.tsx` — abas Agenda (timeline por horário) e Lista; cards no topo; modal "Nova Reserva"; ações por linha: Confirmar, Iniciar atendimento, Marcar não compareceu, Cancelar, WhatsApp confirmação, WhatsApp lembrete
-- `src/routes/_authenticated/configuracoes.tsx` — nova seção "Agenda" (horários, dias, intervalo, capacidade)
-- `src/routes/_authenticated/dashboard.tsx` — adicionar 4 KPIs de agendamento
-- `src/routes/_authenticated/relatorios.tsx` — bloco "Agendamentos" (período, comparecimento %, cancelamento %, horários e dias mais procurados)
-- `src/routes/agendar.$slug.tsx` — pública, SSR on, head() com OG; form em etapas (dados → serviço → data/hora → confirmação)
-- Adicionar `Agendamentos` ao menu (grupo Operação) em `app-layout.tsx`
+### 5. Tabs Agenda/Lista — sticky
+- Tabs ficam **sticky** no topo ao rolar (sempre acessíveis).
 
----
+### 6. Card de agendamento — swipe actions
+- Card fica mais compacto (hora à esquerda em coluna destacada, dados à direita).
+- **Swipe para esquerda** revela ações rápidas: Confirmar / Iniciar / Cancelar (com cores semânticas).
+- Botões WhatsApp ficam em menu `...` (dropdown) para não poluir.
+- Tap no card → abre bottom sheet com todos os detalhes e ações completas.
 
-## 4. Conversão em OS
+### 7. Bottom sheet de detalhes
+- Substitui a explosão de botões dentro do card. Mostra: cliente, telefone (com tap-to-call), serviço, observações, e todas as ações em lista vertical confortável (alvo ≥44px).
 
-`iniciarAtendimento` cria `ordens_servico` com `cliente_id`, `veiculo_id`, `servico_id`, `valor = servicos.preco_padrao`, status `aguardando` (entra direto no Kanban da Fila); invalida queries de fila/ordens/agendamentos.
-
----
-
-## 5. WhatsApp
-
-Helpers em `src/lib/whatsapp.ts`:
-- `mensagemConfirmacao(ag)` e `mensagemLembrete(ag)` → abrem `https://wa.me/<tel>?text=...` em nova aba
-
-Botões na linha do agendamento e no detalhe.
+### 8. Dialog "Nova reserva" → Drawer (bottom sheet) no mobile
+- Usa `Drawer` do shadcn em telas <640px; mantém `Dialog` no desktop.
 
 ---
 
-## 6. Assistente / Oportunidades
+## Detalhes técnicos
 
-Em `oportunidades.tsx` e/ou assistant, adicionar insights baseados em `agendamentos` quando houver dados:
-- nº de no-shows no mês
-- dia da semana com menor ocupação
-- janela de horário mais procurada
-- capacidade ociosa por dia da semana
+- Editar apenas `src/routes/_authenticated/agendamentos.tsx` (sem mudanças em backend/server functions).
+- Swipe actions: implementar com `framer-motion` (`drag="x"`, `dragConstraints`, `onDragEnd` threshold ~80px). Já está no projeto via shadcn.
+- Faixa de dias: array gerado a partir de hoje com `date-fns`; container `overflow-x-auto snap-x snap-mandatory`.
+- KPI carrossel: `flex gap-3 overflow-x-auto snap-x` com `snap-start` em cada card.
+- FAB: `fixed bottom-20 right-4 z-40` (acima do chat bar), `rounded-full h-14 w-14 shadow-lg`.
+- Sticky tabs: `sticky top-0 z-30 bg-background/95 backdrop-blur`.
+- Bottom sheet: componente `Drawer` (já existe em `src/components/ui/drawer.tsx`).
+- Responsivo: todos os ajustes são `sm:` opcionais — desktop continua com grid 4 colunas, dialog padrão, e card com botões inline (sem swipe).
 
-Implementado como funções de agregação simples chamadas pela página existente — sem novo motor.
+## Fora de escopo
+- Backend/server functions inalterados.
+- Configurações de agenda (`/configuracoes`) inalteradas.
+- Página pública `/agendar/$slug` inalterada.
 
----
-
-## 7. Detalhes técnicos
-
-- Mobile-first: cards empilhados, abas via shadcn `Tabs`, timeline com lista agrupada por hora
-- `Dialog` para Nova Reserva reusa selects de cliente/veículo/serviço já existentes em `ordens.tsx`
-- Validação Zod no client e dentro dos handlers
-- Página pública NÃO sob `_authenticated/`; loader chama server fn pública (admin client dentro do handler) — não usa `requireSupabaseAuth`
-- Realtime opcional fica fora desta entrega
-
----
-
-## Arquivos criados/alterados
-
-Novos:
-- `supabase/migrations/<ts>_agendamentos.sql`
-- `src/routes/_authenticated/agendamentos.tsx`
-- `src/routes/agendar.$slug.tsx`
-
-Editados:
-- `src/lib/lavaflow.functions.ts` (server fns + stats)
-- `src/lib/whatsapp.ts` (helpers de mensagem)
-- `src/components/app-layout.tsx` (item de menu)
-- `src/routes/_authenticated/dashboard.tsx` (4 KPIs)
-- `src/routes/_authenticated/configuracoes.tsx` (seção Agenda)
-- `src/routes/_authenticated/relatorios.tsx` (bloco Agendamentos)
-- `src/routes/_authenticated/oportunidades.tsx` (insights)
-
-Fora de escopo (segunda fase): lembretes automáticos via cron, fila de aprovação para solicitações públicas (entram já como `agendado`), realtime updates.
+## Arquivos
+- editado: `src/routes/_authenticated/agendamentos.tsx`
