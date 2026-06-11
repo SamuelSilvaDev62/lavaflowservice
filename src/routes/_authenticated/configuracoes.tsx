@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getEmpresa, updateEmpresa, listServicos, upsertServico } from "@/lib/lavaflow.functions";
+import { getEmpresa, updateEmpresa, listServicos, upsertServico, getAgendaConfig, updateAgendaConfig } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { allTemplates, setTemplate, type WhatsAppTemplateKey } from "@/lib/whatsapp";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -23,13 +24,15 @@ function Page() {
     <>
       <PageHeader title="Configurações" subtitle="Empresa, serviços e mensagens." />
       <Tabs defaultValue="empresa">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex-wrap h-auto">
           <TabsTrigger value="empresa">Empresa</TabsTrigger>
           <TabsTrigger value="servicos">Serviços</TabsTrigger>
+          <TabsTrigger value="agenda">Agenda</TabsTrigger>
           <TabsTrigger value="msg">Mensagens</TabsTrigger>
         </TabsList>
         <TabsContent value="empresa"><EmpresaTab /></TabsContent>
         <TabsContent value="servicos"><ServicosTab /></TabsContent>
+        <TabsContent value="agenda"><AgendaTab /></TabsContent>
         <TabsContent value="msg"><MsgTab /></TabsContent>
       </Tabs>
     </>
@@ -111,5 +114,75 @@ function MsgTab() {
         </CardContent></Card>
       ))}
     </div>
+  );
+}
+
+function AgendaTab() {
+  const fn = useServerFn(getAgendaConfig);
+  const up = useServerFn(updateAgendaConfig);
+  const qc = useQueryClient();
+  const { data } = useQuery({ queryKey: ["agenda-config"], queryFn: () => fn() });
+  const [f, setF] = useState<any>({ hora_inicio: "08:00", hora_fim: "18:00", dias_semana: [1,2,3,4,5,6], intervalo_min: 30, capacidade_simultanea: 1 });
+  useEffect(() => {
+    if (data?.config) setF({
+      hora_inicio: String(data.config.hora_inicio).slice(0,5),
+      hora_fim: String(data.config.hora_fim).slice(0,5),
+      dias_semana: data.config.dias_semana,
+      intervalo_min: data.config.intervalo_min,
+      capacidade_simultanea: data.config.capacidade_simultanea,
+    });
+  }, [data?.config]);
+  const mut = useMutation({
+    mutationFn: () => up({ data: f }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["agenda-config"] }); toast.success("Salvo"); },
+    onError: (e: any) => toast.error(e?.message ?? "Erro"),
+  });
+  const dias = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
+  const toggleDia = (d: number) => {
+    const set = new Set<number>(f.dias_semana);
+    set.has(d) ? set.delete(d) : set.add(d);
+    setF({ ...f, dias_semana: Array.from(set).sort() });
+  };
+  return (
+    <Card><CardContent className="p-5 space-y-4">
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div><Label>Abertura</Label><Input type="time" value={f.hora_inicio} onChange={(e) => setF({ ...f, hora_inicio: e.target.value })} /></div>
+        <div><Label>Fechamento</Label><Input type="time" value={f.hora_fim} onChange={(e) => setF({ ...f, hora_fim: e.target.value })} /></div>
+      </div>
+      <div>
+        <Label className="mb-2 block">Dias de funcionamento</Label>
+        <div className="flex flex-wrap gap-2">
+          {dias.map((label, i) => (
+            <button key={i} type="button" onClick={() => toggleDia(i)}
+              className={`px-3 py-1.5 rounded-md text-sm border ${f.dias_semana.includes(i) ? "bg-primary text-primary-foreground border-primary" : "hover:bg-accent"}`}>
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="grid sm:grid-cols-2 gap-3">
+        <div>
+          <Label>Intervalo entre horários</Label>
+          <Select value={String(f.intervalo_min)} onValueChange={(v) => setF({ ...f, intervalo_min: Number(v) })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="15">15 min</SelectItem>
+              <SelectItem value="30">30 min</SelectItem>
+              <SelectItem value="60">60 min</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div>
+          <Label>Atendimentos simultâneos</Label>
+          <Select value={String(f.capacidade_simultanea)} onValueChange={(v) => setF({ ...f, capacidade_simultanea: Number(v) })}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              {[1,2,3,4,5,6].map(n => <SelectItem key={n} value={String(n)}>{n}</SelectItem>)}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <Button onClick={() => mut.mutate()} disabled={mut.isPending}>Salvar</Button>
+    </CardContent></Card>
   );
 }

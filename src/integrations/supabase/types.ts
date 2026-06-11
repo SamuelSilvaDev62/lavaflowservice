@@ -14,6 +14,119 @@ export type Database = {
   }
   public: {
     Tables: {
+      agenda_config: {
+        Row: {
+          capacidade_simultanea: number
+          dias_semana: number[]
+          hora_fim: string
+          hora_inicio: string
+          intervalo_min: number
+          owner_id: string
+          updated_at: string
+        }
+        Insert: {
+          capacidade_simultanea?: number
+          dias_semana?: number[]
+          hora_fim?: string
+          hora_inicio?: string
+          intervalo_min?: number
+          owner_id: string
+          updated_at?: string
+        }
+        Update: {
+          capacidade_simultanea?: number
+          dias_semana?: number[]
+          hora_fim?: string
+          hora_inicio?: string
+          intervalo_min?: number
+          owner_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      agendamentos: {
+        Row: {
+          cancelado_em: string | null
+          cliente_id: string
+          concluido_em: string | null
+          confirmado_em: string | null
+          created_at: string
+          data_agendada: string
+          hora_agendada: string
+          id: string
+          observacoes: string | null
+          ordem_id: string | null
+          origem: string
+          owner_id: string
+          servico_id: string | null
+          status: Database["public"]["Enums"]["agendamento_status"]
+          veiculo_id: string | null
+        }
+        Insert: {
+          cancelado_em?: string | null
+          cliente_id: string
+          concluido_em?: string | null
+          confirmado_em?: string | null
+          created_at?: string
+          data_agendada: string
+          hora_agendada: string
+          id?: string
+          observacoes?: string | null
+          ordem_id?: string | null
+          origem?: string
+          owner_id: string
+          servico_id?: string | null
+          status?: Database["public"]["Enums"]["agendamento_status"]
+          veiculo_id?: string | null
+        }
+        Update: {
+          cancelado_em?: string | null
+          cliente_id?: string
+          concluido_em?: string | null
+          confirmado_em?: string | null
+          created_at?: string
+          data_agendada?: string
+          hora_agendada?: string
+          id?: string
+          observacoes?: string | null
+          ordem_id?: string | null
+          origem?: string
+          owner_id?: string
+          servico_id?: string | null
+          status?: Database["public"]["Enums"]["agendamento_status"]
+          veiculo_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "agendamentos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_veiculo_id_fkey"
+            columns: ["veiculo_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       assinaturas_clientes: {
         Row: {
           cliente_id: string
@@ -197,6 +310,7 @@ export type Database = {
           onboarding_status: string
           owner_id: string
           razao_social: string | null
+          slug: string | null
           telefone: string | null
           tour_completed_at: string | null
           website: string | null
@@ -216,6 +330,7 @@ export type Database = {
           onboarding_status?: string
           owner_id: string
           razao_social?: string | null
+          slug?: string | null
           telefone?: string | null
           tour_completed_at?: string | null
           website?: string | null
@@ -235,6 +350,7 @@ export type Database = {
           onboarding_status?: string
           owner_id?: string
           razao_social?: string | null
+          slug?: string | null
           telefone?: string | null
           tour_completed_at?: string | null
           website?: string | null
@@ -605,6 +721,43 @@ export type Database = {
     }
     Functions: {
       current_owner_id: { Args: never; Returns: string }
+      get_agenda_config_publica: {
+        Args: { _owner: string }
+        Returns: {
+          capacidade_simultanea: number
+          dias_semana: number[]
+          hora_fim: string
+          hora_inicio: string
+          intervalo_min: number
+        }[]
+      }
+      get_empresa_by_slug: {
+        Args: { _slug: string }
+        Returns: {
+          endereco: string
+          id: string
+          nome_fantasia: string
+          owner_id: string
+          slug: string
+          telefone: string
+          whatsapp: string
+        }[]
+      }
+      get_ocupacao_dia: {
+        Args: { _data: string; _owner: string }
+        Returns: {
+          hora_agendada: string
+          qtd: number
+        }[]
+      }
+      get_servicos_publicos: {
+        Args: { _owner: string }
+        Returns: {
+          id: string
+          nome: string
+          preco_padrao: number
+        }[]
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -618,6 +771,13 @@ export type Database = {
       }
     }
     Enums: {
+      agendamento_status:
+        | "agendado"
+        | "confirmado"
+        | "em_andamento"
+        | "concluido"
+        | "cancelado"
+        | "nao_compareceu"
       app_role: "owner" | "colaborador"
       assinatura_status: "ativa" | "pausada" | "cancelada"
       interacao_tipo:
@@ -761,6 +921,14 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      agendamento_status: [
+        "agendado",
+        "confirmado",
+        "em_andamento",
+        "concluido",
+        "cancelado",
+        "nao_compareceu",
+      ],
       app_role: ["owner", "colaborador"],
       assinatura_status: ["ativa", "pausada", "cancelada"],
       interacao_tipo: [

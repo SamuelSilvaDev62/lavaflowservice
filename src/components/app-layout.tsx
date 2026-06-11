@@ -2,7 +2,7 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import {
   LayoutDashboard, Sparkles, Bot, ListChecks, ClipboardList, Users, UserMinus,
-  CreditCard, Award, UsersRound, BarChart3, Settings, Menu, X, LogOut, Car, Briefcase,
+  CreditCard, Award, UsersRound, BarChart3, Settings, Menu, X, LogOut, Car, Briefcase, CalendarDays,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -19,6 +19,7 @@ const ownerGroups: Array<{ label: string; items: Array<{ to: string; label: stri
   { label: "Operação", items: [
     { to: "/fila", label: "Fila", icon: ListChecks },
     { to: "/ordens", label: "Ordens de serviço", icon: ClipboardList },
+    { to: "/agendamentos", label: "Agendamentos", icon: CalendarDays },
   ]},
   { label: "Crescimento", items: [
     { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes" },
