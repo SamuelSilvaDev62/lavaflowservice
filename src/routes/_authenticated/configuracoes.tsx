@@ -8,10 +8,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getEmpresa, updateEmpresa, listServicos, upsertServico } from "@/lib/lavaflow.functions";
+import { getEmpresa, updateEmpresa, listServicos, upsertServico, getAgendaConfig, updateAgendaConfig } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { allTemplates, setTemplate, type WhatsAppTemplateKey } from "@/lib/whatsapp";
 import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -23,13 +24,15 @@ function Page() {
     <>
       <PageHeader title="Configurações" subtitle="Empresa, serviços e mensagens." />
       <Tabs defaultValue="empresa">
-        <TabsList className="mb-4">
+        <TabsList className="mb-4 flex-wrap h-auto">
           <TabsTrigger value="empresa">Empresa</TabsTrigger>
           <TabsTrigger value="servicos">Serviços</TabsTrigger>
+          <TabsTrigger value="agenda">Agenda</TabsTrigger>
           <TabsTrigger value="msg">Mensagens</TabsTrigger>
         </TabsList>
         <TabsContent value="empresa"><EmpresaTab /></TabsContent>
         <TabsContent value="servicos"><ServicosTab /></TabsContent>
+        <TabsContent value="agenda"><AgendaTab /></TabsContent>
         <TabsContent value="msg"><MsgTab /></TabsContent>
       </Tabs>
     </>
