@@ -10,6 +10,15 @@ import {
   Check, X, ArrowRight, Star, Zap, BarChart3, Trophy, Clock, DollarSign,
   Instagram, Phone, ChevronRight, Bot, Smartphone,
 } from "lucide-react";
+import dashboardAsset from "@/assets/landing/app-dashboard.webp.asset.json";
+import assistantAsset from "@/assets/landing/app-assistant.webp.asset.json";
+import kanbanAsset from "@/assets/landing/app-kanban.webp.asset.json";
+
+const SHOTS = {
+  dashboard: { url: dashboardAsset.url, alt: "Painel executivo do LavaFlow com receita, score de saúde e oportunidades" },
+  assistant: { url: assistantAsset.url, alt: "Assistente LavaFlow apresentando insights e recomendações automáticas" },
+  kanban: { url: kanbanAsset.url, alt: "Kanban de fila de atendimento do LavaFlow com veículos por etapa" },
+} as const;
 
 export const Route = createFileRoute("/")({
   ssr: false,
