@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as ApiAssistenteChatRouteImport } from './routes/api/assistente-chat'
 import { Route as AgendarSlugRouteImport } from './routes/agendar.$slug'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedOrdensRouteImport } from './routes/_authenticated/ordens'
@@ -41,6 +42,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAssistenteChatRoute = ApiAssistenteChatRouteImport.update({
+  id: '/api/assistente-chat',
+  path: '/api/assistente-chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgendarSlugRoute = AgendarSlugRouteImport.update({
@@ -147,6 +153,7 @@ export interface FileRoutesByFullPath {
   '/ordens': typeof AuthenticatedOrdensRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
+  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
   '/clientes/': typeof AuthenticatedClientesIndexRoute
@@ -167,6 +174,7 @@ export interface FileRoutesByTo {
   '/ordens': typeof AuthenticatedOrdensRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
+  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
   '/clientes': typeof AuthenticatedClientesIndexRoute
@@ -189,6 +197,7 @@ export interface FileRoutesById {
   '/_authenticated/ordens': typeof AuthenticatedOrdensRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
+  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/_authenticated/clientes/inativos': typeof AuthenticatedClientesInativosRoute
   '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
@@ -211,6 +220,7 @@ export interface FileRouteTypes {
     | '/ordens'
     | '/relatorios'
     | '/agendar/$slug'
+    | '/api/assistente-chat'
     | '/clientes/$id'
     | '/clientes/inativos'
     | '/clientes/'
@@ -231,6 +241,7 @@ export interface FileRouteTypes {
     | '/ordens'
     | '/relatorios'
     | '/agendar/$slug'
+    | '/api/assistente-chat'
     | '/clientes/$id'
     | '/clientes/inativos'
     | '/clientes'
@@ -252,6 +263,7 @@ export interface FileRouteTypes {
     | '/_authenticated/ordens'
     | '/_authenticated/relatorios'
     | '/agendar/$slug'
+    | '/api/assistente-chat'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/inativos'
     | '/_authenticated/clientes/'
@@ -262,6 +274,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   AgendarSlugRoute: typeof AgendarSlugRoute
+  ApiAssistenteChatRoute: typeof ApiAssistenteChatRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -285,6 +298,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/assistente-chat': {
+      id: '/api/assistente-chat'
+      path: '/api/assistente-chat'
+      fullPath: '/api/assistente-chat'
+      preLoaderRoute: typeof ApiAssistenteChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agendar/$slug': {
@@ -446,6 +466,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   AgendarSlugRoute: AgendarSlugRoute,
+  ApiAssistenteChatRoute: ApiAssistenteChatRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
