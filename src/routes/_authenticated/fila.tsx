@@ -1,27 +1,29 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { useState } from "react";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Drawer, DrawerContent, DrawerHeader, DrawerTitle, DrawerDescription, DrawerClose } from "@/components/ui/drawer";
 import { getFila, updateOrdemStatus, logWhatsappEnvio, getWhatsappLogs, type OsStatus } from "@/lib/lavaflow.functions";
 import { brl, dateTimeBr } from "@/lib/format";
 import { waLink, getTemplate, renderTemplate } from "@/lib/whatsapp";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, PointerSensor, useSensor, useSensors, TouchSensor } from "@dnd-kit/core";
-import { MessageCircle, Check, Send } from "lucide-react";
+import { MessageCircle, Check, Send, Phone, ChevronRight, ChevronLeft, X } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/fila")({
   component: FilaPage,
 });
 
-const columns: Array<{ key: OsStatus; label: string; color: string }> = [
-  { key: "aguardando", label: "Aguardando", color: "bg-muted" },
-  { key: "em_lavagem", label: "Em lavagem", color: "bg-primary/10" },
-  { key: "finalizacao", label: "Finalização", color: "bg-warning/10" },
-  { key: "pronto", label: "Pronto", color: "bg-success/10" },
-  { key: "entregue", label: "Entregue", color: "bg-accent" },
+const columns: Array<{ key: OsStatus; label: string; short: string; color: string; emoji: string }> = [
+  { key: "aguardando", label: "Aguardando", short: "Fila", color: "bg-muted", emoji: "🕓" },
+  { key: "em_lavagem", label: "Em lavagem", short: "Lavando", color: "bg-primary/10", emoji: "🧼" },
+  { key: "finalizacao", label: "Finalização", short: "Final", color: "bg-warning/10", emoji: "✨" },
+  { key: "pronto", label: "Pronto", short: "Pronto", color: "bg-success/10", emoji: "✅" },
+  { key: "entregue", label: "Entregue", short: "Entregue", color: "bg-accent", emoji: "🚗" },
 ];
 
 function disparaWhatsappPronto(ordem: any, logFn: (v: { cliente_id: string; descricao: string }) => Promise<any>) {
@@ -34,7 +36,6 @@ function disparaWhatsappPronto(ordem: any, logFn: (v: { cliente_id: string; desc
     return;
   }
   const msg = renderTemplate(getTemplate("pronto_para_retirada"), { nome, placa });
-  // Sincronamente abrir janela (preserva user gesture do drag/click)
   const win = window.open(waLink(tel, msg), "_blank", "noopener");
   if (!win) {
     toast.error("Bloqueio de pop-up impediu o envio. Use o botão WhatsApp do card.");
@@ -43,6 +44,15 @@ function disparaWhatsappPronto(ordem: any, logFn: (v: { cliente_id: string; desc
   logFn({ cliente_id, descricao: `OS pronta · ${placa || nome} · template "pronto_para_retirada"` })
     .then(() => toast.success(`WhatsApp aberto para ${nome.split(" ")[0]} ✓ registrado nos logs`))
     .catch(() => toast.success(`WhatsApp aberto para ${nome.split(" ")[0]}`));
+}
+
+function nextStatus(s: OsStatus): OsStatus | null {
+  const idx = columns.findIndex(c => c.key === s);
+  return idx >= 0 && idx < columns.length - 1 ? columns[idx + 1].key : null;
+}
+function prevStatus(s: OsStatus): OsStatus | null {
+  const idx = columns.findIndex(c => c.key === s);
+  return idx > 0 ? columns[idx - 1].key : null;
 }
 
 function FilaPage() {
@@ -54,6 +64,9 @@ function FilaPage() {
   const { data, isLoading } = useQuery({ queryKey: ["fila"], queryFn: () => getFn() });
   const { data: logsData } = useQuery({ queryKey: ["wa-logs"], queryFn: () => logsFn() });
 
+  const [activeMobile, setActiveMobile] = useState<OsStatus>("aguardando");
+  const [selected, setSelected] = useState<any | null>(null);
+
   const mut = useMutation({
     mutationFn: (v: { id: string; status: OsStatus }) => updFn({ data: v }),
     onSuccess: (_r, vars) => {
@@ -63,6 +76,7 @@ function FilaPage() {
         const ordem = data?.ordens.find((o) => o.id === vars.id);
         if (ordem) disparaWhatsappPronto(ordem, (p) => logFn({ data: p }));
       }
+      setSelected(null);
     },
     onError: (e: any) => toast.error(e?.message ?? "Falhou"),
   });
@@ -83,24 +97,40 @@ function FilaPage() {
     qc.invalidateQueries({ queryKey: ["wa-logs"] });
   }
 
-  const totalFila = data?.ordens.length ?? 0;
   const ordensList = data?.ordens ?? [];
-  const naFila = ordensList.filter(o => o.status === "aguardando").length;
-  const emAndamento = ordensList.filter(o => o.status === "em_lavagem" || o.status === "finalizacao").length;
-  const prontos = ordensList.filter(o => o.status === "pronto").length;
+  const totalFila = ordensList.length;
+  const countBy = (s: OsStatus) => ordensList.filter(o => o.status === s).length;
+  const naFila = countBy("aguardando");
+  const emAndamento = countBy("em_lavagem") + countBy("finalizacao");
+  const prontos = countBy("pronto");
   const receitaProducao = ordensList
     .filter(o => o.status === "em_lavagem" || o.status === "finalizacao" || o.status === "pronto")
     .reduce((s, o) => s + Number(o.valor ?? 0), 0);
 
+  const itemsMobile = ordensList.filter(o => o.status === activeMobile);
+
   return (
     <>
-      <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', o WhatsApp dispara automaticamente." />
+      <div className="sm:hidden">
+        <h1 className="font-display text-2xl font-bold">Fila</h1>
+        <p className="text-xs text-muted-foreground mb-3">Toque num card para mover de etapa.</p>
+      </div>
+      <div className="hidden sm:block">
+        <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', o WhatsApp dispara automaticamente." />
+      </div>
 
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+      {/* KPIs — grid no desktop, scroll horizontal no mobile */}
+      <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
         <QuickCard label="🚗 Na fila" value={String(naFila)} />
         <QuickCard label="🔄 Em andamento" value={String(emAndamento)} />
         <QuickCard label="✅ Prontos" value={String(prontos)} />
         <QuickCard label="💰 Em produção" value={brl(receitaProducao)} />
+      </div>
+      <div className="sm:hidden -mx-4 px-4 mb-3 flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 [&::-webkit-scrollbar]:hidden">
+        <KpiChip label="Na fila" value={String(naFila)} emoji="🚗" />
+        <KpiChip label="Andamento" value={String(emAndamento)} emoji="🔄" />
+        <KpiChip label="Prontos" value={String(prontos)} emoji="✅" />
+        <KpiChip label="Produção" value={brl(receitaProducao)} emoji="💰" />
       </div>
 
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
@@ -109,35 +139,131 @@ function FilaPage() {
           <Card className="border-dashed">
             <CardContent className="p-6 text-center">
               <p className="font-display font-semibold">Fila vazia 🧼</p>
-              <p className="text-sm text-muted-foreground mt-1">Nenhum carro em atendimento agora. Cada nova OS aparece aqui automaticamente.</p>
+              <p className="text-sm text-muted-foreground mt-1">Nenhum carro em atendimento agora.</p>
               <Button asChild size="sm" className="mt-3"><Link to="/ordens">Criar nova OS</Link></Button>
             </CardContent>
           </Card>
         </div>
       )}
-      <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-          {columns.map((c) => {
-            const items = data?.ordens.filter((o) => o.status === c.key) ?? [];
-            return <Column key={c.key} col={c} items={items} onAdvance={(id, s) => mut.mutate({ id, status: s })} onReenviar={reenviarWhats} />;
-          })}
+
+      {/* MOBILE: tabs de status + lista */}
+      <div className="sm:hidden">
+        <div className="sticky top-0 z-30 -mx-4 px-4 py-2 bg-background/95 backdrop-blur border-b">
+          <div className="flex gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+            {columns.map(c => {
+              const n = countBy(c.key);
+              const active = c.key === activeMobile;
+              return (
+                <button key={c.key} onClick={() => setActiveMobile(c.key)}
+                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition ${active ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-card border-border text-foreground/70"}`}>
+                  <span className="mr-1">{c.emoji}</span>{c.short}
+                  <span className={`ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] ${active ? "bg-primary-foreground/20" : "bg-muted"}`}>{n}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
-      </DndContext>
+        <div className="space-y-2 mt-3">
+          {itemsMobile.length === 0 && totalFila > 0 && (
+            <p className="text-center text-sm text-muted-foreground py-12">Nenhuma OS nesta etapa.</p>
+          )}
+          {itemsMobile.map(o => (
+            <button key={o.id} onClick={() => setSelected(o)}
+              className="w-full text-left bg-card border rounded-xl p-3 shadow-sm active:scale-[0.99] transition">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0 flex-1">
+                  <p className="font-semibold truncate">{o.clientes?.nome ?? "—"}</p>
+                  <p className="text-xs text-muted-foreground truncate">{o.servicos?.nome ?? "Serviço"} · {brl(o.valor)}</p>
+                </div>
+                <span className="shrink-0 text-xs font-mono bg-muted px-2 py-0.5 rounded">{o.veiculos?.placa ?? "—"}</span>
+              </div>
+              <div className="flex items-center justify-between mt-2 text-[11px] text-muted-foreground">
+                <span>⏱ {tempoNaEtapa(o)}</span>
+                <ChevronRight className="h-4 w-4" />
+              </div>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* DESKTOP: kanban com drag */}
+      <div className="hidden sm:block">
+        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
+            {columns.map((c) => {
+              const items = ordensList.filter((o) => o.status === c.key);
+              return <Column key={c.key} col={c} items={items} onAdvance={(id, s) => mut.mutate({ id, status: s })} onReenviar={reenviarWhats} />;
+            })}
+          </div>
+        </DndContext>
+      </div>
+
+      {/* Bottom sheet detalhes (mobile-first, mas funciona em qualquer largura) */}
+      <Drawer open={!!selected} onOpenChange={(o) => !o && setSelected(null)}>
+        <DrawerContent className="max-h-[85vh]">
+          {selected && (
+            <>
+              <DrawerHeader className="text-left">
+                <DrawerTitle className="flex items-center justify-between gap-2">
+                  <span className="truncate">{selected.clientes?.nome ?? "Cliente"}</span>
+                  <DrawerClose asChild><Button size="icon" variant="ghost" className="h-8 w-8"><X className="h-4 w-4" /></Button></DrawerClose>
+                </DrawerTitle>
+                <DrawerDescription className="flex items-center gap-2 text-xs">
+                  <Badge variant="secondary">{columns.find(c => c.key === selected.status)?.emoji} {columns.find(c => c.key === selected.status)?.label}</Badge>
+                  <span className="font-mono">{selected.veiculos?.placa ?? "—"}</span>
+                </DrawerDescription>
+              </DrawerHeader>
+              <div className="px-4 pb-2 space-y-1 text-sm">
+                <p><span className="text-muted-foreground">Serviço:</span> {selected.servicos?.nome ?? "—"}</p>
+                <p><span className="text-muted-foreground">Valor:</span> <span className="font-semibold">{brl(selected.valor)}</span></p>
+                <p><span className="text-muted-foreground">Entrada:</span> {dateTimeBr(selected.created_at)}</p>
+                <p><span className="text-muted-foreground">Tempo na etapa:</span> {tempoNaEtapa(selected)}</p>
+                {selected.funcionarios?.nome && <p><span className="text-muted-foreground">Atendente:</span> {selected.funcionarios.nome}</p>}
+              </div>
+
+              <div className="p-4 pt-3 space-y-2">
+                {nextStatus(selected.status) && (
+                  <Button className="w-full h-12" onClick={() => mut.mutate({ id: selected.id, status: nextStatus(selected.status)! })}>
+                    <Check className="h-4 w-4 mr-2" />
+                    Avançar para {columns.find(c => c.key === nextStatus(selected.status))?.label}
+                  </Button>
+                )}
+                {prevStatus(selected.status) && (
+                  <Button variant="outline" className="w-full h-11" onClick={() => mut.mutate({ id: selected.id, status: prevStatus(selected.status)! })}>
+                    <ChevronLeft className="h-4 w-4 mr-2" />
+                    Voltar para {columns.find(c => c.key === prevStatus(selected.status))?.label}
+                  </Button>
+                )}
+                {selected.clientes?.telefone && (
+                  <div className="grid grid-cols-2 gap-2 pt-1">
+                    <Button variant="outline" className="h-11" asChild>
+                      <a href={`tel:${selected.clientes.telefone}`}><Phone className="h-4 w-4 mr-2" />Ligar</a>
+                    </Button>
+                    <Button variant="outline" className="h-11" onClick={() => reenviarWhats(selected)}>
+                      <MessageCircle className="h-4 w-4 mr-2" />WhatsApp
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </>
+          )}
+        </DrawerContent>
+      </Drawer>
 
       <Card className="mt-6">
         <CardContent className="p-5">
-          <h3 className="font-display font-semibold mb-3 flex items-center gap-2"><Send className="h-4 w-4 text-success" />Logs de envio WhatsApp</h3>
+          <h3 className="font-display font-semibold mb-3 flex items-center gap-2"><Send className="h-4 w-4 text-success" />Logs WhatsApp</h3>
           {(logsData?.logs ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum envio registrado ainda. Mova uma OS para 'Pronto' para disparar.</p>
+            <p className="text-sm text-muted-foreground">Nenhum envio registrado ainda.</p>
           ) : (
             <div className="space-y-1 max-h-64 overflow-y-auto">
               {logsData!.logs.map((l: any) => (
-                <div key={l.id} className="flex items-center justify-between text-xs border-l-2 border-success/40 pl-3 py-1">
-                  <div>
-                    <p className="font-medium text-sm">{l.clientes?.nome ?? "Cliente"}</p>
-                    <p className="text-muted-foreground">{l.descricao}</p>
+                <div key={l.id} className="flex items-center justify-between gap-2 text-xs border-l-2 border-success/40 pl-3 py-1">
+                  <div className="min-w-0">
+                    <p className="font-medium text-sm truncate">{l.clientes?.nome ?? "Cliente"}</p>
+                    <p className="text-muted-foreground truncate">{l.descricao}</p>
                   </div>
-                  <span className="text-muted-foreground whitespace-nowrap">{dateTimeBr(l.created_at)}</span>
+                  <span className="text-muted-foreground whitespace-nowrap shrink-0">{dateTimeBr(l.created_at)}</span>
                 </div>
               ))}
             </div>
@@ -172,6 +298,15 @@ function QuickCard({ label, value }: { label: string; value: string }) {
         <p className="font-display font-bold text-xl mt-1">{value}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function KpiChip({ label, value, emoji }: { label: string; value: string; emoji: string }) {
+  return (
+    <div className="snap-start shrink-0 min-w-[120px] rounded-xl border bg-card px-3 py-2">
+      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><span>{emoji}</span>{label}</p>
+      <p className="font-display font-bold text-lg leading-tight mt-0.5">{value}</p>
+    </div>
   );
 }
 
