@@ -1,77 +1,112 @@
-# Módulo Simplificado de Colaboradores
 
-## 1. Papéis & autenticação
-Migração:
-- enum `app_role` (`owner`, `colaborador`)
-- tabela `user_roles(user_id, role, unique(user_id, role))` + RLS + GRANTs
-- função `public.has_role(_uid, _role)` SECURITY DEFINER
-- adicionar `funcionarios.auth_user_id uuid unique null` + `funcionarios.comissao_*` (ver §3)
-- novo trigger `tg_bootstrap_new_user` continua criando empresa; também insere role `owner` para o usuário recém-criado
-- nova função `vincular_colaborador(email, funcionario_id)`: procura `auth.users` pelo email, marca `funcionarios.auth_user_id` e insere `user_roles(role='colaborador', owner_id=<dono>)`
+# Módulo de Agendamento Inteligente
 
-Como o colaborador "vê" o lava-rápido do dono:
-- `user_roles` ganha coluna `owner_id` (FK auth.users) → identifica de qual operação ele faz parte
-- nova função `current_owner_id()` SECURITY DEFINER: retorna `auth.uid()` se for owner; caso contrário retorna `owner_id` da linha de role do usuário
-- substituir policies `auth.uid() = owner_id` de `ordens_servico`, `funcionarios`, `clientes`, `veiculos`, `servicos` por `current_owner_id() = owner_id` para SELECT/UPDATE — INSERT/DELETE continuam restritas ao owner via `has_role(auth.uid(),'owner')`
+Decisões padrão (sem bloqueios):
+- Página pública `/agendar/{slug}` incluída nesta entrega (slug derivado da empresa).
+- Conflito de horário valida pela capacidade configurada (bloqueia com aviso explicativo).
+- Lembretes manuais via botão WhatsApp (sem cron) — simples e alinhado ao restante.
 
-UI:
-- Tela `/equipe`: campo "email de acesso" no formulário de funcionário → chama `vincular_colaborador`
-- AppLayout: ler role do usuário; se `colaborador`, esconder grupos Visão/Crescimento/Gestão e mostrar só "Meu Trabalho" + "Sair"
-- `_authenticated/route.tsx`: após autenticar, se role=colaborador e rota não começar com `/meu-trabalho`, redirecionar para `/meu-trabalho`
+---
 
-## 2. Nova rota /meu-trabalho
-`src/routes/_authenticated/meu-trabalho.tsx` — mobile-first.
+## 1. Banco de dados (1 migration)
 
-Server fns (em `lavaflow.functions.ts`):
-- `getMeuTrabalho`: retorna funcionário vinculado + cards (concluídos hoje, tempo médio, comissão acumulada do mês, lavagens da semana) + lista de OS atribuídas/não atribuídas em status `aguardando|em_lavagem|finalizacao`
-- `iniciarOs(osId)`: seta `status='em_lavagem'`, `iniciado_em=now()`, `funcionario_id=<meu>`. Valida via `requireSupabaseAuth`.
-- `finalizarOs(osId)`: seta `status='pronto'`, `finalizado_em=now()`. Mantém disparo de WhatsApp (já existente fica no Kanban; aqui só atualiza).
+**Tabela `agendamentos`**
+- `id`, `owner_id`, `cliente_id`, `veiculo_id` (nullable), `servico_id` (nullable)
+- `data_agendada` (date), `hora_agendada` (time)
+- `status` enum `agendamento_status`: agendado | confirmado | em_andamento | concluido | cancelado | nao_compareceu
+- `observacoes` text, `ordem_id` (fk para OS criada)
+- `created_at`, `confirmado_em`, `cancelado_em`, `concluido_em`
+- Índices: (owner_id, data_agendada), (owner_id, status)
 
-Layout:
-- 4 cards no topo (grid 2x2 no mobile)
-- lista de cards de OS com botões `[Iniciar]` ou `[Finalizar]` conforme status
+**Tabela `agenda_config`** (1 linha por owner)
+- `owner_id` PK, `hora_inicio` (default 08:00), `hora_fim` (18:00), `dias_semana` int[] (1-6), `intervalo_min` (30), `capacidade_simultanea` (1)
 
-## 3. Comissão configurável
-Migração:
-- `funcionarios.comissao_tipo text default 'fixo' check in ('fixo','percentual')`
-- `funcionarios.comissao_valor numeric(10,2) default 0` (R$ se fixo, % se percentual)
-- tabela `comissoes(id, owner_id, funcionario_id, ordem_id unique, valor, created_at)` + RLS (`current_owner_id() = owner_id`) + GRANTs
-- trigger `tg_os_entregue_comissao`: ao mudar para `entregue` e `funcionario_id` not null, calcular e inserir em `comissoes` (idempotente via unique)
+**`empresa`**: adicionar `slug` text unique (gerado a partir de `nome_fantasia` no bootstrap; backfill com unaccent+lower+regex).
 
-UI:
-- Tela `/equipe`: inputs "Tipo (fixo/%)" + "Valor"
-- `/meu-trabalho`: card "Comissão acumulada (mês)" lê de `comissoes`
-- `/equipe` (dashboard do dono): ranking + receita gerada + comissão paga
+GRANTs para `authenticated` e `service_role`. RLS com `current_owner_id()` igual ao padrão. Para `agenda_config`/`empresa` por slug, criar função `public.get_empresa_by_slug(slug)` SECURITY DEFINER retornando apenas campos públicos (id, nome, telefone, slug) para a página pública.
 
-## 4. Dashboard da Equipe (dono)
-Server fn `getEquipeMetrics`:
-- veículos lavados hoje, colaboradores ativos hoje (distintos `funcionario_id`), tempo médio (now()-iniciado_em até finalizado_em), valor gerado pela equipe
-- ranking por filtro (hoje/semana/mês): lavagens + receita + comissão por colaborador
+Bootstrap: estender `tg_bootstrap_new_user` para inserir `agenda_config` default e gerar `slug`.
 
-Acrescentado no topo de `/equipe`.
+---
 
-## 5. Kanban — melhorias visuais
-`src/routes/_authenticated/fila.tsx`:
-- 4 cards rápidos no topo (fila / em andamento / prontos / receita em produção)
-- cards do Kanban exibem cliente, veículo, serviço, valor, colaborador responsável, tempo na etapa (`formatDistanceToNow` em pt-BR)
-- ⚠️ SLA verde/amarelo/vermelho fica fora desta entrega (decisão do usuário)
+## 2. Server functions (`src/lib/lavaflow.functions.ts`)
 
-## Detalhes técnicos
-- `os_status` enum já tem `aguardando, em_lavagem, finalizacao, pronto, entregue` — reusar
-- `requireSupabaseAuth` injeta `supabase` autenticado; consultas usarão `current_owner_id()` via RLS, sem mudar code-paths existentes
-- `attachSupabaseAuth` já registrado em `src/start.ts`
-- Re-gerar `routeTree.gen.ts` automaticamente ao salvar `meu-trabalho.tsx`
-- Tudo em PT-BR, tokens semânticos do design system, sem cores hardcoded
+- `listAgendamentos({ date?, range?, status? })`
+- `createAgendamento(input)` — valida capacidade contra `agenda_config`
+- `updateAgendamentoStatus({ id, status })`
+- `iniciarAtendimento({ id })` — cria OS (`ordens_servico` aguardando), grava `ordem_id`, status → `em_andamento`
+- `getAgendaConfig` / `updateAgendaConfig`
+- `agendamentoStats()` — hoje, confirmados, em atendimento, no-show; usado no dashboard e cards
 
-## Entrega em uma única migração + edits de código
-Migração SQL única cobrindo §1 + §3 + recriação das policies dos 5 tables. Depois dos arquivos:
-- novo `src/routes/_authenticated/meu-trabalho.tsx`
-- editar `src/components/app-layout.tsx` (esconder menus por role)
-- editar `src/routes/_authenticated/route.tsx` (redirect colaborador)
-- editar `src/routes/_authenticated/equipe.tsx` (campos comissão + email + dashboard equipe)
-- editar `src/routes/_authenticated/fila.tsx` (cards topo + tempo na etapa + colaborador)
-- editar `src/lib/lavaflow.functions.ts` (server fns novas)
+Página pública usa server fn sem auth:
+- `getEmpresaPublica({ slug })` — chama RPC `get_empresa_by_slug`
+- `getHorariosDisponiveis({ slug, data })` — calcula slots a partir de `agenda_config` − ocupação
+- `solicitarAgendamentoPublico({ slug, nome, telefone, veiculo, servico_id, data, hora, obs })` — usa `supabaseAdmin` (import dentro do handler), cria/upserta cliente, insere agendamento `agendado`
 
-Pontos abertos para confirmar antes de codar:
-1. Quero reaproveitar `funcionarios.telefone` ou adicionar `funcionarios.email`? (proponho **adicionar `email`** pois telefone não serve para login)
-2. Reescrever as policies dos 5 tables agora é uma mudança sensível — confirma que posso fazer?
+---
+
+## 3. Rotas
+
+- `src/routes/_authenticated/agendamentos.tsx` — abas Agenda (timeline por horário) e Lista; cards no topo; modal "Nova Reserva"; ações por linha: Confirmar, Iniciar atendimento, Marcar não compareceu, Cancelar, WhatsApp confirmação, WhatsApp lembrete
+- `src/routes/_authenticated/configuracoes.tsx` — nova seção "Agenda" (horários, dias, intervalo, capacidade)
+- `src/routes/_authenticated/dashboard.tsx` — adicionar 4 KPIs de agendamento
+- `src/routes/_authenticated/relatorios.tsx` — bloco "Agendamentos" (período, comparecimento %, cancelamento %, horários e dias mais procurados)
+- `src/routes/agendar.$slug.tsx` — pública, SSR on, head() com OG; form em etapas (dados → serviço → data/hora → confirmação)
+- Adicionar `Agendamentos` ao menu (grupo Operação) em `app-layout.tsx`
+
+---
+
+## 4. Conversão em OS
+
+`iniciarAtendimento` cria `ordens_servico` com `cliente_id`, `veiculo_id`, `servico_id`, `valor = servicos.preco_padrao`, status `aguardando` (entra direto no Kanban da Fila); invalida queries de fila/ordens/agendamentos.
+
+---
+
+## 5. WhatsApp
+
+Helpers em `src/lib/whatsapp.ts`:
+- `mensagemConfirmacao(ag)` e `mensagemLembrete(ag)` → abrem `https://wa.me/<tel>?text=...` em nova aba
+
+Botões na linha do agendamento e no detalhe.
+
+---
+
+## 6. Assistente / Oportunidades
+
+Em `oportunidades.tsx` e/ou assistant, adicionar insights baseados em `agendamentos` quando houver dados:
+- nº de no-shows no mês
+- dia da semana com menor ocupação
+- janela de horário mais procurada
+- capacidade ociosa por dia da semana
+
+Implementado como funções de agregação simples chamadas pela página existente — sem novo motor.
+
+---
+
+## 7. Detalhes técnicos
+
+- Mobile-first: cards empilhados, abas via shadcn `Tabs`, timeline com lista agrupada por hora
+- `Dialog` para Nova Reserva reusa selects de cliente/veículo/serviço já existentes em `ordens.tsx`
+- Validação Zod no client e dentro dos handlers
+- Página pública NÃO sob `_authenticated/`; loader chama server fn pública (admin client dentro do handler) — não usa `requireSupabaseAuth`
+- Realtime opcional fica fora desta entrega
+
+---
+
+## Arquivos criados/alterados
+
+Novos:
+- `supabase/migrations/<ts>_agendamentos.sql`
+- `src/routes/_authenticated/agendamentos.tsx`
+- `src/routes/agendar.$slug.tsx`
+
+Editados:
+- `src/lib/lavaflow.functions.ts` (server fns + stats)
+- `src/lib/whatsapp.ts` (helpers de mensagem)
+- `src/components/app-layout.tsx` (item de menu)
+- `src/routes/_authenticated/dashboard.tsx` (4 KPIs)
+- `src/routes/_authenticated/configuracoes.tsx` (seção Agenda)
+- `src/routes/_authenticated/relatorios.tsx` (bloco Agendamentos)
+- `src/routes/_authenticated/oportunidades.tsx` (insights)
+
+Fora de escopo (segunda fase): lembretes automáticos via cron, fila de aprovação para solicitações públicas (entram já como `agendado`), realtime updates.
