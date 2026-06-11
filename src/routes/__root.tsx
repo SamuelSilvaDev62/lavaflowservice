@@ -86,8 +86,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:title", content: "LavaFlow — Cresça com seu lava-rápido" },
       { name: "twitter:description", content: "Plataforma de crescimento para lava-rápidos: recupere clientes, crie receita recorrente e tome decisões com dados." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/e259b711-9146-4d28-a3c7-2b0de3493067" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/e259b711-9146-4d28-a3c7-2b0de3493067" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/b8940da5-205a-4f65-bb39-239953117771" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/attachments/og-images/b8940da5-205a-4f65-bb39-239953117771" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
     links: [
