@@ -778,3 +778,265 @@ export const getEquipeMetrics = createServerFn({ method: "GET" })
       ranking,
     };
   });
+
+// ============ AGENDAMENTOS ============
+export type AgendamentoStatus = "agendado" | "confirmado" | "em_andamento" | "concluido" | "cancelado" | "nao_compareceu";
+
+export const listAgendamentos = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { date?: string; from?: string; to?: string }) => d ?? {})
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    let q = supabase.from("agendamentos")
+      .select(`id, data_agendada, hora_agendada, status, observacoes, ordem_id, created_at,
+               cliente_id, veiculo_id, servico_id,
+               clientes:cliente_id(nome, telefone),
+               veiculos:veiculo_id(placa, modelo),
+               servicos:servico_id(nome, preco_padrao)`)
+      .eq("owner_id", userId)
+      .order("data_agendada", { ascending: true })
+      .order("hora_agendada", { ascending: true });
+    if (data.date) q = q.eq("data_agendada", data.date);
+    if (data.from) q = q.gte("data_agendada", data.from);
+    if (data.to) q = q.lte("data_agendada", data.to);
+    const { data: rows, error } = await q.limit(500);
+    if (error) throw error;
+    return { agendamentos: rows ?? [] };
+  });
+
+export const agendamentoStats = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const today = new Date().toISOString().slice(0, 10);
+    const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const [{ data: hoje }, { data: mes }] = await Promise.all([
+      supabase.from("agendamentos").select("id, status").eq("owner_id", userId).eq("data_agendada", today),
+      supabase.from("agendamentos").select("id, status").eq("owner_id", userId).gte("data_agendada", monthAgo),
+    ]);
+    const h = hoje ?? [];
+    const m = mes ?? [];
+    const totalMes = m.length;
+    const compareceu = m.filter(a => a.status === "concluido" || a.status === "em_andamento").length;
+    const naoCompareceu = m.filter(a => a.status === "nao_compareceu").length;
+    return {
+      hoje: h.length,
+      confirmadosHoje: h.filter(a => a.status === "confirmado").length,
+      emAndamentoHoje: h.filter(a => a.status === "em_andamento").length,
+      naoCompareceuHoje: h.filter(a => a.status === "nao_compareceu").length,
+      naoCompareceuMes: naoCompareceu,
+      taxaComparecimento: totalMes ? compareceu / totalMes : 0,
+      totalMes,
+    };
+  });
+
+export const createAgendamento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    cliente_id: z.string().uuid(),
+    veiculo_id: z.string().uuid().nullable().optional(),
+    servico_id: z.string().uuid().nullable().optional(),
+    data_agendada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    hora_agendada: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+    observacoes: z.string().max(500).nullable().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const hora = data.hora_agendada.length === 5 ? data.hora_agendada + ":00" : data.hora_agendada;
+    // Valida capacidade
+    const { data: cfg } = await supabase.from("agenda_config").select("capacidade_simultanea").eq("owner_id", userId).maybeSingle();
+    const cap = cfg?.capacidade_simultanea ?? 1;
+    const { count } = await supabase.from("agendamentos")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", userId)
+      .eq("data_agendada", data.data_agendada)
+      .eq("hora_agendada", hora)
+      .not("status", "in", "(cancelado,nao_compareceu)");
+    if ((count ?? 0) >= cap) {
+      throw new Error(`Horário lotado (capacidade ${cap}).`);
+    }
+    const { error, data: row } = await supabase.from("agendamentos").insert({
+      ...data, hora_agendada: hora, owner_id: userId,
+    }).select().single();
+    if (error) throw error;
+    return { agendamento: row };
+  });
+
+export const updateAgendamentoStatus = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    id: z.string().uuid(),
+    status: z.enum(["agendado","confirmado","em_andamento","concluido","cancelado","nao_compareceu"]),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const patch: any = { status: data.status };
+    if (data.status === "confirmado") patch.confirmado_em = new Date().toISOString();
+    if (data.status === "cancelado") patch.cancelado_em = new Date().toISOString();
+    if (data.status === "concluido") patch.concluido_em = new Date().toISOString();
+    const { error } = await supabase.from("agendamentos").update(patch).eq("id", data.id).eq("owner_id", userId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const iniciarAtendimento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: ag, error: e1 } = await supabase.from("agendamentos")
+      .select("id, cliente_id, veiculo_id, servico_id, ordem_id, observacoes")
+      .eq("id", data.id).eq("owner_id", userId).single();
+    if (e1) throw e1;
+    if (ag.ordem_id) {
+      return { ok: true, ordem_id: ag.ordem_id };
+    }
+    let valor = 0;
+    if (ag.servico_id) {
+      const { data: s } = await supabase.from("servicos").select("preco_padrao").eq("id", ag.servico_id).maybeSingle();
+      valor = Number(s?.preco_padrao ?? 0);
+    }
+    const { data: os, error: e2 } = await supabase.from("ordens_servico").insert({
+      owner_id: userId,
+      cliente_id: ag.cliente_id,
+      veiculo_id: ag.veiculo_id,
+      servico_id: ag.servico_id,
+      valor,
+      observacoes: ag.observacoes,
+      status: "aguardando",
+    }).select("id").single();
+    if (e2) throw e2;
+    const { error: e3 } = await supabase.from("agendamentos").update({
+      status: "em_andamento",
+      ordem_id: os.id,
+    }).eq("id", data.id).eq("owner_id", userId);
+    if (e3) throw e3;
+    return { ok: true, ordem_id: os.id };
+  });
+
+export const getAgendaConfig = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data } = await context.supabase.from("agenda_config").select("*").eq("owner_id", context.userId).maybeSingle();
+    return { config: data ?? { hora_inicio: "08:00", hora_fim: "18:00", dias_semana: [1,2,3,4,5,6], intervalo_min: 30, capacidade_simultanea: 1 } };
+  });
+
+export const updateAgendaConfig = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    hora_inicio: z.string().regex(/^\d{2}:\d{2}/),
+    hora_fim: z.string().regex(/^\d{2}:\d{2}/),
+    dias_semana: z.array(z.number().int().min(0).max(6)).min(1).max(7),
+    intervalo_min: z.number().int().refine(v => [15,30,60].includes(v)),
+    capacidade_simultanea: z.number().int().min(1).max(10),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("agenda_config")
+      .upsert({ ...data, owner_id: context.userId, updated_at: new Date().toISOString() }, { onConflict: "owner_id" });
+    if (error) throw error;
+    return { ok: true };
+  });
+
+// ===== PÚBLICAS (sem auth) =====
+export const getEmpresaPublica = createServerFn({ method: "GET" })
+  .inputValidator((d: { slug: string }) => z.object({ slug: z.string().min(1).max(80) }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: emp } = await supabaseAdmin.rpc("get_empresa_by_slug", { _slug: data.slug });
+    const empresa = (emp ?? [])[0];
+    if (!empresa) throw new Error("Empresa não encontrada");
+    const [{ data: servicos }, { data: cfg }] = await Promise.all([
+      supabaseAdmin.rpc("get_servicos_publicos", { _owner: empresa.owner_id }),
+      supabaseAdmin.rpc("get_agenda_config_publica", { _owner: empresa.owner_id }),
+    ]);
+    return {
+      empresa,
+      servicos: servicos ?? [],
+      config: (cfg ?? [])[0] ?? { hora_inicio: "08:00", hora_fim: "18:00", dias_semana: [1,2,3,4,5,6], intervalo_min: 30, capacidade_simultanea: 1 },
+    };
+  });
+
+export const getHorariosDisponiveis = createServerFn({ method: "GET" })
+  .inputValidator((d: { slug: string; data: string }) => z.object({
+    slug: z.string().min(1).max(80),
+    data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: emp } = await supabaseAdmin.rpc("get_empresa_by_slug", { _slug: data.slug });
+    const empresa = (emp ?? [])[0];
+    if (!empresa) throw new Error("Empresa não encontrada");
+    const [{ data: cfgRows }, { data: ocup }] = await Promise.all([
+      supabaseAdmin.rpc("get_agenda_config_publica", { _owner: empresa.owner_id }),
+      supabaseAdmin.rpc("get_ocupacao_dia", { _owner: empresa.owner_id, _data: data.data }),
+    ]);
+    const cfg = (cfgRows ?? [])[0] ?? { hora_inicio: "08:00", hora_fim: "18:00", dias_semana: [1,2,3,4,5,6], intervalo_min: 30, capacidade_simultanea: 1 };
+    const dia = new Date(data.data + "T12:00:00").getDay();
+    if (!cfg.dias_semana.includes(dia)) return { slots: [] };
+    const ocupMap = new Map<string, number>();
+    (ocup ?? []).forEach((o: any) => ocupMap.set(o.hora_agendada.slice(0,5), Number(o.qtd)));
+    const [hI, mI] = cfg.hora_inicio.split(":").map(Number);
+    const [hF, mF] = cfg.hora_fim.split(":").map(Number);
+    const slots: { hora: string; disponivel: boolean }[] = [];
+    let mins = hI * 60 + mI;
+    const fim = hF * 60 + mF;
+    while (mins < fim) {
+      const h = String(Math.floor(mins/60)).padStart(2,"0") + ":" + String(mins%60).padStart(2,"0");
+      const usado = ocupMap.get(h) ?? 0;
+      slots.push({ hora: h, disponivel: usado < cfg.capacidade_simultanea });
+      mins += cfg.intervalo_min;
+    }
+    return { slots };
+  });
+
+export const solicitarAgendamentoPublico = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    slug: z.string().min(1).max(80),
+    nome: z.string().min(2).max(120),
+    telefone: z.string().min(8).max(20),
+    veiculo: z.string().max(60).optional(),
+    servico_id: z.string().uuid().nullable().optional(),
+    data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    hora: z.string().regex(/^\d{2}:\d{2}$/),
+    observacoes: z.string().max(500).optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: emp } = await supabaseAdmin.rpc("get_empresa_by_slug", { _slug: data.slug });
+    const empresa = (emp ?? [])[0];
+    if (!empresa) throw new Error("Empresa não encontrada");
+    const owner_id = empresa.owner_id;
+    const hora = data.hora + ":00";
+
+    // Verifica capacidade
+    const { data: cfgRows } = await supabaseAdmin.rpc("get_agenda_config_publica", { _owner: owner_id });
+    const cap = (cfgRows ?? [])[0]?.capacidade_simultanea ?? 1;
+    const { count } = await supabaseAdmin.from("agendamentos")
+      .select("id", { count: "exact", head: true })
+      .eq("owner_id", owner_id)
+      .eq("data_agendada", data.data)
+      .eq("hora_agendada", hora)
+      .not("status", "in", "(cancelado,nao_compareceu)");
+    if ((count ?? 0) >= cap) throw new Error("Horário não está mais disponível.");
+
+    // Upsert cliente por telefone
+    const { data: existing } = await supabaseAdmin.from("clientes")
+      .select("id").eq("owner_id", owner_id).eq("telefone", data.telefone).maybeSingle();
+    let cliente_id = existing?.id;
+    if (!cliente_id) {
+      const { data: novo, error } = await supabaseAdmin.from("clientes").insert({
+        owner_id, nome: data.nome, telefone: data.telefone, origem_cliente: "Agendamento online",
+      }).select("id").single();
+      if (error) throw error;
+      cliente_id = novo.id;
+    }
+
+    const { error: e2 } = await supabaseAdmin.from("agendamentos").insert({
+      owner_id, cliente_id, servico_id: data.servico_id ?? null,
+      data_agendada: data.data, hora_agendada: hora,
+      observacoes: data.veiculo ? `Veículo: ${data.veiculo}. ${data.observacoes ?? ""}`.trim() : data.observacoes ?? null,
+      origem: "publico",
+    });
+    if (e2) throw e2;
+    return { ok: true };
+  });
