@@ -126,7 +126,7 @@ function AuthPage() {
             </Tabs>
           </CardContent>
         </Card>
-        <Link to="/" className="text-xs text-muted-foreground mt-6 hover:underline">← Voltar</Link>
+        <Link to="/lp" className="text-xs text-muted-foreground mt-6 hover:underline">← Voltar</Link>
       </div>
     </div>
   );
