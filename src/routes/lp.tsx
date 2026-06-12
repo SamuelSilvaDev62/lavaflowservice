@@ -71,7 +71,7 @@ function Nav() {
   return (
     <header className="sticky top-0 z-40 backdrop-blur-xl bg-background/80 border-b">
       <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
+        <Link to="/lp" className="flex items-center gap-2">
           <div className="h-9 w-9 rounded-xl bg-gradient-to-br from-primary to-primary/50 grid place-content-center shadow-lg shadow-primary/30">
             <Car className="h-4 w-4 text-primary-foreground" />
           </div>
