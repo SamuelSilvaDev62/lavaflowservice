@@ -208,6 +208,26 @@ function Dashboard() {
         </CardContent>
       </Card>
 
+      {/* Recompensas disponíveis */}
+      {rec && rec.qtd > 0 && (
+        <Card className="mb-4 border-success/30 bg-gradient-to-br from-success/10 via-success/5 to-transparent">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-success text-success-foreground grid place-content-center shrink-0">
+                <Gift className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-semibold text-sm">Clientes com recompensa disponível</p>
+                <p className="text-sm mt-1">🎁 <strong>{rec.qtd}</strong> {rec.qtd === 1 ? "cliente pode resgatar" : "clientes podem resgatar"} benefícios agora.</p>
+                <Button asChild size="sm" variant="outline" className="h-8 text-xs mt-3">
+                  <Link to="/clientes" search={{ filtro: "recompensa_disponivel" }}>Ver clientes <ArrowRight className="h-3 w-3 ml-1" /></Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Impacto Financeiro do Mês */}
       <h3 className="font-display font-semibold text-sm uppercase tracking-wider text-muted-foreground mt-6 mb-3">
         Impacto financeiro do mês
