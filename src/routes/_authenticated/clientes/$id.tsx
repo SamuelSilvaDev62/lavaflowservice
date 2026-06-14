@@ -9,10 +9,11 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
-import { getClienteDetalhe, addVeiculo } from "@/lib/lavaflow.functions";
+import { getClienteDetalhe, addVeiculo, getExtratoFidelidade } from "@/lib/lavaflow.functions";
 import { brl, dateBr, daysBetween } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
-import { ArrowLeft, Car, Plus, MessageCircle, Award, TrendingUp } from "lucide-react";
+import { buildExtratoMessage, getFidelidadeTemplates } from "@/lib/fidelidade-messages";
+import { ArrowLeft, Car, Plus, MessageCircle, Award, TrendingUp, Gift } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/clientes/$id")({
