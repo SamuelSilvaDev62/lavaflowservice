@@ -80,6 +80,7 @@ function FilaPage() {
   const updFn = useServerFn(updateOrdemStatus);
   const logFn = useServerFn(logWhatsappEnvio);
   const logsFn = useServerFn(getWhatsappLogs);
+  const dadosFn = useServerFn(getDadosMensagemPronto);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["fila"], queryFn: () => getFn() });
   const { data: logsData } = useQuery({ queryKey: ["wa-logs"], queryFn: () => logsFn() });
@@ -94,7 +95,7 @@ function FilaPage() {
       qc.invalidateQueries({ queryKey: ["wa-logs"] });
       if (vars.status === "pronto") {
         const ordem = data?.ordens.find((o) => o.id === vars.id);
-        if (ordem) disparaWhatsappPronto(ordem, (p) => logFn({ data: p }));
+        if (ordem) disparaWhatsappPronto(ordem, (p) => dadosFn({ data: p }), (p) => logFn({ data: p }));
       }
       setSelected(null);
     },
@@ -113,9 +114,10 @@ function FilaPage() {
   }
 
   function reenviarWhats(ordem: any) {
-    disparaWhatsappPronto(ordem, (p) => logFn({ data: p }));
+    disparaWhatsappPronto(ordem, (p) => dadosFn({ data: p }), (p) => logFn({ data: p }));
     qc.invalidateQueries({ queryKey: ["wa-logs"] });
   }
+
 
   const ordensList = data?.ordens ?? [];
   const totalFila = ordensList.length;
