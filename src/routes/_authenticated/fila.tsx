@@ -27,7 +27,11 @@ const columns: Array<{ key: OsStatus; label: string; short: string; color: strin
   { key: "entregue", label: "Entregue", short: "Entregue", color: "bg-accent", emoji: "🚗" },
 ];
 
-function disparaWhatsappPronto(ordem: any, logFn: (v: { cliente_id: string; descricao: string }) => Promise<any>) {
+async function disparaWhatsappPronto(
+  ordem: any,
+  getDados: (v: { ordemId: string }) => Promise<any>,
+  logFn: (v: { cliente_id: string; descricao: string }) => Promise<any>,
+) {
   const tel = ordem.clientes?.telefone;
   const nome = ordem.clientes?.nome ?? "Cliente";
   const placa = ordem.veiculos?.placa ?? "";
@@ -36,13 +40,28 @@ function disparaWhatsappPronto(ordem: any, logFn: (v: { cliente_id: string; desc
     toast.warning(`${nome} sem telefone — envio manual necessário.`);
     return;
   }
-  const msg = renderTemplate(getTemplate("pronto_para_retirada"), { nome, placa });
+  let msg = `Olá ${nome.split(" ")[0]}! Seu veículo ${placa} está pronto para retirada. 🚗`;
+  let cenario = "padrao";
+  try {
+    const dados = await getDados({ ordemId: ordem.id });
+    const built = buildReadyVehicleMessage({
+      cliente: dados.cliente,
+      ordem: dados.ordem,
+      config: dados.config,
+      recompensas: dados.recompensas,
+      templates: getFidelidadeTemplates(),
+    });
+    msg = built.message;
+    cenario = built.cenario;
+  } catch (err) {
+    console.warn("Falha ao gerar mensagem de fidelidade, usando fallback", err);
+  }
   const win = window.open(waLink(tel, msg), "_blank", "noopener");
   if (!win) {
     toast.error("Bloqueio de pop-up impediu o envio. Use o botão WhatsApp do card.");
     return;
   }
-  logFn({ cliente_id, descricao: `OS pronta · ${placa || nome} · template "pronto_para_retirada"` })
+  logFn({ cliente_id, descricao: `OS pronta · ${placa || nome} · fidelidade:${cenario}` })
     .then(() => toast.success(`WhatsApp aberto para ${nome.split(" ")[0]} ✓ registrado nos logs`))
     .catch(() => toast.success(`WhatsApp aberto para ${nome.split(" ")[0]}`));
 }
