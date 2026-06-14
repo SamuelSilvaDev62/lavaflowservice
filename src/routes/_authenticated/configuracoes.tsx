@@ -106,14 +106,101 @@ function MsgTab() {
     toast.success("Salvo");
   }
   return (
+    <div className="space-y-6">
+      <div className="space-y-3">
+        <div>
+          <h3 className="font-display font-semibold text-base">Mensagens gerais</h3>
+          <p className="text-xs text-muted-foreground">Variáveis disponíveis: <code>{"{{nome}}"}</code>, <code>{"{{placa}}"}</code></p>
+        </div>
+        {tpls.map((t) => (
+          <Card key={t.key}><CardContent className="p-4 space-y-2">
+            <Label className="text-xs uppercase tracking-wide">{t.key}</Label>
+            <Textarea rows={3} defaultValue={t.value} onBlur={(e) => save(t.key, e.target.value)} />
+          </CardContent></Card>
+        ))}
+      </div>
+
+      <FidelidadeMsgSection />
+    </div>
+  );
+}
+
+const FID_LABELS: Record<FidTplKey, { titulo: string; descricao: string }> = {
+  fidelidade_pronto_padrao: { titulo: "Veículo pronto — padrão", descricao: "Cliente ainda não tem recompensa disponível. Mostra próxima meta." },
+  fidelidade_pronto_disponivel: { titulo: "Veículo pronto — recompensa disponível", descricao: "Cliente já pode resgatar um benefício." },
+  fidelidade_pronto_vip: { titulo: "Veículo pronto — cliente VIP", descricao: "10+ visitas ou 1000+ pontos. Tom de agradecimento especial." },
+  fidelidade_extrato: { titulo: "Extrato de fidelidade", descricao: "Mensagem enviada via botão no perfil do cliente." },
+};
+
+const FID_VARS = "{nome}, {servico}, {valor}, {pontos_ganhos}, {saldo_atual}, {proxima_recompensa}, {pontos_faltantes}, {recompensa_disponivel}, {historico}, {disponiveis}";
+
+function FidelidadeMsgSection() {
+  const [version, setVersion] = useState(0);
+  const STORAGE_KEY = "lavaflow_wa_templates";
+
+  function getCustom(key: FidTplKey): string {
+    if (typeof window === "undefined") return FIDELIDADE_DEFAULTS[key];
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const map = raw ? JSON.parse(raw) : {};
+      return map[key] ?? FIDELIDADE_DEFAULTS[key];
+    } catch {
+      return FIDELIDADE_DEFAULTS[key];
+    }
+  }
+
+  function saveCustom(key: FidTplKey, value: string) {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    map[key] = value;
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    setVersion((v) => v + 1);
+    toast.success("Mensagem de fidelidade salva");
+  }
+
+  function reset(key: FidTplKey) {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const map = raw ? JSON.parse(raw) : {};
+    delete map[key];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+    setVersion((v) => v + 1);
+    toast.success("Restaurado para o padrão");
+  }
+
+  const keys = Object.keys(FIDELIDADE_DEFAULTS) as FidTplKey[];
+
+  return (
     <div className="space-y-3">
-      {tpls.map((t) => (
-        <Card key={t.key}><CardContent className="p-4 space-y-2">
-          <Label className="text-xs uppercase tracking-wide">{t.key}</Label>
-          <Textarea rows={3} defaultValue={t.value} onBlur={(e) => save(t.key, e.target.value)} />
-          <p className="text-xs text-muted-foreground">Variáveis: <code>{"{{nome}}"}</code>, <code>{"{{placa}}"}</code></p>
-        </CardContent></Card>
-      ))}
+      <div>
+        <h3 className="font-display font-semibold text-base flex items-center gap-2">🎁 Mensagens do programa de fidelidade</h3>
+        <p className="text-xs text-muted-foreground mt-0.5">
+          Personalize as mensagens enviadas quando o veículo fica pronto e o extrato de pontos.
+        </p>
+        <p className="text-xs text-muted-foreground mt-1">
+          Variáveis: <code className="text-[10px] bg-muted px-1 rounded">{FID_VARS}</code>
+        </p>
+      </div>
+      {keys.map((k) => {
+        const meta = FID_LABELS[k];
+        const value = getCustom(k);
+        const isCustom = value !== FIDELIDADE_DEFAULTS[k];
+        return (
+          <Card key={`${k}-${version}`}>
+            <CardContent className="p-4 space-y-2">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <Label className="font-medium">{meta.titulo}</Label>
+                  <p className="text-xs text-muted-foreground">{meta.descricao}</p>
+                </div>
+                {isCustom && (
+                  <Button size="sm" variant="ghost" onClick={() => reset(k)} className="text-xs h-7">Restaurar padrão</Button>
+                )}
+              </div>
+              <Textarea rows={8} defaultValue={value} onBlur={(e) => saveCustom(k, e.target.value)} className="font-mono text-xs" />
+            </CardContent>
+          </Card>
+        );
+      })}
     </div>
   );
 }
