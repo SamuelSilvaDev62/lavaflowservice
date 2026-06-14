@@ -65,7 +65,12 @@ SUAS CAPACIDADES (use as ferramentas quando relevante):
 - top_clientes: clientes que mais gastaram nos últimos 90d
 - analise_dia_semana: receita por dia da semana
 - top_servicos: serviços que mais geram receita
+- clientes_com_recompensa_disponivel: clientes elegíveis a resgatar benefícios do programa de fidelidade
+- clientes_proximos_recompensa: clientes a poucos pontos da próxima recompensa
 - gerar_mensagem_whatsapp: redigir mensagem persuasiva personalizada
+
+INSIGHT DE NEGÓCIO (use proativamente):
+- Clientes que utilizam o programa de fidelidade tendem a retornar até 34% mais. Sempre que detectar clientes elegíveis a benefícios não resgatados, sugira contato direto.
 
 REGRAS:
 - Sempre cite números concretos quando responder.
@@ -178,6 +183,47 @@ REGRAS:
                     objetivo,
                     instrucao: `Redija agora a mensagem (use {nome} como placeholder do cliente). Objetivo: ${objetivo}. Contexto adicional: ${contexto_extra ?? "nenhum"}. Mantenha ≤ 320 caracteres, emoji moderado, tom brasileiro amigável, CTA claro. Empresa: ${empresa?.nome_fantasia ?? "Lava-Rápido"}.`,
                   };
+                },
+              }),
+              clientes_com_recompensa_disponivel: tool({
+                description: "Lista clientes que já acumularam pontos suficientes para resgatar uma recompensa ativa do programa de fidelidade. Use quando o usuário perguntar sobre fidelidade, resgates pendentes, ou quem chamar de volta com benefício.",
+                inputSchema: z.object({}),
+                execute: async () => {
+                  const [{ data: recompensas }, { data: clientes }] = await Promise.all([
+                    supabase.from("recompensas").select("nome, custo_pontos").eq("owner_id", userId).eq("ativo", true).order("custo_pontos"),
+                    supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", userId),
+                  ]);
+                  const ativas = (recompensas ?? []).sort((a: any, b: any) => a.custo_pontos - b.custo_pontos);
+                  if (ativas.length === 0) return { total: 0, mensagem: "Nenhuma recompensa ativa cadastrada." };
+                  const minCusto = ativas[0].custo_pontos;
+                  const elegiveis = (clientes ?? [])
+                    .filter((c: any) => Number(c.pontos_saldo ?? 0) >= minCusto)
+                    .map((c: any) => {
+                      const saldo = Number(c.pontos_saldo);
+                      const disp = ativas.filter((r: any) => r.custo_pontos <= saldo);
+                      return { nome: c.nome, telefone: c.telefone, pontos: saldo, recompensa_maxima: disp[disp.length - 1]?.nome };
+                    })
+                    .sort((a: any, b: any) => b.pontos - a.pontos)
+                    .slice(0, 20);
+                  return { total: elegiveis.length, clientes: elegiveis };
+                },
+              }),
+              clientes_proximos_recompensa: tool({
+                description: "Clientes a até 50 pontos de conquistar a primeira recompensa do programa de fidelidade. Use para identificar quem incentivar a voltar logo.",
+                inputSchema: z.object({ margem: z.number().int().min(10).max(200).default(50) }),
+                execute: async ({ margem }) => {
+                  const [{ data: recompensas }, { data: clientes }] = await Promise.all([
+                    supabase.from("recompensas").select("nome, custo_pontos").eq("owner_id", userId).eq("ativo", true).order("custo_pontos").limit(1),
+                    supabase.from("clientes").select("nome, telefone, pontos_saldo").eq("owner_id", userId),
+                  ]);
+                  if (!recompensas || recompensas.length === 0) return { total: 0, mensagem: "Nenhuma recompensa ativa cadastrada." };
+                  const min = (recompensas[0] as any).custo_pontos;
+                  const proximos = (clientes ?? [])
+                    .map((c: any) => ({ ...c, faltam: min - Number(c.pontos_saldo ?? 0) }))
+                    .filter((c: any) => c.faltam > 0 && c.faltam <= margem)
+                    .sort((a: any, b: any) => a.faltam - b.faltam)
+                    .slice(0, 20);
+                  return { total: proximos.length, recompensa_alvo: (recompensas[0] as any).nome, custo: min, clientes: proximos };
                 },
               }),
             },

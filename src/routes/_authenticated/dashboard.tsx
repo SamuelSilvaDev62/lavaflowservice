@@ -4,14 +4,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getDashboardMetrics, getOportunidades } from "@/lib/lavaflow.functions";
+import { getDashboardMetrics, getOportunidades, getClientesComRecompensa } from "@/lib/lavaflow.functions";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
 import { brl, pct, num } from "@/lib/format";
 import {
   TrendingUp, TrendingDown, DollarSign, Repeat, Users, ListChecks,
-  Sparkles, ArrowRight, Bot, AlertTriangle, Activity, Target, UserPlus,
+  Sparkles, ArrowRight, Bot, AlertTriangle, Activity, Target, UserPlus, Gift,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 
@@ -69,9 +69,11 @@ function Dashboard() {
   const fetchMetrics = useServerFn(getDashboardMetrics);
   const fetchOps = useServerFn(getOportunidades);
   const fetchState = useServerFn(getOnboardingState);
+  const fetchRec = useServerFn(getClientesComRecompensa);
   const { data: m, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fetchMetrics() });
   const { data: ops } = useQuery({ queryKey: ["oportunidades"], queryFn: () => fetchOps() });
   const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
+  const { data: rec } = useQuery({ queryKey: ["clientes-recompensa"], queryFn: () => fetchRec() });
 
   if (isLoading || !m) {
     return <div className="space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}</div>;
@@ -205,6 +207,26 @@ function Dashboard() {
           )}
         </CardContent>
       </Card>
+
+      {/* Recompensas disponíveis */}
+      {rec && rec.qtd > 0 && (
+        <Card className="mb-4 border-success/30 bg-gradient-to-br from-success/10 via-success/5 to-transparent">
+          <CardContent className="p-4 sm:p-5">
+            <div className="flex items-start gap-3">
+              <div className="h-10 w-10 rounded-xl bg-success text-success-foreground grid place-content-center shrink-0">
+                <Gift className="h-5 w-5" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-display font-semibold text-sm">Clientes com recompensa disponível</p>
+                <p className="text-sm mt-1">🎁 <strong>{rec.qtd}</strong> {rec.qtd === 1 ? "cliente pode resgatar" : "clientes podem resgatar"} benefícios agora.</p>
+                <Button asChild size="sm" variant="outline" className="h-8 text-xs mt-3">
+                  <Link to="/clientes" search={{ filtro: "recompensa_disponivel" }}>Ver clientes <ArrowRight className="h-3 w-3 ml-1" /></Link>
+                </Button>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Impacto Financeiro do Mês */}
       <h3 className="font-display font-semibold text-sm uppercase tracking-wider text-muted-foreground mt-6 mb-3">
