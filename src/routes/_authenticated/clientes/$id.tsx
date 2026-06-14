@@ -24,6 +24,7 @@ function Page() {
   const { id } = Route.useParams();
   const fn = useServerFn(getClienteDetalhe);
   const addV = useServerFn(addVeiculo);
+  const extratoFn = useServerFn(getExtratoFidelidade);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["cliente", id], queryFn: () => fn({ data: { id } }) });
 
@@ -35,6 +36,27 @@ function Page() {
     onError: (e: any) => toast.error(e?.message ?? "Erro"),
   });
 
+  async function enviarExtrato() {
+    if (!data?.cliente?.telefone) {
+      toast.warning("Cliente sem telefone cadastrado.");
+      return;
+    }
+    try {
+      const ext = await extratoFn({ data: { clienteId: id } });
+      const tpls = getFidelidadeTemplates();
+      const msg = buildExtratoMessage({
+        cliente: { nome: ext.cliente?.nome ?? "Cliente", pontos_saldo: Number(ext.cliente?.pontos_saldo ?? 0) },
+        movimentos: ext.movimentos,
+        recompensas: ext.recompensas,
+        template: tpls.fidelidade_extrato,
+      });
+      window.open(waLink(data.cliente.telefone, msg), "_blank", "noopener");
+      toast.success("Extrato aberto no WhatsApp");
+    } catch (e: any) {
+      toast.error(e?.message ?? "Falha ao gerar extrato");
+    }
+  }
+
   if (isLoading || !data?.cliente) return <div className="h-96 rounded-xl bg-muted animate-pulse" />;
 
   const c = data.cliente;
@@ -45,8 +67,22 @@ function Page() {
     <>
       <Link to="/clientes" className="text-sm text-muted-foreground inline-flex items-center gap-1 hover:text-foreground mb-3"><ArrowLeft className="h-4 w-4" /> Voltar</Link>
       <PageHeader title={c.nome} subtitle={c.telefone ?? "Sem telefone"}
-        actions={c.telefone ? <Button asChild variant="outline"><a href={waLink(c.telefone, `Olá ${c.nome.split(" ")[0]}!`)} target="_blank" rel="noopener"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp</a></Button> : null}
+        actions={
+          <div className="flex gap-2">
+            {c.telefone && (
+              <Button variant="outline" onClick={enviarExtrato}>
+                <Gift className="h-4 w-4 mr-1" />Extrato Fidelidade
+              </Button>
+            )}
+            {c.telefone && (
+              <Button asChild variant="outline">
+                <a href={waLink(c.telefone, `Olá ${c.nome.split(" ")[0]}!`)} target="_blank" rel="noopener"><MessageCircle className="h-4 w-4 mr-1" />WhatsApp</a>
+              </Button>
+            )}
+          </div>
+        }
       />
+
 
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-6">
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Relacionamento</p><p className={`font-display text-2xl font-bold ${scoreColor}`}>{data.score}<span className="text-base text-muted-foreground">/100</span></p></CardContent></Card>
