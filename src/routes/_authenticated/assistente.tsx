@@ -47,7 +47,9 @@ function Page() {
         headers: async () => {
           const { data } = await supabase.auth.getSession();
           const freshToken = data.session?.access_token;
-          return freshToken ? { Authorization: `Bearer ${freshToken}` } : {};
+          const headers: Record<string, string> = {};
+          if (freshToken) headers.Authorization = `Bearer ${freshToken}`;
+          return headers;
         },
       }),
     [],
