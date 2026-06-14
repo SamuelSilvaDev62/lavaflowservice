@@ -1040,3 +1040,105 @@ export const solicitarAgendamentoPublico = createServerFn({ method: "POST" })
     if (e2) throw e2;
     return { ok: true };
   });
+
+// ============ FIDELIDADE — MENSAGENS INTELIGENTES ============
+
+// Dados necessários para montar a mensagem de "veículo pronto" do programa de fidelidade.
+export const getDadosMensagemPronto = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ ordemId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { data: ordem, error } = await supabase
+      .from("ordens_servico")
+      .select(`id, valor, cliente_id,
+        clientes:cliente_id(id, nome, telefone, pontos_saldo),
+        veiculos:veiculo_id(placa),
+        servicos:servico_id(nome)`)
+      .eq("id", data.ordemId)
+      .eq("owner_id", userId)
+      .single();
+    if (error) throw error;
+    const cliente: any = ordem.clientes;
+
+    const [{ data: cfg }, { data: recompensas }, { data: visitasRows }] = await Promise.all([
+      supabase.from("fidelidade_config").select("pontos_por_lavagem, pontos_por_real").eq("owner_id", userId).maybeSingle(),
+      supabase.from("recompensas").select("id, nome, custo_pontos, ativo").eq("owner_id", userId).eq("ativo", true).order("custo_pontos"),
+      supabase.from("ordens_servico").select("id", { count: "exact", head: false }).eq("owner_id", userId).eq("cliente_id", cliente?.id),
+    ]);
+
+    return {
+      cliente: {
+        id: cliente?.id,
+        nome: cliente?.nome ?? "Cliente",
+        telefone: cliente?.telefone ?? null,
+        pontos_saldo: Number(cliente?.pontos_saldo ?? 0),
+        total_visitas: visitasRows?.length ?? 0,
+      },
+      ordem: {
+        id: ordem.id,
+        valor: Number(ordem.valor ?? 0),
+        servico_nome: (ordem.servicos as any)?.nome ?? null,
+        placa: (ordem.veiculos as any)?.placa ?? null,
+      },
+      config: {
+        pontos_por_lavagem: Number(cfg?.pontos_por_lavagem ?? 10),
+        pontos_por_real: Number(cfg?.pontos_por_real ?? 1),
+      },
+      recompensas: recompensas ?? [],
+    };
+  });
+
+export const getExtratoFidelidade = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ clienteId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const [{ data: cliente }, { data: movs }, { data: recompensas }] = await Promise.all([
+      supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("id", data.clienteId).eq("owner_id", userId).single(),
+      supabase.from("pontos_movimentos")
+        .select("pontos, tipo, created_at, ordem_id, ordens_servico:ordem_id(servicos:servico_id(nome))")
+        .eq("owner_id", userId).eq("cliente_id", data.clienteId)
+        .order("created_at", { ascending: false }).limit(10),
+      supabase.from("recompensas").select("id, nome, custo_pontos, ativo").eq("owner_id", userId).eq("ativo", true).order("custo_pontos"),
+    ]);
+
+    const movimentos = (movs ?? []).map((m: any) => ({
+      pontos: m.tipo === "credito" ? Number(m.pontos) : -Number(m.pontos),
+      servico_nome: m.ordens_servico?.servicos?.nome ?? null,
+      created_at: m.created_at,
+    }));
+
+    return { cliente, movimentos, recompensas: recompensas ?? [] };
+  });
+
+export const getClientesComRecompensa = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const [{ data: recompensas }, { data: clientes }, { data: ordens }] = await Promise.all([
+      supabase.from("recompensas").select("id, nome, custo_pontos").eq("owner_id", userId).eq("ativo", true).order("custo_pontos"),
+      supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", userId),
+      supabase.from("ordens_servico").select("valor").eq("owner_id", userId).gte("created_at", new Date(Date.now() - 90 * 86_400_000).toISOString()),
+    ]);
+    const ativas = (recompensas ?? []).sort((a, b) => a.custo_pontos - b.custo_pontos);
+    if (ativas.length === 0) return { qtd: 0, clientes: [], proximos: [], ticketMedio: 0 };
+    const minCusto = ativas[0].custo_pontos;
+    const elegiveis = (clientes ?? []).filter((c) => Number(c.pontos_saldo ?? 0) >= minCusto)
+      .map((c) => {
+        const saldo = Number(c.pontos_saldo ?? 0);
+        const disp = ativas.filter((r) => r.custo_pontos <= saldo);
+        const melhor = disp[disp.length - 1];
+        return { ...c, recompensa: melhor?.nome ?? null };
+      });
+    const proximos = (clientes ?? []).filter((c) => {
+      const saldo = Number(c.pontos_saldo ?? 0);
+      return saldo < minCusto && (minCusto - saldo) <= 50;
+    }).map((c) => ({ ...c, faltam: minCusto - Number(c.pontos_saldo ?? 0) }));
+
+    const totalReceita = (ordens ?? []).reduce((s, o) => s + Number(o.valor ?? 0), 0);
+    const ticketMedio = (ordens && ordens.length > 0) ? totalReceita / ordens.length : 50;
+
+    return { qtd: elegiveis.length, clientes: elegiveis, proximos, ticketMedio };
+  });
+
