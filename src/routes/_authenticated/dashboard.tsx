@@ -4,14 +4,14 @@ import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getDashboardMetrics, getOportunidades } from "@/lib/lavaflow.functions";
+import { getDashboardMetrics, getOportunidades, getClientesComRecompensa } from "@/lib/lavaflow.functions";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
 import { brl, pct, num } from "@/lib/format";
 import {
   TrendingUp, TrendingDown, DollarSign, Repeat, Users, ListChecks,
-  Sparkles, ArrowRight, Bot, AlertTriangle, Activity, Target, UserPlus,
+  Sparkles, ArrowRight, Bot, AlertTriangle, Activity, Target, UserPlus, Gift,
 } from "lucide-react";
 import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
 
