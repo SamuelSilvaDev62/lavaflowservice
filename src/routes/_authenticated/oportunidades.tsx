@@ -1,14 +1,14 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getOportunidades } from "@/lib/lavaflow.functions";
+import { getOportunidades, getClientesComRecompensa } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { waLink, getTemplate, renderTemplate, type WhatsAppTemplateKey } from "@/lib/whatsapp";
-import { MessageCircle, TrendingUp } from "lucide-react";
+import { MessageCircle, TrendingUp, Gift, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/oportunidades")({
   component: Page,
