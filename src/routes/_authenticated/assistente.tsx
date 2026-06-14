@@ -32,15 +32,27 @@ function Page() {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data }) => setToken(data.session?.access_token ?? null));
+
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      setToken(session?.access_token ?? null);
+    });
+
+    return () => listener.subscription.unsubscribe();
   }, []);
 
   const transport = useMemo(
     () =>
       new DefaultChatTransport({
         api: "/api/assistente-chat",
-        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        headers: async () => {
+          const { data } = await supabase.auth.getSession();
+          const freshToken = data.session?.access_token;
+          const headers: Record<string, string> = {};
+          if (freshToken) headers.Authorization = `Bearer ${freshToken}`;
+          return headers;
+        },
       }),
-    [token],
+    [],
   );
 
   const { messages, sendMessage, status, error, setMessages } = useChat({
