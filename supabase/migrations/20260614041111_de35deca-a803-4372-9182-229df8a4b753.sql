@@ -1,0 +1,1 @@
+GRANT EXECUTE ON FUNCTION public.current_owner_id() TO authenticated;
