@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { getAssinaturas, upsertPlano, confirmarPagamentoAssinatura, cancelarAssinatura } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
-import { waLink } from "@/lib/whatsapp";
+
 import { Plus, Repeat, Users, TrendingUp, Copy, Share2, QrCode, Clock, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
