@@ -108,7 +108,7 @@ function Page() {
                         <p className="text-xs text-muted-foreground uppercase tracking-wide font-semibold mb-1">Chave PIX</p>
                         <div className="flex items-center justify-between gap-2">
                           <code className="text-sm font-mono break-all">{plano.chave_pix}</code>
-                          <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(plano.chave_pix); toast.success("Copiado"); }}><Copy className="h-4 w-4" /></Button>
+                          <Button size="sm" variant="ghost" onClick={() => { navigator.clipboard.writeText(plano.chave_pix ?? ""); toast.success("Copiado"); }}><Copy className="h-4 w-4" /></Button>
                         </div>
                         <p className="text-sm mt-2">Valor: <strong>{brl(plano.valor_mensal)}</strong></p>
                       </div>

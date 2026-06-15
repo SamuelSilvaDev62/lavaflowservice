@@ -13,6 +13,7 @@ import { Route as LpRouteImport } from './routes/lp'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as PlanoSlugRouteImport } from './routes/plano.$slug'
 import { Route as ApiAssistenteChatRouteImport } from './routes/api/assistente-chat'
 import { Route as AgendarSlugRouteImport } from './routes/agendar.$slug'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
@@ -48,6 +49,11 @@ const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PlanoSlugRoute = PlanoSlugRouteImport.update({
+  id: '/plano/$slug',
+  path: '/plano/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAssistenteChatRoute = ApiAssistenteChatRouteImport.update({
@@ -161,6 +167,7 @@ export interface FileRoutesByFullPath {
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/api/assistente-chat': typeof ApiAssistenteChatRoute
+  '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
   '/clientes/': typeof AuthenticatedClientesIndexRoute
@@ -183,6 +190,7 @@ export interface FileRoutesByTo {
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/api/assistente-chat': typeof ApiAssistenteChatRoute
+  '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
   '/clientes': typeof AuthenticatedClientesIndexRoute
@@ -207,6 +215,7 @@ export interface FileRoutesById {
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/api/assistente-chat': typeof ApiAssistenteChatRoute
+  '/plano/$slug': typeof PlanoSlugRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/_authenticated/clientes/inativos': typeof AuthenticatedClientesInativosRoute
   '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
@@ -231,6 +240,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/agendar/$slug'
     | '/api/assistente-chat'
+    | '/plano/$slug'
     | '/clientes/$id'
     | '/clientes/inativos'
     | '/clientes/'
@@ -253,6 +263,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/agendar/$slug'
     | '/api/assistente-chat'
+    | '/plano/$slug'
     | '/clientes/$id'
     | '/clientes/inativos'
     | '/clientes'
@@ -276,6 +287,7 @@ export interface FileRouteTypes {
     | '/_authenticated/relatorios'
     | '/agendar/$slug'
     | '/api/assistente-chat'
+    | '/plano/$slug'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/inativos'
     | '/_authenticated/clientes/'
@@ -288,6 +300,7 @@ export interface RootRouteChildren {
   LpRoute: typeof LpRoute
   AgendarSlugRoute: typeof AgendarSlugRoute
   ApiAssistenteChatRoute: typeof ApiAssistenteChatRoute
+  PlanoSlugRoute: typeof PlanoSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -318,6 +331,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/plano/$slug': {
+      id: '/plano/$slug'
+      path: '/plano/$slug'
+      fullPath: '/plano/$slug'
+      preLoaderRoute: typeof PlanoSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/assistente-chat': {
@@ -488,6 +508,7 @@ const rootRouteChildren: RootRouteChildren = {
   LpRoute: LpRoute,
   AgendarSlugRoute: AgendarSlugRoute,
   ApiAssistenteChatRoute: ApiAssistenteChatRoute,
+  PlanoSlugRoute: PlanoSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
