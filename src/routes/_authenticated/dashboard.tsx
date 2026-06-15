@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getDashboardMetrics, getOportunidades, getClientesComRecompensa } from "@/lib/lavaflow.functions";
+import { getDashboardMetrics, getOportunidades, getClientesComRecompensa, getAssinaturas } from "@/lib/lavaflow.functions";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
