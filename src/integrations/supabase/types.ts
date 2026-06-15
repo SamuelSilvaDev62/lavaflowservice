@@ -130,33 +130,51 @@ export type Database = {
       assinaturas_clientes: {
         Row: {
           cliente_id: string
+          created_at: string
+          gateway_ref: string | null
           id: string
           inicio: string
           lavagens_usadas_mes: number
+          metodo_pagamento: string | null
+          observacoes: string | null
           owner_id: string
+          pago_em: string | null
           plano_id: string
           proxima_cobranca: string
           status: Database["public"]["Enums"]["assinatura_status"]
+          veiculo_id: string | null
         }
         Insert: {
           cliente_id: string
+          created_at?: string
+          gateway_ref?: string | null
           id?: string
           inicio?: string
           lavagens_usadas_mes?: number
+          metodo_pagamento?: string | null
+          observacoes?: string | null
           owner_id: string
+          pago_em?: string | null
           plano_id: string
           proxima_cobranca?: string
           status?: Database["public"]["Enums"]["assinatura_status"]
+          veiculo_id?: string | null
         }
         Update: {
           cliente_id?: string
+          created_at?: string
+          gateway_ref?: string | null
           id?: string
           inicio?: string
           lavagens_usadas_mes?: number
+          metodo_pagamento?: string | null
+          observacoes?: string | null
           owner_id?: string
+          pago_em?: string | null
           plano_id?: string
           proxima_cobranca?: string
           status?: Database["public"]["Enums"]["assinatura_status"]
+          veiculo_id?: string | null
         }
         Relationships: [
           {
@@ -171,6 +189,13 @@ export type Database = {
             columns: ["plano_id"]
             isOneToOne: false
             referencedRelation: "planos_assinatura"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "assinaturas_clientes_veiculo_id_fkey"
+            columns: ["veiculo_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
             referencedColumns: ["id"]
           },
         ]
@@ -537,28 +562,37 @@ export type Database = {
         Row: {
           ativo: boolean
           beneficios: string[]
+          chave_pix: string | null
+          descricao: string | null
           id: string
           nome: string
           owner_id: string
           quantidade_lavagens: number
+          slug: string | null
           valor_mensal: number
         }
         Insert: {
           ativo?: boolean
           beneficios?: string[]
+          chave_pix?: string | null
+          descricao?: string | null
           id?: string
           nome: string
           owner_id: string
           quantidade_lavagens?: number
+          slug?: string | null
           valor_mensal?: number
         }
         Update: {
           ativo?: boolean
           beneficios?: string[]
+          chave_pix?: string | null
+          descricao?: string | null
           id?: string
           nome?: string
           owner_id?: string
           quantidade_lavagens?: number
+          slug?: string | null
           valor_mensal?: number
         }
         Relationships: []
@@ -779,7 +813,12 @@ export type Database = {
         | "cancelado"
         | "nao_compareceu"
       app_role: "owner" | "colaborador"
-      assinatura_status: "ativa" | "pausada" | "cancelada"
+      assinatura_status:
+        | "ativa"
+        | "pausada"
+        | "cancelada"
+        | "pendente"
+        | "expirada"
       interacao_tipo:
         | "whatsapp"
         | "ligacao"
@@ -930,7 +969,13 @@ export const Constants = {
         "nao_compareceu",
       ],
       app_role: ["owner", "colaborador"],
-      assinatura_status: ["ativa", "pausada", "cancelada"],
+      assinatura_status: [
+        "ativa",
+        "pausada",
+        "cancelada",
+        "pendente",
+        "expirada",
+      ],
       interacao_tipo: [
         "whatsapp",
         "ligacao",
