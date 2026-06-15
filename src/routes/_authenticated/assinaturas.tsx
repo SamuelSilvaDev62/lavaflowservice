@@ -71,7 +71,7 @@ function Page() {
   };
   const compartilharWa = (slug: string, nome: string, valor: number) => {
     const msg = `Conheça nosso plano *${nome}* por ${brl(valor)}/mês 🚗✨\nAssine pelo link: ${planoUrl(slug)}`;
-    window.open(waLink("", msg).replace("wa.me/55", "wa.me/"), "_blank");
+    window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   return (
