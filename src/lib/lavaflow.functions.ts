@@ -467,13 +467,33 @@ export const upsertFuncionario = createServerFn({ method: "POST" })
 export const getAssinaturas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const [{ data: planos }, { data: ativas }] = await Promise.all([
+    const [{ data: planos }, { data: todas }, { data: emp }] = await Promise.all([
       context.supabase.from("planos_assinatura").select("*").eq("owner_id", context.userId).order("valor_mensal"),
-      context.supabase.from("assinaturas_clientes").select("*, clientes:cliente_id(nome), planos_assinatura:plano_id(nome, valor_mensal)").eq("owner_id", context.userId),
+      context.supabase.from("assinaturas_clientes").select("*, clientes:cliente_id(nome, telefone), planos_assinatura:plano_id(nome, valor_mensal)").eq("owner_id", context.userId).order("created_at", { ascending: false }),
+      context.supabase.from("empresa").select("slug").eq("owner_id", context.userId).maybeSingle(),
     ]);
-    const mrr = (ativas ?? []).filter((a: any) => a.status === "ativa").reduce((s, a: any) => s + Number(a.planos_assinatura?.valor_mensal ?? 0), 0);
-    return { planos: planos ?? [], assinaturas: ativas ?? [], mrr, ativas: (ativas ?? []).filter((a: any) => a.status === "ativa").length };
+    const ativas = (todas ?? []).filter((a: any) => a.status === "ativa");
+    const pendentes = (todas ?? []).filter((a: any) => a.status === "pendente");
+    const mrr = ativas.reduce((s, a: any) => s + Number(a.planos_assinatura?.valor_mensal ?? 0), 0);
+    const hoje = new Date(); const limite = new Date(); limite.setDate(limite.getDate() + 7);
+    const proximasCobrancas = ativas
+      .filter((a: any) => { const d = new Date(a.proxima_cobranca); return d >= hoje && d <= limite; })
+      .sort((a: any, b: any) => a.proxima_cobranca.localeCompare(b.proxima_cobranca));
+    return {
+      planos: planos ?? [],
+      assinaturas: ativas,
+      pendentes,
+      proximasCobrancas,
+      mrr,
+      ativas: ativas.length,
+      pendentesCount: pendentes.length,
+      empresaSlug: emp?.slug ?? null,
+    };
   });
+
+function slugifyPlano(s: string) {
+  return s.toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 60);
+}
 
 export const upsertPlano = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -483,13 +503,116 @@ export const upsertPlano = createServerFn({ method: "POST" })
     valor_mensal: z.number().min(0),
     quantidade_lavagens: z.number().int().min(1).max(99),
     beneficios: z.array(z.string()).default([]),
+    descricao: z.string().max(500).optional().nullable(),
+    chave_pix: z.string().max(140).optional().nullable(),
     ativo: z.boolean().default(true),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const row = { ...data, owner_id: context.userId };
+    const row: any = { ...data, owner_id: context.userId };
+    if (!data.id) {
+      const base = slugifyPlano(data.nome) || "plano";
+      row.slug = `${base}-${context.userId.slice(0, 6)}`;
+    }
     const { error } = data.id
       ? await context.supabase.from("planos_assinatura").update(row).eq("id", data.id).eq("owner_id", context.userId)
       : await context.supabase.from("planos_assinatura").insert(row);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+// ============ ASSINATURAS — PÚBLICAS ============
+export const getPlanoPublico = createServerFn({ method: "GET" })
+  .inputValidator((d) => z.object({ slug: z.string().min(1).max(120) }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: plano, error } = await supabaseAdmin
+      .from("planos_assinatura")
+      .select("id, owner_id, nome, valor_mensal, quantidade_lavagens, beneficios, descricao, chave_pix, ativo, slug")
+      .eq("slug", data.slug)
+      .maybeSingle();
+    if (error) throw error;
+    if (!plano || !plano.ativo) throw new Error("Plano não encontrado");
+    const { data: empresa } = await supabaseAdmin
+      .from("empresa")
+      .select("nome_fantasia, whatsapp, telefone, endereco, logo_url, slug")
+      .eq("owner_id", plano.owner_id)
+      .maybeSingle();
+    return { plano, empresa };
+  });
+
+export const criarAssinaturaPendente = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    slug: z.string().min(1).max(120),
+    nome: z.string().min(2).max(120),
+    telefone: z.string().min(8).max(20),
+    veiculo: z.string().max(80).optional(),
+    placa: z.string().max(10).optional(),
+    observacoes: z.string().max(500).optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: plano } = await supabaseAdmin.from("planos_assinatura").select("id, owner_id, ativo").eq("slug", data.slug).maybeSingle();
+    if (!plano || !plano.ativo) throw new Error("Plano não encontrado");
+    const owner_id = plano.owner_id;
+
+    const { data: existing } = await supabaseAdmin.from("clientes")
+      .select("id").eq("owner_id", owner_id).eq("telefone", data.telefone).maybeSingle();
+    let cliente_id = existing?.id;
+    if (!cliente_id) {
+      const { data: novo, error } = await supabaseAdmin.from("clientes").insert({
+        owner_id, nome: data.nome, telefone: data.telefone, origem_cliente: "Assinatura online",
+      }).select("id").single();
+      if (error) throw error;
+      cliente_id = novo.id;
+    }
+
+    let veiculo_id: string | null = null;
+    if (data.placa) {
+      const placa = data.placa.toUpperCase();
+      const { data: vexist } = await supabaseAdmin.from("veiculos")
+        .select("id").eq("owner_id", owner_id).eq("cliente_id", cliente_id).eq("placa", placa).maybeSingle();
+      if (vexist) veiculo_id = vexist.id;
+      else {
+        const { data: vnovo } = await supabaseAdmin.from("veiculos").insert({
+          owner_id, cliente_id, placa, modelo: data.veiculo ?? null,
+        }).select("id").single();
+        veiculo_id = vnovo?.id ?? null;
+      }
+    }
+
+    const obs = [data.veiculo && !data.placa ? `Veículo: ${data.veiculo}` : null, data.observacoes].filter(Boolean).join(" · ");
+    const { data: ass, error: e2 } = await supabaseAdmin.from("assinaturas_clientes").insert({
+      owner_id, cliente_id, plano_id: plano.id,
+      status: "pendente" as any, veiculo_id,
+      observacoes: obs || null, metodo_pagamento: "pix",
+    }).select("id").single();
+    if (e2) throw e2;
+    return { ok: true, id: ass.id };
+  });
+
+export const confirmarPagamentoAssinatura = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid(), gateway_ref: z.string().max(120).optional() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const proxima = new Date(); proxima.setDate(proxima.getDate() + 30);
+    const { error } = await context.supabase.from("assinaturas_clientes").update({
+      status: "ativa" as any,
+      pago_em: new Date().toISOString(),
+      proxima_cobranca: proxima.toISOString().slice(0, 10),
+      lavagens_usadas_mes: 0,
+      gateway_ref: data.gateway_ref ?? null,
+    }).eq("id", data.id).eq("owner_id", context.userId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
+export const cancelarAssinatura = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.from("assinaturas_clientes")
+      .update({ status: "cancelada" as any })
+      .eq("id", data.id).eq("owner_id", context.userId);
     if (error) throw error;
     return { ok: true };
   });

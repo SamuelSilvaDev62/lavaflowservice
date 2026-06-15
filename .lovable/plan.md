@@ -1,99 +1,79 @@
-# Evolução do Programa de Fidelidade
+# Plano — Assinaturas vendáveis no LavaFlow
 
-Transformar cada mensagem de "veículo pronto" em uma ferramenta de retenção, mostrando pontos ganhos, saldo, recompensas disponíveis e próximo benefício.
+## 1. Banco de dados (migration única)
 
-## 1. Nova função `buildReadyVehicleMessage()`
+**`planos_assinatura`** — adicionar:
+- `slug TEXT UNIQUE` (gerado a partir de owner+nome, ex: `lava-xxx-mensal-basico`)
+- `descricao TEXT`
+- `chave_pix TEXT` (opcional, para mostrar no checkout)
 
-Local: `src/lib/fidelidade-messages.ts` (novo, client-safe).
+**`assinaturas_clientes`** — adicionar:
+- novo valor no enum `assinatura_status`: `pendente` (já existe `ativa`, `cancelada`, `expirada`)
+- `created_at TIMESTAMPTZ DEFAULT now()`
+- `observacoes TEXT`
+- `veiculo_id UUID` (opcional, FK)
+- `metodo_pagamento TEXT` default `pix`
+- `pago_em TIMESTAMPTZ`
+- `gateway_ref TEXT` (preparado para futuro webhook)
 
-Recebe:
-- `cliente` (nome, pontos_saldo, total_visitas)
-- `ordem` (serviço, valor)
-- `config` (pontos_por_lavagem, pontos_por_real)
-- `recompensas` (lista ativa ordenada por custo)
-- `templates` personalizados (opcional, do localStorage)
+**RPCs públicas (SECURITY DEFINER, para `/plano/{slug}` sem login):**
+- `get_plano_by_slug(_slug)` → retorna plano + dados da empresa (nome, whatsapp, logo)
+- `criar_assinatura_pendente(_slug, _nome, _telefone, _veiculo, _placa, _obs)` → cria/reaproveita cliente + veículo + assinatura status `pendente`, retorna id
 
-Calcula:
-- `pontos_ganhos` = `pontos_por_lavagem + floor(valor * pontos_por_real)`
-- `saldo_novo` = `pontos_saldo + pontos_ganhos`
-- `recompensa_disponivel` = maior recompensa com `custo_pontos <= saldo_novo`
-- `proxima_recompensa` = menor recompensa com `custo_pontos > saldo_novo`
-- `pontos_faltantes` = `proxima.custo_pontos - saldo_novo`
-- VIP se `total_visitas >= 10` OU `saldo_novo >= 1000` (configurável)
+GRANT EXECUTE para `anon, authenticated` apenas nessas duas funções.
 
-Retorna 1 de 3 mensagens (cenário 1, 2 ou VIP) usando placeholders:
-`{nome}`, `{servico}`, `{valor}`, `{pontos_ganhos}`, `{saldo_atual}`, `{proxima_recompensa}`, `{pontos_faltantes}`, `{recompensa_disponivel}`.
+## 2. Página pública `/plano/$slug`
 
-## 2. Integração no fluxo "Pronto"
+Nova rota top-level (não em `_authenticated`). Mostra:
+- Header com logo/nome da empresa
+- Card do plano: nome, preço grande, X lavagens/mês, lista de benefícios, descrição
+- Botão **"Assinar agora"** → abre dialog com formulário (nome, telefone, veículo, placa, observações)
+- Submit chama `criar_assinatura_pendente` via serverFn pública → mostra tela de confirmação com:
+  - Instruções de pagamento PIX (chave do dono)
+  - Botão "Avisar pagamento no WhatsApp" (link `wa.me` para o dono com mensagem pré-pronta)
+- `head()` com og:title/description do plano para compartilhamento
 
-Na tela de Ordens / Fila / Kanban, ao mover OS para `pronto` e clicar em "Avisar no WhatsApp":
-- Buscar dados necessários via novo server fn `getDadosMensagemPronto({ ordemId })` que retorna cliente, ordem, config, recompensas.
-- Gerar mensagem com `buildReadyVehicleMessage()`.
-- Abrir `waLink(telefone, mensagem)`.
+## 3. Tela de planos (`/assinaturas`)
 
-Substitui o template estático `pronto_para_retirada` atual.
+Em cada card de plano adicionar:
+- Botão **"Copiar link"** (`{origin}/plano/{slug}`)
+- Botão **"Compartilhar WhatsApp"** — mensagem pronta: "Conheça nosso plano *{nome}* por {valor}/mês — {link}"
+- Botão **"QR Code"** — modal com QR gerado client-side (lib `qrcode` ou data-uri via API)
 
-## 3. Botão "Enviar Extrato de Fidelidade" no perfil do cliente
+Nova aba/seção **"Pendentes"** listando assinaturas com status `pendente`:
+- Nome cliente, plano, telefone, criado há X
+- Botões: **"Confirmar pagamento"** (vira `ativa`, define `pago_em`, `proxima_cobranca = today + 30d`) e **"Cancelar"**
 
-Local: `src/routes/_authenticated/clientes/$id.tsx`.
+## 4. Dashboard
 
-- Novo server fn `getExtratoFidelidade({ clienteId })` → saldo, últimos 5 `pontos_movimentos` (com nome do serviço via join em ordens_servico+servicos), recompensas elegíveis.
-- Função `buildExtratoMessage()` em `fidelidade-messages.ts`.
-- Botão abre WhatsApp com a mensagem.
+Adicionar no card de receita recorrente / nova linha:
+- Assinantes ativos (já existe)
+- **Assinaturas pendentes** (novo, com link para aba pendentes) — destaque se >0
+- MRR (já existe)
+- **Próximas cobranças (7 dias)** — lista compacta: cliente, plano, data
 
-## 4. Dashboard — Card "Clientes com recompensa disponível"
+ServerFn `getAssinaturas` ampliada para retornar `pendentes[]` e `proximasCobrancas[]`.
 
-- Novo server fn `getClientesComRecompensa()` → conta clientes cujo `pontos_saldo >= min(recompensas.custo_pontos)`, retorna `{ qtd, clientes: [...] }`.
-- Card no dashboard com botão "Ver clientes" → navega para `/clientes?filtro=recompensa_disponivel`.
-- Suporte ao filtro na rota `clientes/index.tsx`.
+## 5. Estrutura para gateway futuro
 
-## 5. Oportunidades — Nova oportunidade
+- Campo `gateway_ref` já adicionado
+- ServerFn `confirmarPagamento(id, { metodo, gateway_ref? })` centraliza a ativação — mesmo endpoint poderá ser chamado por webhook futuro em `/api/public/webhooks/pagamento`
+- Não implementar gateway agora; apenas deixar o ponto de extensão documentado em comentário
 
-Em `oportunidades.tsx`, adicionar item:
-- "X clientes possuem recompensas disponíveis e ainda não resgataram"
-- Valor potencial = `qtd * ticket_medio` (ticket médio do owner, já calculado nos relatórios; senão fallback R$ 80)
-- Reusa `getClientesComRecompensa()`.
+## 6. Arquivos
 
-## 6. Assistente — Novas ferramentas/insights
+**Novos**
+- `supabase/migrations/<ts>_assinaturas_publicas.sql`
+- `src/routes/plano.$slug.tsx`
+- `src/components/qr-code-dialog.tsx`
 
-Em `src/routes/api/assistente-chat.ts`, adicionar 2 tools:
-- `clientes_proximos_recompensa` (faltam ≤ 50 pts)
-- `clientes_com_recompensa_disponivel`
+**Editados**
+- `src/lib/lavaflow.functions.ts` — `getPlanoPublico`, `criarAssinaturaPendente`, `confirmarPagamento`, `cancelarAssinatura`, ampliar `getAssinaturas`
+- `src/routes/_authenticated/assinaturas.tsx` — botões compartilhar/QR, aba pendentes
+- `src/routes/_authenticated/dashboard.tsx` — pendentes + próximas cobranças
+- `src/lib/whatsapp.ts` — helper `linkAssinatura(plano, origin)`
 
-E expor no system prompt o insight "clientes que usam fidelidade retornam mais" como fato estático.
+## Perguntas (antes de implementar)
 
-## 7. Configurações — Templates personalizáveis
-
-Em `configuracoes.tsx`, nova seção "Mensagens de Fidelidade":
-- 4 textareas: mensagem cenário 1, cenário 2, VIP, extrato.
-- Salvas via `setTemplate()` em `lib/whatsapp.ts` (novas chaves: `fidelidade_pronto_padrao`, `fidelidade_pronto_disponivel`, `fidelidade_pronto_vip`, `fidelidade_extrato`).
-- Lista de placeholders disponíveis exibida acima dos campos.
-- Botão "Restaurar padrão" por mensagem.
-
-## Arquivos
-
-Novos:
-- `src/lib/fidelidade-messages.ts` — funções de build + defaults
-- (opcional) helper de cálculo de pontos compartilhado
-
-Editados:
-- `src/lib/lavaflow.functions.ts` — `getDadosMensagemPronto`, `getExtratoFidelidade`, `getClientesComRecompensa`
-- `src/lib/whatsapp.ts` — novas chaves de template
-- `src/routes/_authenticated/ordens.tsx` (ou onde está o botão "Avisar pronto" hoje) — usar nova msg
-- `src/routes/_authenticated/fila.tsx` — idem
-- `src/routes/_authenticated/clientes/$id.tsx` — botão extrato
-- `src/routes/_authenticated/clientes/index.tsx` — filtro `recompensa_disponivel`
-- `src/routes/_authenticated/dashboard.tsx` — card
-- `src/routes/_authenticated/oportunidades.tsx` — nova oportunidade
-- `src/routes/_authenticated/configuracoes.tsx` — seção de templates
-- `src/routes/api/assistente-chat.ts` — novas tools
-
-## Fora do escopo
-
-- Não altera triggers de crédito de pontos (já funciona).
-- Não cria novas tabelas — usa `clientes`, `recompensas`, `fidelidade_config`, `pontos_movimentos` existentes.
-- Não envia WhatsApp automaticamente — continua sendo "abrir wa.me" manual.
-
-## Pergunta antes de implementar
-
-Critério VIP padrão: **10+ visitas ou 1000+ pontos**. Quer ajustar esses valores ou deixo como configurável depois?
+1. **Slug do plano**: gerar automaticamente (`{empresa-slug}-{nome-plano}`) ou deixar o dono editar?
+2. **PIX**: incluir campo "chave PIX" no plano (ou na empresa) para já mostrar na página pública, ou só mostrar "combine pagamento pelo WhatsApp" no MVP?

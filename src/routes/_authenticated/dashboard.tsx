@@ -4,7 +4,7 @@ import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getDashboardMetrics, getOportunidades, getClientesComRecompensa } from "@/lib/lavaflow.functions";
+import { getDashboardMetrics, getOportunidades, getClientesComRecompensa, getAssinaturas } from "@/lib/lavaflow.functions";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
@@ -70,10 +70,12 @@ function Dashboard() {
   const fetchOps = useServerFn(getOportunidades);
   const fetchState = useServerFn(getOnboardingState);
   const fetchRec = useServerFn(getClientesComRecompensa);
+  const fetchAss = useServerFn(getAssinaturas);
   const { data: m, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fetchMetrics() });
   const { data: ops } = useQuery({ queryKey: ["oportunidades"], queryFn: () => fetchOps() });
   const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
   const { data: rec } = useQuery({ queryKey: ["clientes-recompensa"], queryFn: () => fetchRec() });
+  const { data: ass } = useQuery({ queryKey: ["assinaturas"], queryFn: () => fetchAss() });
 
   if (isLoading || !m) {
     return <div className="space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}</div>;
@@ -226,6 +228,43 @@ function Dashboard() {
             </div>
           </CardContent>
         </Card>
+      )}
+
+      {/* Assinaturas pendentes + próximas cobranças */}
+      {ass && (ass.pendentesCount > 0 || ass.proximasCobrancas.length > 0) && (
+        <div className="grid sm:grid-cols-2 gap-3 mb-4">
+          {ass.pendentesCount > 0 && (
+            <Card className="border-warning/40 bg-gradient-to-br from-warning/10 to-transparent">
+              <CardContent className="p-4 sm:p-5">
+                <div className="flex items-start gap-3">
+                  <div className="h-10 w-10 rounded-xl bg-warning text-warning-foreground grid place-content-center shrink-0"><Repeat className="h-5 w-5" /></div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-display font-semibold text-sm">Assinaturas pendentes</p>
+                    <p className="text-sm mt-1">⏳ <strong>{ass.pendentesCount}</strong> {ass.pendentesCount === 1 ? "cliente aguarda" : "clientes aguardam"} confirmação de pagamento.</p>
+                    <Button asChild size="sm" variant="outline" className="h-8 text-xs mt-3">
+                      <Link to="/assinaturas">Confirmar pagamentos <ArrowRight className="h-3 w-3 ml-1" /></Link>
+                    </Button>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {ass.proximasCobrancas.length > 0 && (
+            <Card>
+              <CardContent className="p-4 sm:p-5">
+                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Próximas cobranças (7 dias)</p>
+                <ul className="space-y-1.5 text-sm">
+                  {ass.proximasCobrancas.slice(0, 4).map((c: any) => (
+                    <li key={c.id} className="flex items-center justify-between gap-2">
+                      <span className="truncate">{c.clientes?.nome} <span className="text-muted-foreground text-xs">· {c.planos_assinatura?.nome}</span></span>
+                      <span className="text-xs text-muted-foreground shrink-0 tabular-nums">{c.proxima_cobranca?.split("-").reverse().slice(0, 2).join("/")}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       )}
 
       {/* Impacto Financeiro do Mês */}
