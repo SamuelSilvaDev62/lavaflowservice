@@ -145,7 +145,9 @@ function Page() {
                 >
                   {text ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-headings:my-2">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+                      <Suspense fallback={<span className="whitespace-pre-wrap">{text}</span>}>
+                        <Markdown>{text}</Markdown>
+                      </Suspense>
                     </div>
                   ) : (
                     <Loader2 className="h-4 w-4 animate-spin" />
