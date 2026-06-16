@@ -1,5 +1,6 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
+import { useQuery } from "@tanstack/react-query";
 import {
   LayoutDashboard, Sparkles, Bot, ListChecks, ClipboardList, Users, UserMinus,
   CreditCard, Award, UsersRound, BarChart3, Settings, Menu, X, LogOut, Car, Briefcase, CalendarDays,
@@ -42,22 +43,24 @@ const colabGroups = [
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const [isColab, setIsColab] = useState<boolean | null>(null);
   const router = useRouter();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
 
   useEffect(() => setOpen(false), [pathname]);
 
-  useEffect(() => {
-    (async () => {
+  const { data: isColab } = useQuery({
+    queryKey: ["user-is-colab"],
+    queryFn: async () => {
       const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return;
+      if (!u.user) return false;
       const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
       const colab = (roles ?? []).some((r: any) => r.role === "colaborador") &&
                     !(roles ?? []).some((r: any) => r.role === "owner");
-      setIsColab(colab);
-    })();
-  }, []);
+      return colab;
+    },
+    staleTime: 5 * 60_000,
+    gcTime: 30 * 60_000,
+  });
 
   async function signOut() {
     await supabase.auth.signOut();
