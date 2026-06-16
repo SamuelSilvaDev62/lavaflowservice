@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
+import { lazy, Suspense } from "react";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -13,7 +14,8 @@ import {
   TrendingUp, TrendingDown, DollarSign, Repeat, Users, ListChecks,
   Sparkles, ArrowRight, Bot, AlertTriangle, Activity, Target, UserPlus, Gift,
 } from "lucide-react";
-import { LineChart, Line, ResponsiveContainer, Tooltip, XAxis, YAxis, CartesianGrid } from "recharts";
+
+const DashboardRevenueChart = lazy(() => import("@/components/charts/dashboard-revenue-chart"));
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: Dashboard,
@@ -287,15 +289,9 @@ function Dashboard() {
             </h3>
           </div>
           <div className="h-56 sm:h-64">
-            <ResponsiveContainer>
-              <LineChart data={m.serie} margin={{ left: -10, right: 5, top: 5, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                <XAxis dataKey="dia" fontSize={10} stroke="var(--color-muted-foreground)" />
-                <YAxis fontSize={10} stroke="var(--color-muted-foreground)" tickFormatter={(v) => `R$${v}`} />
-                <Tooltip formatter={(v: any) => brl(Number(v))} />
-                <Line type="monotone" dataKey="valor" stroke="var(--color-primary)" strokeWidth={2.5} dot={{ r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
+            <Suspense fallback={<div className="h-full w-full rounded-md bg-muted/40 animate-pulse" />}>
+              <DashboardRevenueChart data={m.serie} />
+            </Suspense>
           </div>
         </CardContent>
       </Card>
