@@ -1,14 +1,19 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState } from "react";
+import { lazy, Suspense, useState } from "react";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { getRelatorios } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
-import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, LabelList } from "recharts";
 import { EmptyState } from "@/components/empty-state";
 import { BarChart3, TrendingUp, Package, CheckCircle2, Users, Wrench } from "lucide-react";
+
+const RelatoriosCharts = lazy(() => import("@/components/charts/relatorios-charts"));
+const HorizontalRankingChart = lazy(() =>
+  import("@/components/charts/relatorios-charts").then((m) => ({ default: m.HorizontalRankingChart })),
+);
+const ChartFallback = () => <div className="h-64 w-full rounded-md bg-muted/40 animate-pulse" />;
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
   component: Page,
@@ -106,31 +111,9 @@ function Page() {
 
           {/* DESKTOP — gráficos lado a lado */}
           <div className="hidden sm:grid lg:grid-cols-2 gap-4">
-            <Card><CardContent className="p-5">
-              <h3 className="font-display font-semibold mb-4">Receita por serviço</h3>
-              <div className="h-64"><ResponsiveContainer>
-                <BarChart data={data.porServico}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="nome" fontSize={10} stroke="var(--color-muted-foreground)" />
-                  <YAxis fontSize={10} stroke="var(--color-muted-foreground)" />
-                  <Tooltip formatter={(v: any) => brl(Number(v))} />
-                  <Bar dataKey="valor" fill="var(--color-primary)" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer></div>
-            </CardContent></Card>
-
-            <Card><CardContent className="p-5">
-              <h3 className="font-display font-semibold mb-4">Receita por funcionário</h3>
-              <div className="h-64"><ResponsiveContainer>
-                <BarChart data={data.porFuncionario}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
-                  <XAxis dataKey="nome" fontSize={10} stroke="var(--color-muted-foreground)" />
-                  <YAxis fontSize={10} stroke="var(--color-muted-foreground)" />
-                  <Tooltip formatter={(v: any) => brl(Number(v))} />
-                  <Bar dataKey="valor" fill="var(--color-chart-2)" radius={[6, 6, 0, 0]} />
-                </BarChart>
-              </ResponsiveContainer></div>
-            </CardContent></Card>
+            <Suspense fallback={<><ChartFallback /><ChartFallback /></>}>
+              <RelatoriosCharts porServico={data.porServico} porFuncionario={data.porFuncionario} />
+            </Suspense>
           </div>
         </>
       )}
@@ -148,39 +131,10 @@ function KpiChip({ emoji, label, value }: { emoji: string; label: string; value:
 }
 
 function HorizontalChart({ data }: { data: Array<{ nome: string; valor: number }> }) {
-  const height = Math.max(140, data.length * 44);
   return (
-    <div style={{ height }}>
-      <ResponsiveContainer>
-        <BarChart data={data} layout="vertical" margin={{ top: 4, right: 48, left: 4, bottom: 0 }}>
-          <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke="var(--color-border)" />
-          <XAxis type="number" hide />
-          <YAxis
-            type="category"
-            dataKey="nome"
-            width={90}
-            fontSize={11}
-            stroke="var(--color-muted-foreground)"
-            tick={{ fill: "var(--color-foreground)" }}
-            tickFormatter={(v: string) => (v.length > 14 ? v.slice(0, 13) + "…" : v)}
-          />
-          <Tooltip
-            formatter={(v: any) => brl(Number(v))}
-            cursor={{ fill: "var(--color-muted)", opacity: 0.4 }}
-            contentStyle={{ borderRadius: 12, border: "1px solid var(--color-border)", fontSize: 12 }}
-          />
-          <Bar dataKey="valor" fill="var(--color-primary)" radius={[0, 8, 8, 0]} barSize={22}>
-            <LabelList
-              dataKey="valor"
-              position="right"
-              fontSize={11}
-              fill="var(--color-foreground)"
-              formatter={(v: any) => brl(Number(v))}
-            />
-          </Bar>
-        </BarChart>
-      </ResponsiveContainer>
-    </div>
+    <Suspense fallback={<ChartFallback />}>
+      <HorizontalRankingChart data={data} />
+    </Suspense>
   );
 }
 

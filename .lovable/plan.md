@@ -1,79 +1,94 @@
-# Plano — Assinaturas vendáveis no LavaFlow
+## Plano de Otimização e PWA — LavaFlow
 
-## 1. Banco de dados (migration única)
+Auditei o projeto e identifiquei os principais gargalos. O plano abaixo agrupa correções por impacto/esforço, mantendo o comportamento atual do app (sem mudar regras de negócio).
 
-**`planos_assinatura`** — adicionar:
-- `slug TEXT UNIQUE` (gerado a partir de owner+nome, ex: `lava-xxx-mensal-basico`)
-- `descricao TEXT`
-- `chave_pix TEXT` (opcional, para mostrar no checkout)
+---
 
-**`assinaturas_clientes`** — adicionar:
-- novo valor no enum `assinatura_status`: `pendente` (já existe `ativa`, `cancelada`, `expirada`)
-- `created_at TIMESTAMPTZ DEFAULT now()`
-- `observacoes TEXT`
-- `veiculo_id UUID` (opcional, FK)
-- `metodo_pagamento TEXT` default `pix`
-- `pago_em TIMESTAMPTZ`
-- `gateway_ref TEXT` (preparado para futuro webhook)
+### 1. Bundle inicial menor (carrega mais rápido em 4G)
 
-**RPCs públicas (SECURITY DEFINER, para `/plano/{slug}` sem login):**
-- `get_plano_by_slug(_slug)` → retorna plano + dados da empresa (nome, whatsapp, logo)
-- `criar_assinatura_pendente(_slug, _nome, _telefone, _veiculo, _placa, _obs)` → cria/reaproveita cliente + veículo + assinatura status `pendente`, retorna id
+- **Lazy load de `recharts`** no `dashboard.tsx` e `relatorios.tsx` via `React.lazy` + `<Suspense>`. Reduz ~150 KB do bundle inicial.
+- **Lazy load de `react-markdown`** no assistente (carrega só ao abrir a página).
+- **Lazy load de `qrcode`** no `qr-code-dialog.tsx` (carrega só ao abrir o diálogo).
+- **Lazy load do `guided-tour`** (driver.js) — só quando o usuário clica em "iniciar tour".
+- **Google Fonts otimizado** no `__root.tsx`: usar `preconnect` + `display=swap` (já existe `swap`, falta `preconnect` para `fonts.gstatic.com`).
 
-GRANT EXECUTE para `anon, authenticated` apenas nessas duas funções.
+### 2. Eliminar cascata de loading (HTML → JS → fetch → spinner)
 
-## 2. Página pública `/plano/$slug`
+- Adicionar **`loader` + `ensureQueryData`** nas rotas autenticadas principais: `dashboard`, `fila`, `clientes/index`, `assinaturas`, `oportunidades`, `relatorios`. Dispara o fetch em paralelo com o JS, eliminando o spinner inicial.
+- Mover **check de role do `AppLayout`** (hoje `useEffect` direto) para `useQuery` cacheado, evitando refetch a cada navegação.
+- Configurar **`defaultPreload: 'intent'`** no router para prefetch ao passar o mouse / focar links.
+- Adicionar **skeletons estruturais** (não spinners) nas rotas mais visitadas.
 
-Nova rota top-level (não em `_authenticated`). Mostra:
-- Header com logo/nome da empresa
-- Card do plano: nome, preço grande, X lavagens/mês, lista de benefícios, descrição
-- Botão **"Assinar agora"** → abre dialog com formulário (nome, telefone, veículo, placa, observações)
-- Submit chama `criar_assinatura_pendente` via serverFn pública → mostra tela de confirmação com:
-  - Instruções de pagamento PIX (chave do dono)
-  - Botão "Avisar pagamento no WhatsApp" (link `wa.me` para o dono com mensagem pré-pronta)
-- `head()` com og:title/description do plano para compartilhamento
+### 3. Queries de banco mais rápidas
 
-## 3. Tela de planos (`/assinaturas`)
+- **Índices Postgres** (migração SQL):
+  - `ordens_servico (owner_id, created_at DESC)` — usado em dashboard, relatórios, oportunidades, clientes inativos.
+  - `ordens_servico (owner_id, status)` — usado no kanban da fila.
+  - `clientes (owner_id, ultima_visita)` — usado em clientes inativos.
+- **Limites e colunas explícitas** em queries que hoje fazem `select("*")` sem `.limit()`:
+  - `getClienteInativos`, `getOportunidades`, `getDashboardMetrics`, `listClientes`, `getRelatorios`: restringir janela (ex. últimos 90 dias já filtrado) e selecionar apenas colunas necessárias.
+- **`staleTime` por rota**: `fila` recebe `staleTime: 0` + `refetchInterval: 15s`; demais ficam em 60s (atual).
 
-Em cada card de plano adicionar:
-- Botão **"Copiar link"** (`{origin}/plano/{slug}`)
-- Botão **"Compartilhar WhatsApp"** — mensagem pronta: "Conheça nosso plano *{nome}* por {valor}/mês — {link}"
-- Botão **"QR Code"** — modal com QR gerado client-side (lib `qrcode` ou data-uri via API)
+### 4. PWA instalável (Add to Home Screen + cache offline básico)
 
-Nova aba/seção **"Pendentes"** listando assinaturas com status `pendente`:
-- Nome cliente, plano, telefone, criado há X
-- Botões: **"Confirmar pagamento"** (vira `ativa`, define `pago_em`, `proxima_cobranca = today + 30d`) e **"Cancelar"**
+Usar `vite-plugin-pwa` com `generateSW` seguindo as regras de skill PWA do projeto:
 
-## 4. Dashboard
+- `public/manifest.webmanifest` com nome "LavaFlow", `display: standalone`, `theme_color` alinhado ao tema, ícones 192/512 + maskable.
+- Ícones PWA gerados a partir da identidade visual atual (verde/escuro), salvos em `public/icons/`.
+- Tags no `__root.tsx`: `<link rel="manifest">`, `<meta name="theme-color">`, `<link rel="apple-touch-icon">`.
+- Service Worker via `vite-plugin-pwa`:
+  - `registerType: 'autoUpdate'`, `injectRegister: null`, `devOptions.enabled: false`.
+  - Navegação HTML: `NetworkFirst` (nunca cache-first).
+  - Assets hashados: `CacheFirst`.
+  - Excluir `/api/*` e `/~oauth` do cache.
+- Wrapper de registro `src/pwa/register-sw.ts` que **só registra em produção** e **nunca em preview Lovable / iframe / `?sw=off`** (cumpre a regra obrigatória do skill).
+- Resultado: o app fica instalável no celular (ícone na home), abre como app standalone e mostra shell mesmo offline.
 
-Adicionar no card de receita recorrente / nova linha:
-- Assinantes ativos (já existe)
-- **Assinaturas pendentes** (novo, com link para aba pendentes) — destaque se >0
-- MRR (já existe)
-- **Próximas cobranças (7 dias)** — lista compacta: cliente, plano, data
+### 5. Mobile UX
 
-ServerFn `getAssinaturas` ampliada para retornar `pendentes[]` e `proximasCobrancas[]`.
+- Garantir `TouchSensor` no `@dnd-kit` da fila (drag funcional em touch sem long-press atrapalhar scroll).
+- Skeletons em vez de telas brancas durante o fetch inicial.
+- `theme-color` correto para a status bar do mobile.
 
-## 5. Estrutura para gateway futuro
+---
 
-- Campo `gateway_ref` já adicionado
-- ServerFn `confirmarPagamento(id, { metodo, gateway_ref? })` centraliza a ativação — mesmo endpoint poderá ser chamado por webhook futuro em `/api/public/webhooks/pagamento`
-- Não implementar gateway agora; apenas deixar o ponto de extensão documentado em comentário
+### Arquivos afetados
 
-## 6. Arquivos
+**Criados:**
+- `vite-plugin-pwa` adicionado ao `vite.config.ts`
+- `public/manifest.webmanifest`
+- `public/icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`
+- `src/pwa/register-sw.ts`
+- `src/components/ui/skeleton-*.tsx` (skeletons de dashboard/fila/lista)
+- `supabase/migrations/<ts>_perf_indices.sql`
 
-**Novos**
-- `supabase/migrations/<ts>_assinaturas_publicas.sql`
-- `src/routes/plano.$slug.tsx`
-- `src/components/qr-code-dialog.tsx`
+**Editados:**
+- `src/router.tsx` (defaultPreload + preserva client por request)
+- `src/routes/__root.tsx` (manifest, theme-color, apple-touch-icon, preconnect fonts, registro SW)
+- `src/routes/_authenticated/{dashboard,fila,clientes/index,assinaturas,oportunidades,relatorios}.tsx` (loaders + ensureQueryData + lazy charts + skeletons)
+- `src/routes/_authenticated/assistente.tsx` (react-markdown lazy)
+- `src/components/qr-code-dialog.tsx` (qrcode lazy)
+- `src/components/app-layout.tsx` (role via useQuery)
+- `src/components/guided-tour.tsx` (driver.js lazy)
+- `src/lib/lavaflow.functions.ts` (limites + colunas explícitas nas queries pesadas)
+- `package.json` (`vite-plugin-pwa` + `workbox-window`)
 
-**Editados**
-- `src/lib/lavaflow.functions.ts` — `getPlanoPublico`, `criarAssinaturaPendente`, `confirmarPagamento`, `cancelarAssinatura`, ampliar `getAssinaturas`
-- `src/routes/_authenticated/assinaturas.tsx` — botões compartilhar/QR, aba pendentes
-- `src/routes/_authenticated/dashboard.tsx` — pendentes + próximas cobranças
-- `src/lib/whatsapp.ts` — helper `linkAssinatura(plano, origin)`
+---
 
-## Perguntas (antes de implementar)
+### Detalhes técnicos
 
-1. **Slug do plano**: gerar automaticamente (`{empresa-slug}-{nome-plano}`) ou deixar o dono editar?
-2. **PIX**: incluir campo "chave PIX" no plano (ou na empresa) para já mostrar na página pública, ou só mostrar "combine pagamento pelo WhatsApp" no MVP?
+- O `vite-plugin-pwa` é compatível com o template `@lovable.dev/vite-tanstack-config` (apenas adicionar ao array `vite.plugins` via override).
+- O Service Worker **não** registra em `id-preview--*.lovable.app` nem em iframe (regra obrigatória do skill PWA), só na URL publicada.
+- Os índices Postgres são criados via migração padrão (`CREATE INDEX`, não `CONCURRENTLY`, pois roda dentro de transação).
+- Nenhuma mudança de schema de dados ou regra de negócio — apenas índices, limites de query e estrutura de loading.
+
+---
+
+### Ganho esperado
+
+- **Bundle inicial:** ~−40% (lazy de recharts/markdown/qrcode/driver).
+- **Primeiro render do dashboard:** ~−1s (loader + ensureQueryData elimina cascata).
+- **Queries do dashboard/fila:** −50 a −300 ms (índices compostos).
+- **Mobile:** instalável como app, abre instantâneo nas próximas visitas, shell funciona offline.
+
+Posso executar tudo de uma vez ou prefere dividir em etapas (ex.: primeiro PWA + bundle, depois loaders + índices)?

@@ -2,8 +2,7 @@ import { useEffect, useRef } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useRouter, useRouterState } from "@tanstack/react-router";
-import { driver, type DriveStep } from "driver.js";
-import "driver.js/dist/driver.css";
+import type { DriveStep } from "driver.js";
 import { getOnboardingState, dismissTour } from "@/lib/onboarding.functions";
 
 const STEPS: DriveStep[] = [
@@ -99,13 +98,19 @@ export function GuidedTour() {
 
     started.current = true;
 
-    const t = setTimeout(() => {
+    const t = setTimeout(async () => {
       // Filtra steps cujos elementos existem no DOM
       const steps = STEPS.filter((s) => {
         const sel = typeof s.element === "string" ? s.element : null;
         return sel ? !!document.querySelector(sel) : true;
       });
       if (steps.length === 0) return;
+
+      // Lazy-load driver.js (~30KB) e o CSS apenas quando o tour vai rodar
+      const [{ driver }] = await Promise.all([
+        import("driver.js"),
+        import("driver.js/dist/driver.css"),
+      ]);
 
       const d = driver({
         showProgress: true,

@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { PageHeader } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { Bot, Send, Sparkles, User, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+
+const Markdown = lazy(() => import("@/components/markdown-message"));
 
 export const Route = createFileRoute("/_authenticated/assistente")({
   component: Page,
@@ -145,7 +145,9 @@ function Page() {
                 >
                   {text ? (
                     <div className="prose prose-sm dark:prose-invert max-w-none prose-p:my-1 prose-ul:my-1 prose-headings:my-2">
-                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{text}</ReactMarkdown>
+                      <Suspense fallback={<span className="whitespace-pre-wrap">{text}</span>}>
+                        <Markdown>{text}</Markdown>
+                      </Suspense>
                     </div>
                   ) : (
                     <Loader2 className="h-4 w-4 animate-spin" />
