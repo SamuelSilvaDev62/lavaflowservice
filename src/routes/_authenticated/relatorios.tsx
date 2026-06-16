@@ -112,14 +112,10 @@ function Page() {
           {/* DESKTOP — gráficos lado a lado */}
           <div className="hidden sm:grid lg:grid-cols-2 gap-4">
             <Card><CardContent className="p-5">
-              <Suspense fallback={<ChartFallback />}>
-                <RelatoriosCharts porServico={data.porServico} porFuncionario={[]} />
-              </Suspense>
-            </CardContent></Card>
-            <Card><CardContent className="p-5">
-              <Suspense fallback={<ChartFallback />}>
-                <RelatoriosCharts porServico={[]} porFuncionario={data.porFuncionario} />
-              </Suspense>
+              <h3 className="font-display font-semibold mb-4">Receita por serviço</h3>
+              <div className="h-64"><Suspense fallback={<ChartFallback />}>
+                <RelatoriosCharts porServico={data.porServico} porFuncionario={data.porFuncionario} />
+              </Suspense></div>
             </CardContent></Card>
           </div>
         </>
