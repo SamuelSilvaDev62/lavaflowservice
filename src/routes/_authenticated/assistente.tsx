@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import ReactMarkdown from "react-markdown";
-import remarkGfm from "remark-gfm";
 import { PageHeader } from "@/components/app-layout";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -11,6 +9,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { supabase } from "@/integrations/supabase/client";
 import { Bot, Send, Sparkles, User, Loader2, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+
+const Markdown = lazy(() => import("@/components/markdown-message"));
 
 export const Route = createFileRoute("/_authenticated/assistente")({
   component: Page,

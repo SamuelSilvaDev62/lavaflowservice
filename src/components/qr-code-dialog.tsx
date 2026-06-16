@@ -1,5 +1,4 @@
 import { useEffect, useState } from "react";
-import QRCode from "qrcode";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Download, Copy } from "lucide-react";
@@ -11,7 +10,14 @@ export function QrCodeDialog({ open, onOpenChange, url, title = "Compartilhe seu
   const [dataUrl, setDataUrl] = useState<string>("");
   useEffect(() => {
     if (!open || !url) return;
-    QRCode.toDataURL(url, { width: 400, margin: 2 }).then(setDataUrl).catch(() => setDataUrl(""));
+    let cancelled = false;
+    // Lazy-load qrcode only when the dialog actually opens
+    import("qrcode").then(({ default: QRCode }) => {
+      QRCode.toDataURL(url, { width: 400, margin: 2 })
+        .then((d) => { if (!cancelled) setDataUrl(d); })
+        .catch(() => { if (!cancelled) setDataUrl(""); });
+    });
+    return () => { cancelled = true; };
   }, [open, url]);
 
   return (
