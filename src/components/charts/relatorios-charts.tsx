@@ -1,9 +1,10 @@
 import { BarChart, Bar, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid, LabelList } from "recharts";
 import { brl } from "@/lib/format";
+import { Card, CardContent } from "@/components/ui/card";
 
 type Item = { nome: string; valor: number };
 
-export function VerticalBarChart({ data, color = "var(--color-primary)" }: { data: Item[]; color?: string }) {
+function VerticalBarChart({ data, color = "var(--color-primary)" }: { data: Item[]; color?: string }) {
   return (
     <ResponsiveContainer>
       <BarChart data={data}>
@@ -59,14 +60,14 @@ export default function RelatoriosCharts({
 }: { porServico: Item[]; porFuncionario: Item[] }) {
   return (
     <>
-      <div>
+      <Card><CardContent className="p-5">
         <h3 className="font-display font-semibold mb-4">Receita por serviço</h3>
         <div className="h-64"><VerticalBarChart data={porServico} /></div>
-      </div>
-      <div>
+      </CardContent></Card>
+      <Card><CardContent className="p-5">
         <h3 className="font-display font-semibold mb-4">Receita por funcionário</h3>
         <div className="h-64"><VerticalBarChart data={porFuncionario} color="var(--color-chart-2)" /></div>
-      </div>
+      </CardContent></Card>
     </>
   );
 }
