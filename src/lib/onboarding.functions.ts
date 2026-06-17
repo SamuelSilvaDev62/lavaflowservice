@@ -199,15 +199,20 @@ async function runSeed(supabase: any, userId: string) {
     await Promise.all(updates.slice(i, i + 20));
   }
 
-  // Avaliações — ~60 nas OS entregues
+  // Avaliações — mix de 5★, 4★ e algumas 2-3★ com comentário para alimentar oportunidades
   const entregues = ordens.slice(0, 135);
-  const avaliacoesPayload = entregues.slice(0, 60).map((o: any, i: number) => ({
-    owner_id: userId,
-    cliente_id: o.cliente_id,
-    ordem_id: o.id,
-    nota: i % 8 === 0 ? 4 : 5,
-    comentario: i % 3 === 0 ? "Atendimento excelente, voltarei!" : null,
-  }));
+  const avaliacoesPayload = entregues.slice(0, 60).map((o: any, i: number) => {
+    const ruim = i < 2; // 2 avaliações ruins
+    return {
+      owner_id: userId,
+      cliente_id: o.cliente_id,
+      ordem_id: o.id,
+      nota: ruim ? (i === 0 ? 2 : 3) : (i % 8 === 0 ? 4 : 5),
+      comentario: ruim
+        ? (i === 0 ? "Demorou muito para entregar." : "O carro voltou com manchas no painel.")
+        : (i % 3 === 0 ? "Atendimento excelente, voltarei!" : null),
+    };
+  });
   await supabase.from("avaliacoes").insert(avaliacoesPayload);
 
   // Interações — 40
@@ -218,4 +223,77 @@ async function runSeed(supabase: any, userId: string) {
     descricao: ["Confirmação de horário", "Lembrete de retorno", "Pesquisa de satisfação"][i % 3],
   }));
   await supabase.from("interacoes_clientes").insert(interacoesPayload);
+
+  // Resgates de recompensas — 3 movimentos de débito para alimentar /fidelidade
+  const { data: recompensasAtivas } = await supabase
+    .from("recompensas").select("id, custo_pontos").eq("owner_id", userId).limit(2);
+  if (recompensasAtivas && recompensasAtivas.length > 0) {
+    const resgates = Array.from({ length: 3 }, (_, i) => ({
+      owner_id: userId,
+      cliente_id: clientes[i].id,
+      tipo: "debito" as const,
+      pontos: -Number(recompensasAtivas[i % recompensasAtivas.length].custo_pontos),
+      observacao: `Resgate: ${i === 0 ? "Lavagem simples grátis" : "20% off"}`,
+    }));
+    await supabase.from("pontos_movimentos").insert(resgates);
+  }
+
+  // Assinaturas pendentes — 2, para o dashboard mostrar o card de pendências
+  const pendentes = [0, 1].map((i) => ({
+    owner_id: userId,
+    cliente_id: clientes[10 + i].id,
+    plano_id: planos[i % planos.length].id,
+    inicio: new Date().toISOString().slice(0, 10),
+    status: "pendente" as const,
+    metodo_pagamento: "pix",
+    observacoes: "Aguardando confirmação de PIX",
+  }));
+  await supabase.from("assinaturas_clientes").insert(pendentes);
+
+  // Agendamentos futuros — 5 distribuídos nos próximos 7 dias
+  const horas = ["09:00", "10:30", "14:00", "15:30", "17:00"];
+  const agendamentos = Array.from({ length: 5 }, (_, i) => {
+    const d = new Date(Date.now() + (i + 1) * 86_400_000);
+    return {
+      owner_id: userId,
+      cliente_id: clientes[(i + 5) % clientes.length].id,
+      veiculo_id: veiculos[(i + 5) % veiculos.length].id,
+      servico_id: servicos[i % servicos.length].id,
+      data_agendada: d.toISOString().slice(0, 10),
+      hora_agendada: horas[i],
+      status: (i === 0 ? "confirmado" : "agendado") as any,
+      origem: "demo",
+    };
+  });
+  await supabase.from("agendamentos").insert(agendamentos);
+
+  // Clientes recuperados (impacto do mês) — 3 clientes com OS antiga (50d) + OS este mês
+  const recIds = [clientes[15].id, clientes[16].id, clientes[17].id];
+  const recOSAntigas = recIds.map((cid, i) => ({
+    owner_id: userId,
+    cliente_id: cid,
+    veiculo_id: veiculos[i % veiculos.length].id,
+    servico_id: servicos[i % servicos.length].id,
+    funcionario_id: funcionarios[i % funcionarios.length].id,
+    valor: Number(servicos[i % servicos.length].preco_padrao),
+    status: "entregue" as const,
+    created_at: new Date(Date.now() - 50 * 86_400_000).toISOString(),
+    entregue_em: new Date(Date.now() - 50 * 86_400_000 + 80 * 60_000).toISOString(),
+  }));
+  const recOSAgora = recIds.map((cid, i) => {
+    const created = new Date(Date.now() - i * 86_400_000);
+    return {
+      owner_id: userId,
+      cliente_id: cid,
+      veiculo_id: veiculos[(i + 3) % veiculos.length].id,
+      servico_id: servicos[(i + 1) % servicos.length].id,
+      funcionario_id: funcionarios[i % funcionarios.length].id,
+      valor: Number(servicos[(i + 1) % servicos.length].preco_padrao),
+      status: "entregue" as const,
+      created_at: created.toISOString(),
+      entregue_em: new Date(created.getTime() + 80 * 60_000).toISOString(),
+    };
+  });
+  await supabase.from("ordens_servico").insert([...recOSAntigas, ...recOSAgora]);
 }
+
