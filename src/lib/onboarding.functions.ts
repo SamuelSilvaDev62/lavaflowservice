@@ -15,13 +15,14 @@ export const getOnboardingState = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
-    const [emp, c, s, f, p, o] = await Promise.all([
+    const [emp, c, s, f, p, o, r] = await Promise.all([
       supabase.from("empresa").select("nome_fantasia, telefone, onboarding_status, onboarding_completed_steps, tour_completed_at").eq("owner_id", userId).maybeSingle(),
       supabase.from("clientes").select("id", { count: "exact", head: true }).eq("owner_id", userId),
       supabase.from("servicos").select("id", { count: "exact", head: true }).eq("owner_id", userId),
       supabase.from("funcionarios").select("id", { count: "exact", head: true }).eq("owner_id", userId),
       supabase.from("planos_assinatura").select("id", { count: "exact", head: true }).eq("owner_id", userId),
       supabase.from("ordens_servico").select("id", { count: "exact", head: true }).eq("owner_id", userId),
+      supabase.from("recompensas").select("id", { count: "exact", head: true }).eq("owner_id", userId),
     ]);
     const empresa = emp.data;
     return {
@@ -35,6 +36,7 @@ export const getOnboardingState = createServerFn({ method: "GET" })
         funcionarios: f.count ?? 0,
         planos: p.count ?? 0,
         ordens: o.count ?? 0,
+        recompensas: r.count ?? 0,
       },
     };
   });
