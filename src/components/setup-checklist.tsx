@@ -61,13 +61,16 @@ export function SetupChecklist() {
             <li key={s.id}>
               <Link
                 to={s.to}
-                className="flex items-center gap-3 rounded-md px-3 py-2 hover:bg-accent transition group"
+                className="flex items-start gap-3 rounded-md px-3 py-2 hover:bg-accent transition group"
               >
-                <span className={`h-5 w-5 rounded-full grid place-content-center text-xs ${s.done ? "bg-success text-success-foreground" : "border-2 border-muted-foreground/30"}`}>
+                <span className={`h-5 w-5 mt-0.5 rounded-full grid place-content-center text-xs shrink-0 ${s.done ? "bg-success text-success-foreground" : "border-2 border-muted-foreground/30"}`}>
                   {s.done && <Check className="h-3 w-3" />}
                 </span>
-                <span className={`text-sm flex-1 ${s.done ? "text-muted-foreground line-through" : "font-medium"}`}>{s.label}</span>
-                {!s.done && <ArrowRight className="h-3 w-3 text-muted-foreground group-hover:text-primary" />}
+                <span className="flex-1 min-w-0">
+                  <span className={`block text-sm ${s.done ? "text-muted-foreground line-through" : "font-medium"}`}>{s.label}</span>
+                  {!s.done && <span className="block text-[11px] text-muted-foreground mt-0.5">{s.hint}</span>}
+                </span>
+                {!s.done && <ArrowRight className="h-3 w-3 mt-1 text-muted-foreground group-hover:text-primary shrink-0" />}
               </Link>
             </li>
           ))}
