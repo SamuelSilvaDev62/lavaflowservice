@@ -5,10 +5,12 @@ import { lazy, Suspense } from "react";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getDashboardMetrics, getOportunidades, getClientesComRecompensa, getAssinaturas } from "@/lib/lavaflow.functions";
+import { getDashboardMetrics, getOportunidades, getClientesComRecompensa, getAssinaturas, getCrescimentoKPIs } from "@/lib/lavaflow.functions";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
+import { ImpactBanner } from "@/components/dashboard/impact-banner";
+import { GrowthKPIs } from "@/components/dashboard/growth-kpis";
 import { brl, pct, num } from "@/lib/format";
 import {
   TrendingUp, TrendingDown, DollarSign, Repeat, Users, ListChecks,
