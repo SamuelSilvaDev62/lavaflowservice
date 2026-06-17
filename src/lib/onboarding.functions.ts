@@ -233,7 +233,6 @@ async function runSeed(supabase: any, userId: string) {
       cliente_id: clientes[i].id,
       tipo: "debito" as const,
       pontos: -Number(recompensasAtivas[i % recompensasAtivas.length].custo_pontos),
-      observacao: `Resgate: ${i === 0 ? "Lavagem simples grátis" : "20% off"}`,
     }));
     await supabase.from("pontos_movimentos").insert(resgates);
   }
