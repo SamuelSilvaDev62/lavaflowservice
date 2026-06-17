@@ -1,94 +1,84 @@
-## Plano de Otimização e PWA — LavaFlow
+## Plano — Maturidade comercial do LavaFlow
 
-Auditei o projeto e identifiquei os principais gargalos. O plano abaixo agrupa correções por impacto/esforço, mantendo o comportamento atual do app (sem mudar regras de negócio).
+Foco em transformar funcionalidades existentes em **resultado mensurável**. Já existem `SetupChecklist`, `WelcomeModal` e seed demo — vou refinar o que está, expandir o que falta e adicionar a camada de KPIs que ainda não existe.
+
+Entrego em 3 frentes na mesma leva.
 
 ---
 
-### 1. Bundle inicial menor (carrega mais rápido em 4G)
+### Frente 1 — Onboarding mais guiado
 
-- **Lazy load de `recharts`** no `dashboard.tsx` e `relatorios.tsx` via `React.lazy` + `<Suspense>`. Reduz ~150 KB do bundle inicial.
-- **Lazy load de `react-markdown`** no assistente (carrega só ao abrir a página).
-- **Lazy load de `qrcode`** no `qr-code-dialog.tsx` (carrega só ao abrir o diálogo).
-- **Lazy load do `guided-tour`** (driver.js) — só quando o usuário clica em "iniciar tour".
-- **Google Fonts otimizado** no `__root.tsx`: usar `preconnect` + `display=swap` (já existe `swap`, falta `preconnect` para `fonts.gstatic.com`).
+**Refinos no `SetupChecklist` existente:**
+- Adicionar passo **"Criar primeira OS"** (hoje só tem cliente/serviço/funcionário/plano).
+- Adicionar passo **"Configurar fidelidade"** (link para `/fidelidade`).
+- Mostrar checklist também no `/dashboard` mesmo após `status = done`, enquanto progresso < 100% (hoje ele esconde cedo demais).
+- Cada item ganha micro-descrição ("Cadastre o serviço que você mais vende") em vez de só o título.
+- CTA final quando chega 100%: "Pronto! Veja seu dashboard de crescimento" → leva ao topo do dashboard.
 
-### 2. Eliminar cascata de loading (HTML → JS → fetch → spinner)
+**Onde aparece:** dashboard (já aparece) + uma versão compacta no topo de cada página relevante enquanto o passo daquela página não está concluído (ex.: banner em `/clientes` se ainda não tem cliente).
 
-- Adicionar **`loader` + `ensureQueryData`** nas rotas autenticadas principais: `dashboard`, `fila`, `clientes/index`, `assinaturas`, `oportunidades`, `relatorios`. Dispara o fetch em paralelo com o JS, eliminando o spinner inicial.
-- Mover **check de role do `AppLayout`** (hoje `useEffect` direto) para `useQuery` cacheado, evitando refetch a cada navegação.
-- Configurar **`defaultPreload: 'intent'`** no router para prefetch ao passar o mouse / focar links.
-- Adicionar **skeletons estruturais** (não spinners) nas rotas mais visitadas.
+---
 
-### 3. Queries de banco mais rápidas
+### Frente 2 — Dados demo mais ricos
 
-- **Índices Postgres** (migração SQL):
-  - `ordens_servico (owner_id, created_at DESC)` — usado em dashboard, relatórios, oportunidades, clientes inativos.
-  - `ordens_servico (owner_id, status)` — usado no kanban da fila.
-  - `clientes (owner_id, ultima_visita)` — usado em clientes inativos.
-- **Limites e colunas explícitas** em queries que hoje fazem `select("*")` sem `.limit()`:
-  - `getClienteInativos`, `getOportunidades`, `getDashboardMetrics`, `listClientes`, `getRelatorios`: restringir janela (ex. últimos 90 dias já filtrado) e selecionar apenas colunas necessárias.
-- **`staleTime` por rota**: `fila` recebe `staleTime: 0` + `refetchInterval: 15s`; demais ficam em 60s (atual).
+O seed atual cria clientes, OS, planos e avaliações. Vou adicionar para a venda ficar mais convincente:
+- **Recompensas resgatadas** (3-4 movimentos de débito de pontos) para a tela Fidelidade não ficar vazia.
+- **Clientes em risco** plantados de propósito (5 clientes com `ultima_visita` 50-90 dias atrás e histórico ≥3 OS) para os KPIs novos já mostrarem números no demo.
+- **Assinaturas pendentes** (2) além das ativas, para Dashboard mostrar o card de pendências.
+- **Avaliações ruins** (2 com nota ≤3 e comentário) para a aba de oportunidades fazer sentido.
+- **Agendamentos futuros** (5 próximos 7 dias) para `/agendamentos` não estar vazio no demo.
 
-### 4. PWA instalável (Add to Home Screen + cache offline básico)
+Tudo idempotente (continua respeitando o guard `count > 0`).
 
-Usar `vite-plugin-pwa` com `generateSW` seguindo as regras de skill PWA do projeto:
+---
 
-- `public/manifest.webmanifest` com nome "LavaFlow", `display: standalone`, `theme_color` alinhado ao tema, ícones 192/512 + maskable.
-- Ícones PWA gerados a partir da identidade visual atual (verde/escuro), salvos em `public/icons/`.
-- Tags no `__root.tsx`: `<link rel="manifest">`, `<meta name="theme-color">`, `<link rel="apple-touch-icon">`.
-- Service Worker via `vite-plugin-pwa`:
-  - `registerType: 'autoUpdate'`, `injectRegister: null`, `devOptions.enabled: false`.
-  - Navegação HTML: `NetworkFirst` (nunca cache-first).
-  - Assets hashados: `CacheFirst`.
-  - Excluir `/api/*` e `/~oauth` do cache.
-- Wrapper de registro `src/pwa/register-sw.ts` que **só registra em produção** e **nunca em preview Lovable / iframe / `?sw=off`** (cumpre a regra obrigatória do skill).
-- Resultado: o app fica instalável no celular (ícone na home), abre como app standalone e mostra shell mesmo offline.
+### Frente 3 — KPIs de crescimento + banner de impacto
 
-### 5. Mobile UX
+**Novo server fn `getCrescimentoKPIs`** (em `lavaflow.functions.ts`), retornando:
 
-- Garantir `TouchSensor` no `@dnd-kit` da fila (drag funcional em touch sem long-press atrapalhar scroll).
-- Skeletons em vez de telas brancas durante o fetch inicial.
-- `theme-color` correto para a status bar do mobile.
+| KPI | Fórmula |
+|---|---|
+| **Receita recuperável** | Σ (ticket médio do cliente) para clientes com ≥3 OS históricas e sem visita há 30-90 dias. Ticket médio = avg(valor) das OS entregues do cliente. |
+| **Clientes em risco** | Count de clientes com ≥3 OS e última visita entre 45 e 90 dias atrás. |
+| **Próximas recompensas** | Count de clientes a ≤50 pts da recompensa ativa mais barata. |
+| **Potencial de assinatura** | (Clientes com ≥4 OS nos últimos 60 dias e SEM assinatura ativa) × valor mensal do plano mais barato. |
+| **Impacto do mês** | Clientes "recuperados" (voltaram este mês após >30 dias inativos) + faturamento gerado por eles. |
+
+**UI no Dashboard** (acima dos cards atuais):
+- **Banner de impacto** (full-width, gradient com a cor primária):
+  > "Este mês o LavaFlow ajudou a recuperar **{N} clientes** e gerar **R$ {X}** em faturamento."
+  
+  Esconde quando N=0 e mês ainda no início (<dia 5).
+
+- **Grid de 4 cards "Oportunidades de Crescimento"**: Receita recuperável, Clientes em risco, Próximas recompensas, Potencial de assinatura. Cada card tem CTA que leva para a tela relevante já filtrada (ex.: "Clientes em risco" → `/oportunidades?filter=risco`).
+
+**Performance:** uma única query SQL com CTEs, com filtro `owner_id` (já tem índice). `staleTime: 5 min` no React Query.
 
 ---
 
 ### Arquivos afetados
 
-**Criados:**
-- `vite-plugin-pwa` adicionado ao `vite.config.ts`
-- `public/manifest.webmanifest`
-- `public/icons/icon-192.png`, `icon-512.png`, `icon-maskable-512.png`, `apple-touch-icon.png`
-- `src/pwa/register-sw.ts`
-- `src/components/ui/skeleton-*.tsx` (skeletons de dashboard/fila/lista)
-- `supabase/migrations/<ts>_perf_indices.sql`
+**Novos:**
+- `src/components/dashboard/impact-banner.tsx`
+- `src/components/dashboard/growth-kpis.tsx`
 
 **Editados:**
-- `src/router.tsx` (defaultPreload + preserva client por request)
-- `src/routes/__root.tsx` (manifest, theme-color, apple-touch-icon, preconnect fonts, registro SW)
-- `src/routes/_authenticated/{dashboard,fila,clientes/index,assinaturas,oportunidades,relatorios}.tsx` (loaders + ensureQueryData + lazy charts + skeletons)
-- `src/routes/_authenticated/assistente.tsx` (react-markdown lazy)
-- `src/components/qr-code-dialog.tsx` (qrcode lazy)
-- `src/components/app-layout.tsx` (role via useQuery)
-- `src/components/guided-tour.tsx` (driver.js lazy)
-- `src/lib/lavaflow.functions.ts` (limites + colunas explícitas nas queries pesadas)
-- `package.json` (`vite-plugin-pwa` + `workbox-window`)
+- `src/lib/lavaflow.functions.ts` — adicionar `getCrescimentoKPIs`.
+- `src/lib/onboarding.functions.ts` — adicionar passos `os_criada` e `fidelidade_configurada`; enriquecer `runSeed` (resgates, clientes em risco, assinaturas pendentes, avaliações ruins, agendamentos).
+- `src/components/setup-checklist.tsx` — novos passos, descrições, lógica de "esconder só com 100%".
+- `src/routes/_authenticated/dashboard.tsx` — banner + grid de KPIs no topo.
+- `src/routes/_authenticated/oportunidades.tsx` — aceitar `?filter=` via search params.
+
+**Sem migrations** — todos os dados já existem nas tabelas atuais.
 
 ---
 
-### Detalhes técnicos
+### Resultado esperado
 
-- O `vite-plugin-pwa` é compatível com o template `@lovable.dev/vite-tanstack-config` (apenas adicionar ao array `vite.plugins` via override).
-- O Service Worker **não** registra em `id-preview--*.lovable.app` nem em iframe (regra obrigatória do skill PWA), só na URL publicada.
-- Os índices Postgres são criados via migração padrão (`CREATE INDEX`, não `CONCURRENTLY`, pois roda dentro de transação).
-- Nenhuma mudança de schema de dados ou regra de negócio — apenas índices, limites de query e estrutura de loading.
+Quando o dono abre o LavaFlow vê, em ordem:
+1. Quanto o sistema **gerou para ele este mês** (banner).
+2. Quanto **ainda pode gerar** (4 KPIs com CTA).
+3. O que falta **configurar** (checklist, quando aplicável).
+4. Operação do dia (cards atuais).
 
----
-
-### Ganho esperado
-
-- **Bundle inicial:** ~−40% (lazy de recharts/markdown/qrcode/driver).
-- **Primeiro render do dashboard:** ~−1s (loader + ensureQueryData elimina cascata).
-- **Queries do dashboard/fila:** −50 a −300 ms (índices compostos).
-- **Mobile:** instalável como app, abre instantâneo nas próximas visitas, shell funciona offline.
-
-Posso executar tudo de uma vez ou prefere dividir em etapas (ex.: primeiro PWA + bundle, depois loaders + índices)?
+Esse é o salto de "ferramenta operacional" para "consultor de crescimento" que você descreveu.
