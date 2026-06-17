@@ -75,11 +75,13 @@ function Dashboard() {
   const fetchState = useServerFn(getOnboardingState);
   const fetchRec = useServerFn(getClientesComRecompensa);
   const fetchAss = useServerFn(getAssinaturas);
+  const fetchGrowth = useServerFn(getCrescimentoKPIs);
   const { data: m, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fetchMetrics() });
   const { data: ops } = useQuery({ queryKey: ["oportunidades"], queryFn: () => fetchOps() });
   const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
   const { data: rec } = useQuery({ queryKey: ["clientes-recompensa"], queryFn: () => fetchRec() });
   const { data: ass } = useQuery({ queryKey: ["assinaturas"], queryFn: () => fetchAss() });
+  const { data: growth } = useQuery({ queryKey: ["crescimento-kpis"], queryFn: () => fetchGrowth(), staleTime: 5 * 60_000 });
 
   if (isLoading || !m) {
     return <div className="space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}</div>;
