@@ -30,7 +30,7 @@ export function SetupChecklist() {
       { id: "funcionario", label: "Cadastrar primeiro funcionário", hint: "Para acompanhar produtividade e comissão.", to: "/equipe", done: state.counts.funcionarios > 0 },
       { id: "cliente", label: "Cadastrar primeiro cliente", hint: "Cada cliente vira histórico, pontos e oportunidades.", to: "/clientes", done: state.counts.clientes > 0 },
       { id: "ordem", label: "Criar primeira OS", hint: "Coloque um veículo na fila e veja o fluxo funcionando.", to: "/fila", done: state.counts.ordens > 0 },
-      { id: "fidelidade", label: "Configurar fidelidade", hint: "Defina pontos por lavagem para reter clientes.", to: "/fidelidade", done: (state.completedSteps ?? []).includes("fidelidade_configurada") },
+      { id: "fidelidade", label: "Configurar fidelidade", hint: "Crie recompensas para reter clientes.", to: "/fidelidade", done: (state.counts as any).recompensas > 0 || (state.completedSteps ?? []).includes("fidelidade_configurada") },
       { id: "plano", label: "Criar primeiro plano de assinatura", hint: "Receita recorrente — o ativo mais valioso.", to: "/assinaturas", done: state.counts.planos > 0 },
     ];
   }, [state]);
