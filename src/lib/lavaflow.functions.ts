@@ -1265,3 +1265,89 @@ export const getClientesComRecompensa = createServerFn({ method: "GET" })
     return { qtd: elegiveis.length, clientes: elegiveis, proximos, ticketMedio };
   });
 
+// ============ CRESCIMENTO — KPIs e Impacto do Mês ============
+export const getCrescimentoKPIs = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const now = Date.now();
+    const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
+
+    const [{ data: clientes }, { data: ordens }, { data: assinaturas }, { data: planos }, { data: recompensas }] = await Promise.all([
+      supabase.from("clientes").select("id, pontos_saldo").eq("owner_id", userId),
+      supabase.from("ordens_servico").select("cliente_id, valor, created_at").eq("owner_id", userId).order("created_at", { ascending: false }).limit(2000),
+      supabase.from("assinaturas_clientes").select("cliente_id, status").eq("owner_id", userId),
+      supabase.from("planos_assinatura").select("valor_mensal").eq("owner_id", userId).eq("ativo", true).order("valor_mensal", { ascending: true }).limit(1),
+      supabase.from("recompensas").select("custo_pontos").eq("owner_id", userId).eq("ativo", true).order("custo_pontos", { ascending: true }).limit(1),
+    ]);
+
+    type OS = { cliente_id: string; valor: number; created_at: string };
+    const all = (ordens ?? []) as OS[];
+    const byCliente = new Map<string, OS[]>();
+    all.forEach((o) => {
+      const arr = byCliente.get(o.cliente_id) ?? [];
+      arr.push(o);
+      byCliente.set(o.cliente_id, arr);
+    });
+
+    let receitaRecuperavel = 0;
+    let clientesEmRisco = 0;
+    let candidatosAssinatura = 0;
+    let recuperadosNoMes = 0;
+    let faturamentoRecuperado = 0;
+
+    const assinaturasAtivas = new Set(
+      (assinaturas ?? []).filter((a) => a.status === "ativa").map((a) => a.cliente_id),
+    );
+
+    for (const [cid, list] of byCliente) {
+      const sorted = list.slice().sort((a, b) => a.created_at.localeCompare(b.created_at));
+      const ultima = new Date(sorted[sorted.length - 1].created_at).getTime();
+      const dias = Math.floor((now - ultima) / 86_400_000);
+      const ticket = list.reduce((s, o) => s + Number(o.valor ?? 0), 0) / list.length;
+
+      if (list.length >= 3 && dias >= 45 && dias <= 90) {
+        clientesEmRisco += 1;
+        receitaRecuperavel += ticket;
+      }
+
+      const sixtyAgo = now - 60 * 86_400_000;
+      const recentes60 = list.filter((o) => new Date(o.created_at).getTime() >= sixtyAgo).length;
+      if (recentes60 >= 4 && !assinaturasAtivas.has(cid)) candidatosAssinatura += 1;
+
+      const visitasMes = sorted.filter((o) => new Date(o.created_at).getTime() >= startOfMonth);
+      const anterior = sorted.filter((o) => new Date(o.created_at).getTime() < startOfMonth).pop();
+      if (visitasMes.length > 0 && anterior) {
+        const gap = (new Date(visitasMes[0].created_at).getTime() - new Date(anterior.created_at).getTime()) / 86_400_000;
+        if (gap >= 30) {
+          recuperadosNoMes += 1;
+          faturamentoRecuperado += visitasMes.reduce((s, o) => s + Number(o.valor ?? 0), 0);
+        }
+      }
+    }
+
+    const minCusto = recompensas?.[0]?.custo_pontos ?? null;
+    const proximasRecompensas = minCusto != null
+      ? (clientes ?? []).filter((c) => {
+          const s = Number(c.pontos_saldo ?? 0);
+          return s < minCusto && minCusto - s <= 50;
+        }).length
+      : 0;
+
+    const valorPlanoBase = Number(planos?.[0]?.valor_mensal ?? 0);
+    const potencialAssinatura = candidatosAssinatura * valorPlanoBase;
+
+    return {
+      receitaRecuperavel: Math.round(receitaRecuperavel * 100) / 100,
+      clientesEmRisco,
+      proximasRecompensas,
+      potencialAssinatura: Math.round(potencialAssinatura * 100) / 100,
+      candidatosAssinatura,
+      impactoMes: {
+        clientesRecuperados: recuperadosNoMes,
+        faturamentoRecuperado: Math.round(faturamentoRecuperado * 100) / 100,
+      },
+    };
+  });
+
+

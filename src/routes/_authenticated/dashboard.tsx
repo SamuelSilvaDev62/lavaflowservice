@@ -5,10 +5,12 @@ import { lazy, Suspense } from "react";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getDashboardMetrics, getOportunidades, getClientesComRecompensa, getAssinaturas } from "@/lib/lavaflow.functions";
+import { getDashboardMetrics, getOportunidades, getClientesComRecompensa, getAssinaturas, getCrescimentoKPIs } from "@/lib/lavaflow.functions";
 import { getOnboardingState } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
+import { ImpactBanner } from "@/components/dashboard/impact-banner";
+import { GrowthKPIs } from "@/components/dashboard/growth-kpis";
 import { brl, pct, num } from "@/lib/format";
 import {
   TrendingUp, TrendingDown, DollarSign, Repeat, Users, ListChecks,
@@ -73,11 +75,13 @@ function Dashboard() {
   const fetchState = useServerFn(getOnboardingState);
   const fetchRec = useServerFn(getClientesComRecompensa);
   const fetchAss = useServerFn(getAssinaturas);
+  const fetchGrowth = useServerFn(getCrescimentoKPIs);
   const { data: m, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fetchMetrics() });
   const { data: ops } = useQuery({ queryKey: ["oportunidades"], queryFn: () => fetchOps() });
   const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
   const { data: rec } = useQuery({ queryKey: ["clientes-recompensa"], queryFn: () => fetchRec() });
   const { data: ass } = useQuery({ queryKey: ["assinaturas"], queryFn: () => fetchAss() });
+  const { data: growth } = useQuery({ queryKey: ["crescimento-kpis"], queryFn: () => fetchGrowth(), staleTime: 5 * 60_000 });
 
   if (isLoading || !m) {
     return <div className="space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}</div>;
@@ -106,6 +110,23 @@ function Dashboard() {
       <div data-tour="dash-checklist" className="scroll-mt-20">
         <SetupChecklist />
       </div>
+
+      {growth && (
+        <ImpactBanner
+          clientes={growth.impactoMes.clientesRecuperados}
+          faturamento={growth.impactoMes.faturamentoRecuperado}
+        />
+      )}
+
+      {growth && (
+        <GrowthKPIs
+          receitaRecuperavel={growth.receitaRecuperavel}
+          clientesEmRisco={growth.clientesEmRisco}
+          proximasRecompensas={growth.proximasRecompensas}
+          potencialAssinatura={growth.potencialAssinatura}
+          candidatosAssinatura={growth.candidatosAssinatura}
+        />
+      )}
 
       {/* Card do Assistente — destaque no topo */}
       <Card data-tour="dash-assistente" className="mb-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent scroll-mt-20">
