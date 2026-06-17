@@ -111,6 +111,23 @@ function Dashboard() {
         <SetupChecklist />
       </div>
 
+      {growth && (
+        <ImpactBanner
+          clientes={growth.impactoMes.clientesRecuperados}
+          faturamento={growth.impactoMes.faturamentoRecuperado}
+        />
+      )}
+
+      {growth && (
+        <GrowthKPIs
+          receitaRecuperavel={growth.receitaRecuperavel}
+          clientesEmRisco={growth.clientesEmRisco}
+          proximasRecompensas={growth.proximasRecompensas}
+          potencialAssinatura={growth.potencialAssinatura}
+          candidatosAssinatura={growth.candidatosAssinatura}
+        />
+      )}
+
       {/* Card do Assistente — destaque no topo */}
       <Card data-tour="dash-assistente" className="mb-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent scroll-mt-20">
         <CardContent className="p-4 sm:p-5">
