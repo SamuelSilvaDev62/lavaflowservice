@@ -30,6 +30,7 @@ function Page() {
   const { data, isLoading } = useQuery({ queryKey: ["cliente", id], queryFn: () => fn({ data: { id } }) });
 
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [veic, setVeic] = useState({ placa: "", modelo: "", cor: "" });
   const mut = useMutation({
     mutationFn: () => addV({ data: { cliente_id: id, ...veic } }),
