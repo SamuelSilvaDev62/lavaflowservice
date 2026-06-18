@@ -20,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   listAgendamentos, createAgendamento, agendamentoStats, updateAgendamentoStatus,
-  iniciarAtendimento, listClientes, listServicos, getEmpresa,
+  iniciarAtendimento, listClientes, listServicos, getEmpresa, listFuncionarios, updateAgendamento,
   type AgendamentoStatus,
 } from "@/lib/lavaflow.functions";
 import { dateBr } from "@/lib/format";
