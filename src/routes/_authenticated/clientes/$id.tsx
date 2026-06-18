@@ -13,8 +13,9 @@ import { getClienteDetalhe, addVeiculo, getExtratoFidelidade } from "@/lib/lavaf
 import { brl, dateBr, daysBetween } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import { buildExtratoMessage, getFidelidadeTemplates } from "@/lib/fidelidade-messages";
-import { ArrowLeft, Car, Plus, MessageCircle, Award, TrendingUp, Gift } from "lucide-react";
+import { ArrowLeft, Car, Plus, MessageCircle, Gift, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { EditarClienteDialog } from "@/components/clientes/editar-cliente-dialog";
 
 export const Route = createFileRoute("/_authenticated/clientes/$id")({
   component: Page,
