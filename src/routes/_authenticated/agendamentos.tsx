@@ -199,9 +199,12 @@ function Page() {
               <EmptyState icon={CalendarDays} title="Nenhum agendamento neste dia"
                 description="Toque no botão + para criar a primeira reserva ou compartilhe seu link público." />
             ) : (
-              <div className="space-y-2 pb-24">
-                {ag!.agendamentos.map((a: any) => <AgendamentoCard key={a.id} a={a} />)}
-              </div>
+              <>
+                <DistribuicaoEquipe agendamentos={ag!.agendamentos} />
+                <div className="space-y-2 pb-24">
+                  {ag!.agendamentos.map((a: any) => <AgendamentoCard key={a.id} a={a} />)}
+                </div>
+              </>
             )}
         </TabsContent>
 
