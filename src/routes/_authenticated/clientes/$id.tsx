@@ -123,7 +123,7 @@ function Page() {
               {data.veiculos.map((v: any) => (
                 <div key={v.id} className="flex items-center justify-between p-2 rounded-md bg-muted">
                   <span className="font-mono font-semibold">{v.placa}</span>
-                  <span className="text-sm text-muted-foreground">{v.modelo} · {v.cor}</span>
+                  <span className="text-sm text-muted-foreground">{[v.marca, v.modelo, v.cor].filter(Boolean).join(" · ") || "—"}</span>
                 </div>
               ))}
               {data.veiculos.length === 0 && <p className="text-sm text-muted-foreground">Sem veículos.</p>}
