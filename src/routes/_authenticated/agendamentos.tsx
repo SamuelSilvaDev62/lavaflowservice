@@ -307,9 +307,14 @@ function AgendamentoCard({ a }: { a: any }) {
               <p className="text-xs text-muted-foreground truncate">
                 {a.servicos?.nome ?? "Sem serviço"}{a.veiculos?.placa ? ` · ${a.veiculos.placa}` : ""}
               </p>
-              <Badge className={cn("mt-1.5 text-[10px] py-0 h-4", STATUS_COLOR[a.status as AgendamentoStatus])}>
-                {STATUS_LABEL[a.status as AgendamentoStatus]}
-              </Badge>
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <Badge className={cn("text-[10px] py-0 h-4", STATUS_COLOR[a.status as AgendamentoStatus])}>
+                  {STATUS_LABEL[a.status as AgendamentoStatus]}
+                </Badge>
+                {a.funcionarios?.nome && (
+                  <Badge variant="outline" className="text-[10px] py-0 h-4">👤 {a.funcionarios.nome}</Badge>
+                )}
+              </div>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground self-center shrink-0" />
           </CardContent>
