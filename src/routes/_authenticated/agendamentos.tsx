@@ -20,7 +20,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   listAgendamentos, createAgendamento, agendamentoStats, updateAgendamentoStatus,
-  iniciarAtendimento, listClientes, listServicos, getEmpresa,
+  iniciarAtendimento, listClientes, listServicos, getEmpresa, listFuncionarios, updateAgendamento,
   type AgendamentoStatus,
 } from "@/lib/lavaflow.functions";
 import { dateBr } from "@/lib/format";
@@ -199,9 +199,12 @@ function Page() {
               <EmptyState icon={CalendarDays} title="Nenhum agendamento neste dia"
                 description="Toque no botão + para criar a primeira reserva ou compartilhe seu link público." />
             ) : (
-              <div className="space-y-2 pb-24">
-                {ag!.agendamentos.map((a: any) => <AgendamentoCard key={a.id} a={a} />)}
-              </div>
+              <>
+                <DistribuicaoEquipe agendamentos={ag!.agendamentos} />
+                <div className="space-y-2 pb-24">
+                  {ag!.agendamentos.map((a: any) => <AgendamentoCard key={a.id} a={a} />)}
+                </div>
+              </>
             )}
         </TabsContent>
 
@@ -304,9 +307,14 @@ function AgendamentoCard({ a }: { a: any }) {
               <p className="text-xs text-muted-foreground truncate">
                 {a.servicos?.nome ?? "Sem serviço"}{a.veiculos?.placa ? ` · ${a.veiculos.placa}` : ""}
               </p>
-              <Badge className={cn("mt-1.5 text-[10px] py-0 h-4", STATUS_COLOR[a.status as AgendamentoStatus])}>
-                {STATUS_LABEL[a.status as AgendamentoStatus]}
-              </Badge>
+              <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                <Badge className={cn("text-[10px] py-0 h-4", STATUS_COLOR[a.status as AgendamentoStatus])}>
+                  {STATUS_LABEL[a.status as AgendamentoStatus]}
+                </Badge>
+                {a.funcionarios?.nome && (
+                  <Badge variant="outline" className="text-[10px] py-0 h-4">👤 {a.funcionarios.nome}</Badge>
+                )}
+              </div>
             </div>
             <ChevronRight className="h-4 w-4 text-muted-foreground self-center shrink-0" />
           </CardContent>
@@ -325,8 +333,11 @@ function AgendamentoCard({ a }: { a: any }) {
           <Row label="Serviço" value={a.servicos?.nome ?? "—"} />
           <Row label="Veículo" value={a.veiculos?.placa ?? "—"} />
           <Row label="Data" value={dateBr(a.data_agendada)} />
+          <Row label="Colaborador" value={a.funcionarios?.nome ?? "Sem definir"} />
           {a.observacoes && <Row label="Observações" value={a.observacoes} />}
         </div>
+
+        <AtribuirColaboradorInline agendamentoId={a.id} atual={a.funcionario_id ?? ""} />
 
         <div className="space-y-2 overflow-y-auto">
           {ativo && (a.status === "agendado" || a.status === "confirmado") && (
@@ -398,17 +409,20 @@ function NovoAgendamentoDialog({ onClose, defaultDate }: { onClose: () => void; 
 function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; defaultDate: string }) {
   const cli = useServerFn(listClientes);
   const sv = useServerFn(listServicos);
+  const fnFunc = useServerFn(listFuncionarios);
   const create = useServerFn(createAgendamento);
   const qc = useQueryClient();
   const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: () => cli() });
   const { data: servicos } = useQuery({ queryKey: ["servicos"], queryFn: () => sv() });
+  const { data: funcs } = useQuery({ queryKey: ["funcionarios"], queryFn: () => fnFunc() });
   const [f, setF] = useState({
-    cliente_id: "", servico_id: "", data_agendada: defaultDate, hora_agendada: "09:00", observacoes: "",
+    cliente_id: "", servico_id: "", funcionario_id: "", data_agendada: defaultDate, hora_agendada: "09:00", observacoes: "",
   });
   const mut = useMutation({
     mutationFn: () => create({ data: {
       cliente_id: f.cliente_id,
       servico_id: f.servico_id || null,
+      funcionario_id: f.funcionario_id || null,
       data_agendada: f.data_agendada,
       hora_agendada: f.hora_agendada,
       observacoes: f.observacoes || null,
@@ -436,6 +450,15 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
           <SelectContent>{servicos?.servicos.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
         </Select>
       </div>
+      <div><Label>Colaborador responsável (opcional)</Label>
+        <Select value={f.funcionario_id || "__none__"} onValueChange={(v) => setF({ ...f, funcionario_id: v === "__none__" ? "" : v })}>
+          <SelectTrigger><SelectValue placeholder="Sem definir" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none__">Sem definir</SelectItem>
+            {funcs?.funcionarios.filter((x: any) => x.ativo).map((x: any) => <SelectItem key={x.id} value={x.id}>{x.nome}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      </div>
       <div className="grid grid-cols-2 gap-3">
         <div><Label>Data</Label><Input type="date" required value={f.data_agendada} onChange={(e) => setF({ ...f, data_agendada: e.target.value })} /></div>
         <div><Label>Horário</Label><Input type="time" required value={f.hora_agendada} onChange={(e) => setF({ ...f, hora_agendada: e.target.value })} /></div>
@@ -443,5 +466,53 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
       <div><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
       <Button type="submit" className="w-full h-12" disabled={mut.isPending}>Salvar agendamento</Button>
     </form>
+  );
+}
+
+function DistribuicaoEquipe({ agendamentos }: { agendamentos: any[] }) {
+  const ativos = agendamentos.filter((a) => a.status !== "cancelado" && a.status !== "nao_compareceu");
+  const counts = new Map<string, number>();
+  let semDef = 0;
+  ativos.forEach((a) => {
+    const nome = a.funcionarios?.nome;
+    if (nome) counts.set(nome, (counts.get(nome) ?? 0) + 1);
+    else semDef += 1;
+  });
+  if (counts.size === 0 && semDef === ativos.length) return null;
+  return (
+    <div className="mb-3 flex flex-wrap gap-1.5">
+      <span className="text-xs text-muted-foreground self-center mr-1">Distribuição:</span>
+      {Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([nome, qtd]) => (
+        <Badge key={nome} variant="secondary" className="font-normal">👤 {nome} · {qtd}</Badge>
+      ))}
+      {semDef > 0 && <Badge variant="outline">Sem definir · {semDef}</Badge>}
+    </div>
+  );
+}
+
+function AtribuirColaboradorInline({ agendamentoId, atual }: { agendamentoId: string; atual: string }) {
+  const fnFunc = useServerFn(listFuncionarios);
+  const upd = useServerFn(updateAgendamento);
+  const qc = useQueryClient();
+  const { data: funcs } = useQuery({ queryKey: ["funcionarios"], queryFn: () => fnFunc() });
+  const mut = useMutation({
+    mutationFn: (funcId: string | null) => upd({ data: { id: agendamentoId, funcionario_id: funcId } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["agendamentos"] });
+      toast.success("Colaborador atualizado");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro"),
+  });
+  return (
+    <div className="mb-3">
+      <Label className="text-xs">Atribuir colaborador</Label>
+      <Select value={atual || "__none__"} onValueChange={(v) => mut.mutate(v === "__none__" ? null : v)}>
+        <SelectTrigger><SelectValue placeholder="Sem definir" /></SelectTrigger>
+        <SelectContent>
+          <SelectItem value="__none__">Sem definir</SelectItem>
+          {funcs?.funcionarios.filter((x: any) => x.ativo).map((x: any) => <SelectItem key={x.id} value={x.id}>{x.nome}</SelectItem>)}
+        </SelectContent>
+      </Select>
+    </div>
   );
 }

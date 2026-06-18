@@ -13,8 +13,9 @@ import { getClienteDetalhe, addVeiculo, getExtratoFidelidade } from "@/lib/lavaf
 import { brl, dateBr, daysBetween } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import { buildExtratoMessage, getFidelidadeTemplates } from "@/lib/fidelidade-messages";
-import { ArrowLeft, Car, Plus, MessageCircle, Award, TrendingUp, Gift } from "lucide-react";
+import { ArrowLeft, Car, Plus, MessageCircle, Gift, Pencil } from "lucide-react";
 import { toast } from "sonner";
+import { EditarClienteDialog } from "@/components/clientes/editar-cliente-dialog";
 
 export const Route = createFileRoute("/_authenticated/clientes/$id")({
   component: Page,
@@ -29,6 +30,7 @@ function Page() {
   const { data, isLoading } = useQuery({ queryKey: ["cliente", id], queryFn: () => fn({ data: { id } }) });
 
   const [open, setOpen] = useState(false);
+  const [editOpen, setEditOpen] = useState(false);
   const [veic, setVeic] = useState({ placa: "", modelo: "", cor: "" });
   const mut = useMutation({
     mutationFn: () => addV({ data: { cliente_id: id, ...veic } }),
@@ -68,7 +70,10 @@ function Page() {
       <Link to="/clientes" className="text-sm text-muted-foreground inline-flex items-center gap-1 hover:text-foreground mb-3"><ArrowLeft className="h-4 w-4" /> Voltar</Link>
       <PageHeader title={c.nome} subtitle={c.telefone ?? "Sem telefone"}
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-4 w-4 mr-1" />Editar
+            </Button>
             {c.telefone && (
               <Button variant="outline" onClick={enviarExtrato}>
                 <Gift className="h-4 w-4 mr-1" />Extrato Fidelidade
@@ -81,6 +86,11 @@ function Page() {
             )}
           </div>
         }
+      />
+
+      <EditarClienteDialog
+        open={editOpen} onOpenChange={setEditOpen}
+        cliente={c} veiculo={data.veiculos[0]}
       />
 
 
@@ -113,7 +123,7 @@ function Page() {
               {data.veiculos.map((v: any) => (
                 <div key={v.id} className="flex items-center justify-between p-2 rounded-md bg-muted">
                   <span className="font-mono font-semibold">{v.placa}</span>
-                  <span className="text-sm text-muted-foreground">{v.modelo} · {v.cor}</span>
+                  <span className="text-sm text-muted-foreground">{[v.marca, v.modelo, v.cor].filter(Boolean).join(" · ") || "—"}</span>
                 </div>
               ))}
               {data.veiculos.length === 0 && <p className="text-sm text-muted-foreground">Sem veículos.</p>}

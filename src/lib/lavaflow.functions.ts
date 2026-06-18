@@ -752,6 +752,7 @@ export const upsertFuncionarioFull = createServerFn({ method: "POST" })
     email: z.string().email().max(160).optional().nullable().or(z.literal("")),
     comissao_tipo: z.enum(["fixo", "percentual"]).default("fixo"),
     comissao_valor: z.number().min(0).max(10000).default(0),
+    comissao_modo: z.enum(["global", "por_servico"]).default("global"),
     ativo: z.boolean().default(true),
   }).parse(d))
   .handler(async ({ data, context }) => {
@@ -761,6 +762,260 @@ export const upsertFuncionarioFull = createServerFn({ method: "POST" })
       ? await context.supabase.from("funcionarios").update(row).eq("id", data.id).eq("owner_id", context.userId)
       : await context.supabase.from("funcionarios").insert(row);
     if (error) throw error;
+    return { ok: true };
+  });
+
+// ============ COMISSÕES POR SERVIÇO ============
+export const listComissoesServico = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { funcionario_id: string }) => z.object({ funcionario_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: rows } = await context.supabase
+      .from("comissoes_servico")
+      .select("id, servico_id, tipo, valor")
+      .eq("owner_id", context.userId)
+      .eq("funcionario_id", data.funcionario_id);
+    return { itens: rows ?? [] };
+  });
+
+export const upsertComissoesServico = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    funcionario_id: z.string().uuid(),
+    itens: z.array(z.object({
+      servico_id: z.string().uuid(),
+      tipo: z.enum(["fixo", "percentual"]),
+      valor: z.number().min(0).max(100000),
+    })),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { error: delErr } = await supabase.from("comissoes_servico")
+      .delete().eq("owner_id", userId).eq("funcionario_id", data.funcionario_id);
+    if (delErr) throw delErr;
+    const rows = data.itens
+      .filter((i) => i.valor > 0)
+      .map((i) => ({ ...i, owner_id: userId, funcionario_id: data.funcionario_id }));
+    if (rows.length > 0) {
+      const { error } = await supabase.from("comissoes_servico").insert(rows);
+      if (error) throw error;
+    }
+    return { ok: true };
+  });
+
+// ============ EQUIPE — PAINEL COMPLETO ============
+function rangeForPeriodo(periodo: string, inicio?: string, fim?: string) {
+  const now = new Date();
+  let start = new Date();
+  let end = new Date();
+  end.setHours(23, 59, 59, 999);
+  if (periodo === "semana") { start.setDate(now.getDate() - 7); start.setHours(0, 0, 0, 0); }
+  else if (periodo === "quinzena") { start.setDate(now.getDate() - 15); start.setHours(0, 0, 0, 0); }
+  else if (periodo === "custom" && inicio && fim) {
+    start = new Date(inicio + "T00:00:00");
+    end = new Date(fim + "T23:59:59");
+  } else { start = new Date(now.getFullYear(), now.getMonth(), 1); }
+  return { start, end };
+}
+
+export const getEquipePainel = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    periodo: z.enum(["semana", "quinzena", "mes", "custom"]).default("mes"),
+    inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    fim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { start, end } = rangeForPeriodo(data.periodo, data.inicio, data.fim);
+    const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+
+    const [{ data: func }, { data: ordens }, { data: comissoes }, { data: pagamentos }] = await Promise.all([
+      supabase.from("funcionarios")
+        .select("id, nome, ativo, comissao_tipo, comissao_valor, comissao_modo, auth_user_id, cargo, telefone, email")
+        .eq("owner_id", userId).order("nome"),
+      supabase.from("ordens_servico")
+        .select("id, valor, status, funcionario_id, iniciado_em, entregue_em, created_at")
+        .eq("owner_id", userId)
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString()),
+      supabase.from("comissoes")
+        .select("funcionario_id, valor, pagamento_id, created_at")
+        .eq("owner_id", userId)
+        .gte("created_at", start.toISOString())
+        .lte("created_at", end.toISOString()),
+      supabase.from("pagamentos_comissao")
+        .select("funcionario_id, valor, pago_em")
+        .eq("owner_id", userId)
+        .order("pago_em", { ascending: false }),
+    ]);
+
+    const ultimoPagto = new Map<string, { valor: number; pago_em: string }>();
+    (pagamentos ?? []).forEach((p: any) => {
+      if (!ultimoPagto.has(p.funcionario_id)) {
+        ultimoPagto.set(p.funcionario_id, { valor: Number(p.valor), pago_em: p.pago_em });
+      }
+    });
+
+    const byFunc = new Map<string, { lavagens: number; receita: number; comissaoTotal: number; comissaoAberta: number }>();
+    (func ?? []).forEach((f: any) => byFunc.set(f.id, { lavagens: 0, receita: 0, comissaoTotal: 0, comissaoAberta: 0 }));
+    (ordens ?? []).forEach((o: any) => {
+      if (!o.funcionario_id || o.status !== "entregue") return;
+      const cur = byFunc.get(o.funcionario_id) ?? { lavagens: 0, receita: 0, comissaoTotal: 0, comissaoAberta: 0 };
+      cur.lavagens += 1; cur.receita += Number(o.valor ?? 0);
+      byFunc.set(o.funcionario_id, cur);
+    });
+    (comissoes ?? []).forEach((c: any) => {
+      const cur = byFunc.get(c.funcionario_id) ?? { lavagens: 0, receita: 0, comissaoTotal: 0, comissaoAberta: 0 };
+      cur.comissaoTotal += Number(c.valor ?? 0);
+      if (!c.pagamento_id) cur.comissaoAberta += Number(c.valor ?? 0);
+      byFunc.set(c.funcionario_id, cur);
+    });
+
+    const colaboradores = (func ?? []).map((f: any) => {
+      const m = byFunc.get(f.id)!;
+      const status: "a_receber" | "pago" | "sem_comissao" =
+        m.comissaoAberta > 0.005 ? "a_receber" : (m.comissaoTotal > 0 ? "pago" : "sem_comissao");
+      const tipoLabel = f.comissao_modo === "por_servico"
+        ? "Personalizado por serviço"
+        : f.comissao_tipo === "percentual"
+          ? `${Number(f.comissao_valor)}% por OS`
+          : `R$ ${Number(f.comissao_valor).toFixed(2)} por OS`;
+      return {
+        id: f.id, nome: f.nome, cargo: f.cargo, telefone: f.telefone, email: f.email,
+        ativo: f.ativo, vinculado: !!f.auth_user_id,
+        comissao_tipo: f.comissao_tipo, comissao_valor: Number(f.comissao_valor),
+        comissao_modo: f.comissao_modo,
+        tipo_label: tipoLabel,
+        lavagens: m.lavagens, receita: m.receita,
+        comissao_acumulada: m.comissaoAberta,
+        comissao_total: m.comissaoTotal,
+        status,
+        ultimo_pagamento: ultimoPagto.get(f.id) ?? null,
+      };
+    });
+
+    const totalAPagar = colaboradores.reduce((s, c) => s + c.comissao_acumulada, 0);
+    const totalLavagens = colaboradores.reduce((s, c) => s + c.lavagens, 0);
+    const ativosHoje = new Set(
+      (ordens ?? [])
+        .filter((o: any) => o.iniciado_em && new Date(o.iniciado_em) >= startToday && o.funcionario_id)
+        .map((o: any) => o.funcionario_id),
+    ).size;
+    const melhor = [...colaboradores].sort((a, b) => b.lavagens - a.lavagens)[0] ?? null;
+
+    return {
+      colaboradores: colaboradores.sort((a, b) => b.receita - a.receita),
+      periodo: { inicio: start.toISOString().slice(0, 10), fim: end.toISOString().slice(0, 10) },
+      cards: {
+        totalAPagar, totalLavagens, ativosHoje,
+        melhor: melhor && melhor.lavagens > 0
+          ? { id: melhor.id, nome: melhor.nome, lavagens: melhor.lavagens, receita: melhor.receita }
+          : null,
+      },
+    };
+  });
+
+export const marcarPagamentoComissao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    funcionario_id: z.string().uuid(),
+    periodo_inicio: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    periodo_fim: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    observacao: z.string().max(300).optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const inicioIso = new Date(data.periodo_inicio + "T00:00:00").toISOString();
+    const fimIso = new Date(data.periodo_fim + "T23:59:59").toISOString();
+    const { data: abertas, error: eList } = await supabase
+      .from("comissoes")
+      .select("id, valor")
+      .eq("owner_id", userId)
+      .eq("funcionario_id", data.funcionario_id)
+      .is("pagamento_id", null)
+      .gte("created_at", inicioIso)
+      .lte("created_at", fimIso);
+    if (eList) throw eList;
+    const valor = (abertas ?? []).reduce((s, c) => s + Number(c.valor ?? 0), 0);
+    if (valor <= 0) throw new Error("Nada a pagar no período selecionado.");
+    const { data: pag, error: ePag } = await supabase.from("pagamentos_comissao").insert({
+      owner_id: userId, funcionario_id: data.funcionario_id,
+      periodo_inicio: data.periodo_inicio, periodo_fim: data.periodo_fim,
+      valor, observacao: data.observacao ?? null,
+    }).select("id").single();
+    if (ePag) throw ePag;
+    const ids = (abertas ?? []).map((c) => c.id);
+    if (ids.length > 0) {
+      const { error: eUpd } = await supabase.from("comissoes")
+        .update({ pagamento_id: pag.id }).in("id", ids);
+      if (eUpd) throw eUpd;
+    }
+    return { ok: true, valor };
+  });
+
+export const listPagamentosComissao = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ funcionario_id: z.string().uuid(), limit: z.number().int().min(1).max(50).default(10) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: rows } = await context.supabase
+      .from("pagamentos_comissao")
+      .select("id, valor, pago_em, periodo_inicio, periodo_fim, observacao")
+      .eq("owner_id", context.userId)
+      .eq("funcionario_id", data.funcionario_id)
+      .order("pago_em", { ascending: false })
+      .limit(data.limit);
+    return { pagamentos: rows ?? [] };
+  });
+
+// ============ CLIENTES — UPDATE COMPLETO ============
+export const updateClienteCompleto = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    id: z.string().uuid(),
+    nome: z.string().min(1).max(120),
+    telefone: z.string().max(20).optional().nullable(),
+    whatsapp: z.string().max(20).optional().nullable(),
+    email: z.string().email().max(160).optional().nullable().or(z.literal("")),
+    observacoes: z.string().max(1000).optional().nullable(),
+    veiculo: z.object({
+      id: z.string().uuid().optional(),
+      placa: z.string().min(1).max(10),
+      modelo: z.string().max(60).optional().nullable(),
+      marca: z.string().max(60).optional().nullable(),
+      cor: z.string().max(30).optional().nullable(),
+    }).optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const patch: any = {
+      nome: data.nome.trim(),
+      telefone: data.telefone || null,
+      whatsapp: data.whatsapp || null,
+      email: (data.email && data.email !== "") ? data.email : null,
+      observacoes: data.observacoes || null,
+    };
+    const { error: eC } = await supabase.from("clientes")
+      .update(patch).eq("id", data.id).eq("owner_id", userId);
+    if (eC) throw eC;
+    if (data.veiculo) {
+      const v = {
+        placa: data.veiculo.placa.toUpperCase().trim(),
+        modelo: data.veiculo.modelo || null,
+        marca: data.veiculo.marca || null,
+        cor: data.veiculo.cor || null,
+      };
+      if (data.veiculo.id) {
+        const { error } = await supabase.from("veiculos")
+          .update(v).eq("id", data.veiculo.id).eq("owner_id", userId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase.from("veiculos").insert({
+          ...v, owner_id: userId, cliente_id: data.id,
+        });
+        if (error) throw error;
+      }
+    }
     return { ok: true };
   });
 
@@ -912,10 +1167,11 @@ export const listAgendamentos = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     let q = supabase.from("agendamentos")
       .select(`id, data_agendada, hora_agendada, status, observacoes, ordem_id, created_at,
-               cliente_id, veiculo_id, servico_id,
+               cliente_id, veiculo_id, servico_id, funcionario_id,
                clientes:cliente_id(nome, telefone),
                veiculos:veiculo_id(placa, modelo),
-               servicos:servico_id(nome, preco_padrao)`)
+               servicos:servico_id(nome, preco_padrao),
+               funcionarios:funcionario_id(nome)`)
       .eq("owner_id", userId)
       .order("data_agendada", { ascending: true })
       .order("hora_agendada", { ascending: true });
@@ -959,6 +1215,7 @@ export const createAgendamento = createServerFn({ method: "POST" })
     cliente_id: z.string().uuid(),
     veiculo_id: z.string().uuid().nullable().optional(),
     servico_id: z.string().uuid().nullable().optional(),
+    funcionario_id: z.string().uuid().nullable().optional(),
     data_agendada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     hora_agendada: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
     observacoes: z.string().max(500).nullable().optional(),
@@ -966,7 +1223,6 @@ export const createAgendamento = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const hora = data.hora_agendada.length === 5 ? data.hora_agendada + ":00" : data.hora_agendada;
-    // Valida capacidade
     const { data: cfg } = await supabase.from("agenda_config").select("capacidade_simultanea").eq("owner_id", userId).maybeSingle();
     const cap = cfg?.capacidade_simultanea ?? 1;
     const { count } = await supabase.from("agendamentos")
@@ -983,6 +1239,22 @@ export const createAgendamento = createServerFn({ method: "POST" })
     }).select().single();
     if (error) throw error;
     return { agendamento: row };
+  });
+
+export const updateAgendamento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    id: z.string().uuid(),
+    funcionario_id: z.string().uuid().nullable().optional(),
+    servico_id: z.string().uuid().nullable().optional(),
+    observacoes: z.string().max(500).nullable().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { id, ...rest } = data;
+    const { error } = await context.supabase.from("agendamentos")
+      .update(rest).eq("id", id).eq("owner_id", context.userId);
+    if (error) throw error;
+    return { ok: true };
   });
 
 export const updateAgendamentoStatus = createServerFn({ method: "POST" })
@@ -1008,7 +1280,7 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: ag, error: e1 } = await supabase.from("agendamentos")
-      .select("id, cliente_id, veiculo_id, servico_id, ordem_id, observacoes")
+      .select("id, cliente_id, veiculo_id, servico_id, funcionario_id, ordem_id, observacoes")
       .eq("id", data.id).eq("owner_id", userId).single();
     if (e1) throw e1;
     if (ag.ordem_id) {
@@ -1019,11 +1291,18 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
       const { data: s } = await supabase.from("servicos").select("preco_padrao").eq("id", ag.servico_id).maybeSingle();
       valor = Number(s?.preco_padrao ?? 0);
     }
+    // Se já tem funcionario no agendamento, usa; senão tenta o usuário logado (colaborador)
+    let funcionario_id: string | null = ag.funcionario_id ?? null;
+    if (!funcionario_id) {
+      const { data: meFunc } = await supabase.from("funcionarios").select("id").eq("auth_user_id", userId).maybeSingle();
+      if (meFunc?.id) funcionario_id = meFunc.id;
+    }
     const { data: os, error: e2 } = await supabase.from("ordens_servico").insert({
       owner_id: userId,
       cliente_id: ag.cliente_id,
       veiculo_id: ag.veiculo_id,
       servico_id: ag.servico_id,
+      funcionario_id,
       valor,
       observacoes: ag.observacoes,
       status: "aguardando",
@@ -1036,6 +1315,7 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
     if (e3) throw e3;
     return { ok: true, ordem_id: os.id };
   });
+
 
 export const getAgendaConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])

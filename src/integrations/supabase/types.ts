@@ -52,6 +52,7 @@ export type Database = {
           confirmado_em: string | null
           created_at: string
           data_agendada: string
+          funcionario_id: string | null
           hora_agendada: string
           id: string
           observacoes: string | null
@@ -69,6 +70,7 @@ export type Database = {
           confirmado_em?: string | null
           created_at?: string
           data_agendada: string
+          funcionario_id?: string | null
           hora_agendada: string
           id?: string
           observacoes?: string | null
@@ -86,6 +88,7 @@ export type Database = {
           confirmado_em?: string | null
           created_at?: string
           data_agendada?: string
+          funcionario_id?: string | null
           hora_agendada?: string
           id?: string
           observacoes?: string | null
@@ -102,6 +105,13 @@ export type Database = {
             columns: ["cliente_id"]
             isOneToOne: false
             referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "agendamentos_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
             referencedColumns: ["id"]
           },
           {
@@ -248,30 +258,39 @@ export type Database = {
       clientes: {
         Row: {
           created_at: string
+          email: string | null
           id: string
           nome: string
+          observacoes: string | null
           origem_cliente: string | null
           owner_id: string
           pontos_saldo: number
           telefone: string | null
+          whatsapp: string | null
         }
         Insert: {
           created_at?: string
+          email?: string | null
           id?: string
           nome: string
+          observacoes?: string | null
           origem_cliente?: string | null
           owner_id: string
           pontos_saldo?: number
           telefone?: string | null
+          whatsapp?: string | null
         }
         Update: {
           created_at?: string
+          email?: string | null
           id?: string
           nome?: string
+          observacoes?: string | null
           origem_cliente?: string | null
           owner_id?: string
           pontos_saldo?: number
           telefone?: string | null
+          whatsapp?: string | null
         }
         Relationships: []
       }
@@ -282,6 +301,7 @@ export type Database = {
           id: string
           ordem_id: string
           owner_id: string
+          pagamento_id: string | null
           tipo: string
           valor: number
         }
@@ -291,6 +311,7 @@ export type Database = {
           id?: string
           ordem_id: string
           owner_id: string
+          pagamento_id?: string | null
           tipo: string
           valor?: number
         }
@@ -300,6 +321,7 @@ export type Database = {
           id?: string
           ordem_id?: string
           owner_id?: string
+          pagamento_id?: string | null
           tipo?: string
           valor?: number
         }
@@ -316,6 +338,61 @@ export type Database = {
             columns: ["ordem_id"]
             isOneToOne: true
             referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissoes_pagamento_id_fkey"
+            columns: ["pagamento_id"]
+            isOneToOne: false
+            referencedRelation: "pagamentos_comissao"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comissoes_servico: {
+        Row: {
+          created_at: string
+          funcionario_id: string
+          id: string
+          owner_id: string
+          servico_id: string
+          tipo: string
+          updated_at: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          funcionario_id: string
+          id?: string
+          owner_id: string
+          servico_id: string
+          tipo: string
+          updated_at?: string
+          valor?: number
+        }
+        Update: {
+          created_at?: string
+          funcionario_id?: string
+          id?: string
+          owner_id?: string
+          servico_id?: string
+          tipo?: string
+          updated_at?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comissoes_servico_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissoes_servico_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
             referencedColumns: ["id"]
           },
         ]
@@ -409,6 +486,7 @@ export type Database = {
           ativo: boolean
           auth_user_id: string | null
           cargo: string | null
+          comissao_modo: string
           comissao_tipo: string
           comissao_valor: number
           email: string | null
@@ -421,6 +499,7 @@ export type Database = {
           ativo?: boolean
           auth_user_id?: string | null
           cargo?: string | null
+          comissao_modo?: string
           comissao_tipo?: string
           comissao_valor?: number
           email?: string | null
@@ -433,6 +512,7 @@ export type Database = {
           ativo?: boolean
           auth_user_id?: string | null
           cargo?: string | null
+          comissao_modo?: string
           comissao_tipo?: string
           comissao_valor?: number
           email?: string | null
@@ -554,6 +634,50 @@ export type Database = {
             columns: ["veiculo_id"]
             isOneToOne: false
             referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      pagamentos_comissao: {
+        Row: {
+          created_at: string
+          funcionario_id: string
+          id: string
+          observacao: string | null
+          owner_id: string
+          pago_em: string
+          periodo_fim: string
+          periodo_inicio: string
+          valor: number
+        }
+        Insert: {
+          created_at?: string
+          funcionario_id: string
+          id?: string
+          observacao?: string | null
+          owner_id: string
+          pago_em?: string
+          periodo_fim: string
+          periodo_inicio: string
+          valor?: number
+        }
+        Update: {
+          created_at?: string
+          funcionario_id?: string
+          id?: string
+          observacao?: string | null
+          owner_id?: string
+          pago_em?: string
+          periodo_fim?: string
+          periodo_inicio?: string
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "pagamentos_comissao_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
             referencedColumns: ["id"]
           },
         ]
@@ -719,6 +843,7 @@ export type Database = {
           cliente_id: string
           cor: string | null
           id: string
+          marca: string | null
           modelo: string | null
           owner_id: string
           placa: string
@@ -727,6 +852,7 @@ export type Database = {
           cliente_id: string
           cor?: string | null
           id?: string
+          marca?: string | null
           modelo?: string | null
           owner_id: string
           placa: string
@@ -735,6 +861,7 @@ export type Database = {
           cliente_id?: string
           cor?: string | null
           id?: string
+          marca?: string | null
           modelo?: string | null
           owner_id?: string
           placa?: string
