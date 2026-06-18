@@ -1167,10 +1167,11 @@ export const listAgendamentos = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     let q = supabase.from("agendamentos")
       .select(`id, data_agendada, hora_agendada, status, observacoes, ordem_id, created_at,
-               cliente_id, veiculo_id, servico_id,
+               cliente_id, veiculo_id, servico_id, funcionario_id,
                clientes:cliente_id(nome, telefone),
                veiculos:veiculo_id(placa, modelo),
-               servicos:servico_id(nome, preco_padrao)`)
+               servicos:servico_id(nome, preco_padrao),
+               funcionarios:funcionario_id(nome)`)
       .eq("owner_id", userId)
       .order("data_agendada", { ascending: true })
       .order("hora_agendada", { ascending: true });
