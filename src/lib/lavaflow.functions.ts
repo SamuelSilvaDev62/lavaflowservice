@@ -1215,6 +1215,7 @@ export const createAgendamento = createServerFn({ method: "POST" })
     cliente_id: z.string().uuid(),
     veiculo_id: z.string().uuid().nullable().optional(),
     servico_id: z.string().uuid().nullable().optional(),
+    funcionario_id: z.string().uuid().nullable().optional(),
     data_agendada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     hora_agendada: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
     observacoes: z.string().max(500).nullable().optional(),
@@ -1222,7 +1223,6 @@ export const createAgendamento = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const hora = data.hora_agendada.length === 5 ? data.hora_agendada + ":00" : data.hora_agendada;
-    // Valida capacidade
     const { data: cfg } = await supabase.from("agenda_config").select("capacidade_simultanea").eq("owner_id", userId).maybeSingle();
     const cap = cfg?.capacidade_simultanea ?? 1;
     const { count } = await supabase.from("agendamentos")
@@ -1239,6 +1239,22 @@ export const createAgendamento = createServerFn({ method: "POST" })
     }).select().single();
     if (error) throw error;
     return { agendamento: row };
+  });
+
+export const updateAgendamento = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    id: z.string().uuid(),
+    funcionario_id: z.string().uuid().nullable().optional(),
+    servico_id: z.string().uuid().nullable().optional(),
+    observacoes: z.string().max(500).nullable().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { id, ...rest } = data;
+    const { error } = await context.supabase.from("agendamentos")
+      .update(rest).eq("id", id).eq("owner_id", context.userId);
+    if (error) throw error;
+    return { ok: true };
   });
 
 export const updateAgendamentoStatus = createServerFn({ method: "POST" })
@@ -1264,7 +1280,7 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { data: ag, error: e1 } = await supabase.from("agendamentos")
-      .select("id, cliente_id, veiculo_id, servico_id, ordem_id, observacoes")
+      .select("id, cliente_id, veiculo_id, servico_id, funcionario_id, ordem_id, observacoes")
       .eq("id", data.id).eq("owner_id", userId).single();
     if (e1) throw e1;
     if (ag.ordem_id) {
@@ -1275,11 +1291,18 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
       const { data: s } = await supabase.from("servicos").select("preco_padrao").eq("id", ag.servico_id).maybeSingle();
       valor = Number(s?.preco_padrao ?? 0);
     }
+    // Se já tem funcionario no agendamento, usa; senão tenta o usuário logado (colaborador)
+    let funcionario_id: string | null = ag.funcionario_id ?? null;
+    if (!funcionario_id) {
+      const { data: meFunc } = await supabase.from("funcionarios").select("id").eq("auth_user_id", userId).maybeSingle();
+      if (meFunc?.id) funcionario_id = meFunc.id;
+    }
     const { data: os, error: e2 } = await supabase.from("ordens_servico").insert({
       owner_id: userId,
       cliente_id: ag.cliente_id,
       veiculo_id: ag.veiculo_id,
       servico_id: ag.servico_id,
+      funcionario_id,
       valor,
       observacoes: ag.observacoes,
       status: "aguardando",
@@ -1292,6 +1315,7 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
     if (e3) throw e3;
     return { ok: true, ordem_id: os.id };
   });
+
 
 export const getAgendaConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
