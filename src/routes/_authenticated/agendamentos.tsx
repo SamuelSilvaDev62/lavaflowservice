@@ -333,8 +333,11 @@ function AgendamentoCard({ a }: { a: any }) {
           <Row label="Serviço" value={a.servicos?.nome ?? "—"} />
           <Row label="Veículo" value={a.veiculos?.placa ?? "—"} />
           <Row label="Data" value={dateBr(a.data_agendada)} />
+          <Row label="Colaborador" value={a.funcionarios?.nome ?? "Sem definir"} />
           {a.observacoes && <Row label="Observações" value={a.observacoes} />}
         </div>
+
+        <AtribuirColaboradorInline agendamentoId={a.id} atual={a.funcionario_id ?? ""} />
 
         <div className="space-y-2 overflow-y-auto">
           {ativo && (a.status === "agendado" || a.status === "confirmado") && (
