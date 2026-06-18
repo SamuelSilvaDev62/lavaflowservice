@@ -70,7 +70,10 @@ function Page() {
       <Link to="/clientes" className="text-sm text-muted-foreground inline-flex items-center gap-1 hover:text-foreground mb-3"><ArrowLeft className="h-4 w-4" /> Voltar</Link>
       <PageHeader title={c.nome} subtitle={c.telefone ?? "Sem telefone"}
         actions={
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-wrap">
+            <Button variant="outline" onClick={() => setEditOpen(true)}>
+              <Pencil className="h-4 w-4 mr-1" />Editar
+            </Button>
             {c.telefone && (
               <Button variant="outline" onClick={enviarExtrato}>
                 <Gift className="h-4 w-4 mr-1" />Extrato Fidelidade
@@ -83,6 +86,11 @@ function Page() {
             )}
           </div>
         }
+      />
+
+      <EditarClienteDialog
+        open={editOpen} onOpenChange={setEditOpen}
+        cliente={c} veiculo={data.veiculos[0]}
       />
 
 
