@@ -853,6 +853,97 @@ function rangeForPeriodo(periodo: string, inicio?: string, fim?: string) {
   return { start, end };
 }
 
+function ordemComissaoDate(o: any) {
+  return o.entregue_em ?? o.created_at;
+}
+
+function calcComissaoOrdem(ordem: any, funcionario: any, regrasServico: Map<string, any>) {
+  let tipo = funcionario.comissao_tipo;
+  let valorRegra = Number(funcionario.comissao_valor ?? 0);
+
+  if (funcionario.comissao_modo === "por_servico" && ordem.servico_id) {
+    const regra = regrasServico.get(`${funcionario.id}:${ordem.servico_id}`);
+    if (regra) {
+      tipo = regra.tipo;
+      valorRegra = Number(regra.valor ?? 0);
+    }
+  }
+
+  const valor = tipo === "percentual"
+    ? Math.round((Number(ordem.valor ?? 0) * valorRegra / 100) * 100) / 100
+    : valorRegra;
+
+  return { tipo, valor };
+}
+
+async function ensureComissoesEntregues(
+  supabase: any,
+  userId: string,
+  start: Date,
+  end: Date,
+  funcionarioId?: string,
+) {
+  const startIso = start.toISOString();
+  const endMs = end.getTime();
+  const [{ data: funcionarios }, { data: ordens }, { data: regrasServico }] = await Promise.all([
+    supabase.from("funcionarios")
+      .select("id, comissao_tipo, comissao_valor, comissao_modo")
+      .eq("owner_id", userId),
+    supabase.from("ordens_servico")
+      .select("id, valor, status, funcionario_id, servico_id, entregue_em, created_at")
+      .eq("owner_id", userId)
+      .eq("status", "entregue")
+      .or(`entregue_em.gte.${startIso},created_at.gte.${startIso}`),
+    supabase.from("comissoes_servico")
+      .select("funcionario_id, servico_id, tipo, valor")
+      .eq("owner_id", userId),
+  ]);
+
+  const funcionariosById = new Map((funcionarios ?? []).map((f: any) => [f.id, f]));
+  const regrasByFuncServico = new Map(
+    (regrasServico ?? []).map((r: any) => [`${r.funcionario_id}:${r.servico_id}`, r]),
+  );
+  const ordensElegiveis = (ordens ?? []).filter((o: any) => {
+    const ref = ordemComissaoDate(o);
+    if (!ref || !o.funcionario_id) return false;
+    if (funcionarioId && o.funcionario_id !== funcionarioId) return false;
+    const t = new Date(ref).getTime();
+    return t >= start.getTime() && t <= endMs;
+  });
+
+  if (ordensElegiveis.length === 0) return;
+
+  const { data: existentes } = await supabase
+    .from("comissoes")
+    .select("ordem_id")
+    .eq("owner_id", userId)
+    .in("ordem_id", ordensElegiveis.map((o: any) => o.id));
+
+  const existentesIds = new Set((existentes ?? []).map((c: any) => c.ordem_id));
+  const novas = ordensElegiveis
+    .filter((o: any) => !existentesIds.has(o.id))
+    .map((o: any) => {
+      const f = funcionariosById.get(o.funcionario_id);
+      if (!f) return null;
+      const { tipo, valor } = calcComissaoOrdem(o, f, regrasByFuncServico);
+      if (valor <= 0) return null;
+      return {
+        owner_id: userId,
+        funcionario_id: o.funcionario_id,
+        ordem_id: o.id,
+        valor,
+        tipo,
+        created_at: ordemComissaoDate(o),
+      };
+    })
+    .filter(Boolean);
+
+  if (novas.length > 0) {
+    const { error } = await supabase.from("comissoes").insert(novas);
+    if (error) throw error;
+  }
+}
+
 export const getEquipePainel = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
@@ -864,6 +955,7 @@ export const getEquipePainel = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { start, end } = rangeForPeriodo(data.periodo, data.inicio, data.fim);
     const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
+    await ensureComissoesEntregues(supabase, userId, start, end);
 
     const [{ data: func }, { data: ordens }, { data: comissoes }, { data: pagamentos }] = await Promise.all([
       supabase.from("funcionarios")
@@ -872,8 +964,7 @@ export const getEquipePainel = createServerFn({ method: "GET" })
       supabase.from("ordens_servico")
         .select("id, valor, status, funcionario_id, iniciado_em, entregue_em, created_at")
         .eq("owner_id", userId)
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
+        .or(`entregue_em.gte.${start.toISOString()},created_at.gte.${start.toISOString()}`),
       supabase.from("comissoes")
         .select("funcionario_id, valor, pagamento_id, created_at")
         .eq("owner_id", userId)
@@ -896,6 +987,10 @@ export const getEquipePainel = createServerFn({ method: "GET" })
     (func ?? []).forEach((f: any) => byFunc.set(f.id, { lavagens: 0, receita: 0, comissaoTotal: 0, comissaoAberta: 0 }));
     (ordens ?? []).forEach((o: any) => {
       if (!o.funcionario_id || o.status !== "entregue") return;
+      const ref = ordemComissaoDate(o);
+      if (!ref) return;
+      const t = new Date(ref).getTime();
+      if (t < start.getTime() || t > end.getTime()) return;
       const cur = byFunc.get(o.funcionario_id) ?? { lavagens: 0, receita: 0, comissaoTotal: 0, comissaoAberta: 0 };
       cur.lavagens += 1; cur.receita += Number(o.valor ?? 0);
       byFunc.set(o.funcionario_id, cur);
@@ -963,6 +1058,13 @@ export const marcarPagamentoComissao = createServerFn({ method: "POST" })
     const { supabase, userId } = context;
     const inicioIso = new Date(data.periodo_inicio + "T00:00:00").toISOString();
     const fimIso = new Date(data.periodo_fim + "T23:59:59").toISOString();
+    await ensureComissoesEntregues(
+      supabase,
+      userId,
+      new Date(inicioIso),
+      new Date(fimIso),
+      data.funcionario_id,
+    );
     const { data: abertas, error: eList } = await supabase
       .from("comissoes")
       .select("id, valor")
@@ -1664,5 +1766,3 @@ export const getCrescimentoKPIs = createServerFn({ method: "GET" })
       },
     };
   });
-
-
