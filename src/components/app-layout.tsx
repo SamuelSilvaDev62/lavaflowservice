@@ -1,6 +1,6 @@
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
-import { useQuery } from "@tanstack/react-query";
+import { useQueryClient } from "@tanstack/react-query";
 import {
   LayoutDashboard, Sparkles, Bot, ListChecks, ClipboardList, Users, UserMinus,
   CreditCard, Award, UsersRound, BarChart3, Settings, Menu, X, LogOut, Car, Briefcase, CalendarDays,
@@ -10,69 +10,69 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { WelcomeModal } from "@/components/welcome-modal";
 import { GuidedTour } from "@/components/guided-tour";
+import { useRole } from "@/hooks/use-role";
+import { ADMINS, GESTAO, OPERACIONAL, isColaborador, type AppRole, ROLE_LABELS } from "@/lib/rbac";
 
-const ownerGroups: Array<{ label: string; items: Array<{ to: string; label: string; icon: any; tour?: string }> }> = [
+type NavItem = { to: string; label: string; icon: any; tour?: string; roles: AppRole[] };
+type NavGroup = { label: string; items: NavItem[] };
+
+const groupsAll: NavGroup[] = [
   { label: "Visão", items: [
-    { to: "/dashboard", label: "Painel Executivo", icon: LayoutDashboard, tour: "dashboard" },
-    { to: "/oportunidades", label: "Oportunidades", icon: Sparkles, tour: "oportunidades" },
-    { to: "/assistente", label: "Assistente LavaFlow", icon: Bot, tour: "assistente" },
+    { to: "/dashboard", label: "Painel Executivo", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
+    { to: "/oportunidades", label: "Oportunidades", icon: Sparkles, tour: "oportunidades", roles: OPERACIONAL },
+    { to: "/assistente", label: "Assistente LavaFlow", icon: Bot, tour: "assistente", roles: GESTAO },
   ]},
   { label: "Operação", items: [
-    { to: "/fila", label: "Fila", icon: ListChecks },
-    { to: "/ordens", label: "Ordens de serviço", icon: ClipboardList },
-    { to: "/agendamentos", label: "Agendamentos", icon: CalendarDays },
+    { to: "/fila", label: "Fila", icon: ListChecks, roles: OPERACIONAL },
+    { to: "/ordens", label: "Ordens de serviço", icon: ClipboardList, roles: OPERACIONAL },
+    { to: "/agendamentos", label: "Agendamentos", icon: CalendarDays, roles: OPERACIONAL },
   ]},
   { label: "Crescimento", items: [
-    { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes" },
-    { to: "/clientes/inativos", label: "Inativos", icon: UserMinus },
-    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas" },
-    { to: "/fidelidade", label: "Fidelidade", icon: Award },
+    { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes", roles: OPERACIONAL },
+    { to: "/clientes/inativos", label: "Inativos", icon: UserMinus, roles: OPERACIONAL },
+    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: OPERACIONAL },
+    { to: "/fidelidade", label: "Fidelidade", icon: Award, roles: ADMINS },
   ]},
   { label: "Gestão", items: [
-    { to: "/equipe", label: "Equipe", icon: UsersRound },
-    { to: "/relatorios", label: "Relatórios", icon: BarChart3 },
-    { to: "/configuracoes", label: "Configurações", icon: Settings },
+    { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },
+    { to: "/relatorios", label: "Relatórios", icon: BarChart3, roles: GESTAO },
+    { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
   ]},
 ];
 
-const colabGroups = [
+const colabGroups: NavGroup[] = [
   { label: "Operação", items: [
-    { to: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase },
+    { to: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, roles: ["lavador", "colaborador"] },
   ]},
 ];
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
   const router = useRouter();
+  const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
+  const { role } = useRole();
 
   useEffect(() => setOpen(false), [pathname]);
 
-  const { data: isColab } = useQuery({
-    queryKey: ["user-is-colab"],
-    queryFn: async () => {
-      const { data: u } = await supabase.auth.getUser();
-      if (!u.user) return false;
-      const { data: roles } = await supabase.from("user_roles").select("role").eq("user_id", u.user.id);
-      const colab = (roles ?? []).some((r: any) => r.role === "colaborador") &&
-                    !(roles ?? []).some((r: any) => r.role === "owner");
-      return colab;
-    },
-    staleTime: 5 * 60_000,
-    gcTime: 30 * 60_000,
-  });
+  const colab = isColaborador(role);
+  const groups: NavGroup[] = colab
+    ? colabGroups
+    : groupsAll
+        .map((g) => ({ ...g, items: g.items.filter((it) => !role || it.roles.includes(role)) }))
+        .filter((g) => g.items.length > 0);
 
   async function signOut() {
+    await qc.cancelQueries();
+    qc.clear();
     await supabase.auth.signOut();
     router.navigate({ to: "/auth", replace: true });
   }
 
-  const groups = isColab ? colabGroups : ownerGroups;
-
   return (
     <div className="min-h-screen bg-background">
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-background/80 backdrop-blur px-4 h-14">
-        <Link to={isColab ? "/meu-trabalho" : "/dashboard"} className="font-display text-lg font-bold tracking-tight">
+        <Link to={colab ? "/meu-trabalho" : "/dashboard"} className="font-display text-lg font-bold tracking-tight">
           Lava<span className="text-primary">Flow</span>
         </Link>
         <button onClick={() => setOpen(!open)} className="p-2 rounded-md hover:bg-accent" aria-label="Menu">
@@ -88,11 +88,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <div className="h-8 w-8 rounded-lg bg-gradient-to-br from-primary to-primary/60 grid place-content-center">
             <Car className="h-4 w-4 text-primary-foreground" />
           </div>
-          <Link to={isColab ? "/meu-trabalho" : "/dashboard"} className="font-display text-lg font-bold tracking-tight">
+          <Link to={colab ? "/meu-trabalho" : "/dashboard"} className="font-display text-lg font-bold tracking-tight">
             Lava<span className="text-primary">Flow</span>
           </Link>
         </div>
-        <nav className="px-3 py-4 space-y-5 overflow-y-auto h-[calc(100vh-8rem)]">
+        {role && (
+          <div className="px-5 pt-3 pb-1">
+            <span className="inline-block text-[10px] uppercase tracking-wider px-2 py-0.5 rounded-md bg-sidebar-accent/60 text-sidebar-accent-foreground">
+              {ROLE_LABELS[role]}
+            </span>
+          </div>
+        )}
+        <nav className="px-3 py-4 space-y-5 overflow-y-auto h-[calc(100vh-9rem)]">
           {groups.map((g) => (
             <div key={g.label}>
               <p className="px-3 pb-2 text-[10px] font-semibold tracking-widest uppercase text-muted-foreground">{g.label}</p>
@@ -129,8 +136,8 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="px-4 lg:px-8 py-6 lg:py-8 max-w-7xl mx-auto">{children}</div>
       </main>
 
-      {!isColab && <WelcomeModal />}
-      {!isColab && <GuidedTour />}
+      {!colab && <WelcomeModal />}
+      {!colab && <GuidedTour />}
     </div>
   );
 }
