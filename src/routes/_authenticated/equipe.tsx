@@ -47,6 +47,7 @@ const defaultForm = {
   comissao_valor: 0,
   comissao_modo: "global" as "global" | "por_servico",
   ativo: true,
+  role: "lavador" as "admin" | "gerente" | "atendente" | "lavador",
 };
 
 function todayIso() { return new Date().toISOString().slice(0, 10); }
