@@ -1,5 +1,11 @@
 
-# RBAC completo — OWNER, ADMIN, GERENTE, ATENDENTE, LAVADOR
+# RBAC completo — Onda 2 ✅ APLICADA
+
+Migrations executadas, helpers/policies criadas, server fns e UI atualizadas. Ver `.lovable/rbac-tests.md`.
+
+---
+
+
 
 Implementa a Onda 2 do plano de segurança: expande o enum `app_role`, cria helpers de autorização no banco e no front, aplica RLS por papel e adiciona guards de UI em cada tela.
 
