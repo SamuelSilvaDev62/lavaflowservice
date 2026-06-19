@@ -16,8 +16,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 
+import { RequireRole } from "@/components/require-role";
+import { ADMINS } from "@/lib/rbac";
+
 export const Route = createFileRoute("/_authenticated/configuracoes")({
-  component: Page,
+  component: () => <RequireRole roles={ADMINS}><Page /></RequireRole>,
 });
 
 function Page() {
