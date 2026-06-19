@@ -29,22 +29,99 @@ export const Route = createFileRoute("/_authenticated/configuracoes")({
 function Page() {
   return (
     <>
-      <PageHeader title="Configurações" subtitle="Empresa, serviços e mensagens." />
+      <PageHeader title="Configurações" subtitle="Empresa, serviços, equipe e mensagens." />
       <Tabs defaultValue="empresa">
         <TabsList className="mb-4 flex-wrap h-auto">
           <TabsTrigger value="empresa">Empresa</TabsTrigger>
           <TabsTrigger value="servicos">Serviços</TabsTrigger>
           <TabsTrigger value="agenda">Agenda</TabsTrigger>
+          <TabsTrigger value="membros">Membros e papéis</TabsTrigger>
           <TabsTrigger value="msg">Mensagens</TabsTrigger>
         </TabsList>
         <TabsContent value="empresa"><EmpresaTab /></TabsContent>
         <TabsContent value="servicos"><ServicosTab /></TabsContent>
         <TabsContent value="agenda"><AgendaTab /></TabsContent>
+        <TabsContent value="membros"><MembrosTab /></TabsContent>
         <TabsContent value="msg"><MsgTab /></TabsContent>
       </Tabs>
     </>
   );
 }
+
+function MembrosTab() {
+  const fn = useServerFn(listTenantMembers);
+  const setFn = useServerFn(setMemberRole);
+  const qc = useQueryClient();
+  const { role: myRole } = useRole();
+  const { data, isLoading } = useQuery({ queryKey: ["tenant-members"], queryFn: () => fn() });
+
+  const mut = useMutation({
+    mutationFn: (v: { user_id: string; role: AppRole }) =>
+      setFn({ data: { user_id: v.user_id, role: v.role as any } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["tenant-members"] }); toast.success("Papel atualizado"); },
+    onError: (e: any) => toast.error(e?.message ?? "Falhou"),
+  });
+
+  const opcoes: { value: AppRole; label: string }[] = [
+    { value: "admin", label: "Administrador" },
+    { value: "gerente", label: "Gerente" },
+    { value: "atendente", label: "Atendente" },
+    { value: "lavador", label: "Lavador" },
+  ];
+
+  return (
+    <Card><CardContent className="p-5 space-y-3">
+      <div>
+        <h3 className="font-display font-semibold">Quem tem acesso</h3>
+        <p className="text-xs text-muted-foreground">
+          Promova ou rebaixe membros do seu lava-rápido. Apenas o proprietário pode designar administradores.
+        </p>
+      </div>
+      {isLoading && <div className="h-32 rounded-md bg-muted animate-pulse" />}
+      <ul className="divide-y">
+        {(data?.membros ?? []).map((m: any) => {
+          const isOwner = m.role === "owner";
+          const isAdmin = m.role === "admin";
+          const canEdit = !isOwner && (myRole === "owner" || (myRole === "admin" && !isAdmin));
+          return (
+            <li key={m.user_id} className="py-3 flex items-center gap-3">
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{m.funcionario_nome ?? m.email ?? "—"}</p>
+                <p className="text-xs text-muted-foreground truncate">{m.email ?? "—"}</p>
+              </div>
+              {isOwner ? (
+                <Badge>{ROLE_LABELS[m.role as AppRole]}</Badge>
+              ) : (
+                <Select
+                  value={m.role}
+                  onValueChange={(v) => mut.mutate({ user_id: m.user_id, role: v as AppRole })}
+                  disabled={!canEdit || mut.isPending}
+                >
+                  <SelectTrigger className="w-44 h-9"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {opcoes.map((o) => (
+                      <SelectItem
+                        key={o.value} value={o.value}
+                        disabled={o.value === "admin" && myRole !== "owner"}
+                      >{o.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+            </li>
+          );
+        })}
+        {!isLoading && (data?.membros ?? []).length === 0 && (
+          <li className="py-6 text-center text-sm text-muted-foreground">Ainda não há membros vinculados.</li>
+        )}
+      </ul>
+      <p className="text-[11px] text-muted-foreground">
+        Para adicionar alguém, vá em <strong>Equipe → Novo</strong>, preencha o e-mail e escolha o perfil.
+      </p>
+    </CardContent></Card>
+  );
+}
+
 
 function EmpresaTab() {
   const fn = useServerFn(getEmpresa);
