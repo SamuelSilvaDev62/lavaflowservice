@@ -80,13 +80,17 @@ function Page() {
   const [pagamentoOpen, setPagamentoOpen] = useState<{ id: string; nome: string; valor: number } | null>(null);
 
   const mut = useMutation({
-    mutationFn: () => up({ data: { ...form, id: form.id || undefined, email: form.email || null } }),
+    mutationFn: () => {
+      const { role: _r, ...rest } = form;
+      return up({ data: { ...rest, id: rest.id || undefined, email: rest.email || null } });
+    },
     onSuccess: async () => {
       if (form.id && form.email) {
-        try { await vinc({ data: { funcionario_id: form.id, email: form.email } }); }
+        try { await vinc({ data: { funcionario_id: form.id, email: form.email, role: form.role } }); }
         catch (e: any) { toast.warning(`Salvo, mas não foi possível vincular: ${e?.message ?? "verifique se o colaborador já criou conta em /auth"}`); }
       }
       qc.invalidateQueries({ queryKey: ["equipe-painel"] });
+      qc.invalidateQueries({ queryKey: ["tenant-members"] });
       setOpen(false); setForm({ ...defaultForm });
       toast.success("Salvo");
     },
@@ -102,9 +106,11 @@ function Page() {
       comissao_valor: Number(c.comissao_valor ?? 0),
       comissao_modo: c.comissao_modo ?? "global",
       ativo: c.ativo ?? true,
+      role: (c.role ?? "lavador") as any,
     });
     setOpen(true);
   }
+
 
   const cards = data?.cards;
   const colaboradores = data?.colaboradores ?? [];
