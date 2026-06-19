@@ -12,8 +12,11 @@ import { getFidelidade, updateFidelidadeConfig, upsertRecompensa } from "@/lib/l
 import { Plus, Award, Star } from "lucide-react";
 import { toast } from "sonner";
 
+import { RequireRole } from "@/components/require-role";
+import { ADMINS } from "@/lib/rbac";
+
 export const Route = createFileRoute("/_authenticated/fidelidade")({
-  component: Page,
+  component: () => <RequireRole roles={ADMINS}><Page /></RequireRole>,
 });
 
 function Page() {

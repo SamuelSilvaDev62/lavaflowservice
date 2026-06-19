@@ -732,15 +732,50 @@ export const vincularColaborador = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     funcionario_id: z.string().uuid(),
     email: z.string().email().max(160),
+    role: z.enum(["admin", "gerente", "atendente", "lavador"]).default("lavador"),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.rpc("vincular_colaborador", {
       _funcionario_id: data.funcionario_id,
       _email: data.email,
-    });
+      _role: data.role,
+    } as any);
     if (error) throw new Error(error.message);
     return { ok: true };
   });
+
+// ============ RBAC — perfil corrente, membros, troca de papel ============
+export const getCurrentUserRole = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase.rpc("current_user_role");
+    if (error) throw new Error(error.message);
+    return { role: (data as string | null) ?? null };
+  });
+
+export const listTenantMembers = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data, error } = await context.supabase.rpc("list_tenant_members");
+    if (error) throw new Error(error.message);
+    return { membros: (data as any[]) ?? [] };
+  });
+
+export const setMemberRole = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    user_id: z.string().uuid(),
+    role: z.enum(["admin", "gerente", "atendente", "lavador"]),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { error } = await context.supabase.rpc("set_member_role", {
+      _user_id: data.user_id,
+      _role: data.role,
+    } as any);
+    if (error) throw new Error(error.message);
+    return { ok: true };
+  });
+
 
 export const upsertFuncionarioFull = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

@@ -15,8 +15,11 @@ const HorizontalRankingChart = lazy(() =>
 );
 const ChartFallback = () => <div className="h-64 w-full rounded-md bg-muted/40 animate-pulse" />;
 
+import { RequireRole } from "@/components/require-role";
+import { GESTAO } from "@/lib/rbac";
+
 export const Route = createFileRoute("/_authenticated/relatorios")({
-  component: Page,
+  component: () => <RequireRole roles={GESTAO}><Page /></RequireRole>,
 });
 
 function Page() {

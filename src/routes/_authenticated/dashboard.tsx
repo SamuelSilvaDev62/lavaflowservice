@@ -19,8 +19,11 @@ import {
 
 const DashboardRevenueChart = lazy(() => import("@/components/charts/dashboard-revenue-chart"));
 
+import { RequireRole } from "@/components/require-role";
+import { GESTAO } from "@/lib/rbac";
+
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  component: Dashboard,
+  component: () => <RequireRole roles={GESTAO}><Dashboard /></RequireRole>,
 });
 
 function Kpi({

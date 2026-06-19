@@ -24,9 +24,16 @@ import { EmptyState } from "@/components/empty-state";
 import { ComissaoPorServicoDialog } from "@/components/equipe/comissao-por-servico-dialog";
 import { MarcarPagamentoDialog } from "@/components/equipe/marcar-pagamento-dialog";
 
+import { RequireRole } from "@/components/require-role";
+import { GESTAO } from "@/lib/rbac";
+
 export const Route = createFileRoute("/_authenticated/equipe")({
-  component: Page,
+  component: PageGuarded,
 });
+
+function PageGuarded() {
+  return <RequireRole roles={GESTAO}><Page /></RequireRole>;
+}
 
 type Periodo = "semana" | "quinzena" | "mes" | "custom";
 
@@ -40,6 +47,7 @@ const defaultForm = {
   comissao_valor: 0,
   comissao_modo: "global" as "global" | "por_servico",
   ativo: true,
+  role: "lavador" as "admin" | "gerente" | "atendente" | "lavador",
 };
 
 function todayIso() { return new Date().toISOString().slice(0, 10); }
@@ -72,13 +80,17 @@ function Page() {
   const [pagamentoOpen, setPagamentoOpen] = useState<{ id: string; nome: string; valor: number } | null>(null);
 
   const mut = useMutation({
-    mutationFn: () => up({ data: { ...form, id: form.id || undefined, email: form.email || null } }),
+    mutationFn: () => {
+      const { role: _r, ...rest } = form;
+      return up({ data: { ...rest, id: rest.id || undefined, email: rest.email || null } });
+    },
     onSuccess: async () => {
       if (form.id && form.email) {
-        try { await vinc({ data: { funcionario_id: form.id, email: form.email } }); }
+        try { await vinc({ data: { funcionario_id: form.id, email: form.email, role: form.role } }); }
         catch (e: any) { toast.warning(`Salvo, mas não foi possível vincular: ${e?.message ?? "verifique se o colaborador já criou conta em /auth"}`); }
       }
       qc.invalidateQueries({ queryKey: ["equipe-painel"] });
+      qc.invalidateQueries({ queryKey: ["tenant-members"] });
       setOpen(false); setForm({ ...defaultForm });
       toast.success("Salvo");
     },
@@ -94,9 +106,11 @@ function Page() {
       comissao_valor: Number(c.comissao_valor ?? 0),
       comissao_modo: c.comissao_modo ?? "global",
       ativo: c.ativo ?? true,
+      role: (c.role ?? "lavador") as any,
     });
     setOpen(true);
   }
+
 
   const cards = data?.cards;
   const colaboradores = data?.colaboradores ?? [];
@@ -156,6 +170,21 @@ function Page() {
                 Peça ao colaborador para criar a conta em <code>/auth</code> antes de vincular.
               </p>
             </div>
+            <div>
+              <Label>Perfil de acesso</Label>
+              <select className="w-full h-9 rounded-md border bg-background px-3 text-sm"
+                      value={form.role}
+                      onChange={(e) => setForm({ ...form, role: e.target.value as any })}>
+                <option value="lavador">Lavador — só vê seus serviços</option>
+                <option value="atendente">Atendente — opera clientes, agenda e OS</option>
+                <option value="gerente">Gerente — vê relatórios e equipe</option>
+                <option value="admin">Administrador — acesso total (sem trocar dono)</option>
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                O perfil só é aplicado quando o colaborador é vinculado por e-mail.
+              </p>
+            </div>
+
             <div>
               <Label>Modo de comissão</Label>
               <select className="w-full h-9 rounded-md border bg-background px-3 text-sm"

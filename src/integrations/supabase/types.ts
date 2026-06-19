@@ -882,6 +882,10 @@ export type Database = {
     }
     Functions: {
       current_owner_id: { Args: never; Returns: string }
+      current_user_role: {
+        Args: never
+        Returns: Database["public"]["Enums"]["app_role"]
+      }
       get_agenda_config_publica: {
         Args: { _owner: string }
         Returns: {
@@ -919,6 +923,13 @@ export type Database = {
           preco_padrao: number
         }[]
       }
+      has_any_role: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user: string
+        }
+        Returns: boolean
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -926,10 +937,35 @@ export type Database = {
         }
         Returns: boolean
       }
-      vincular_colaborador: {
-        Args: { _email: string; _funcionario_id: string }
+      list_tenant_members: {
+        Args: never
+        Returns: {
+          email: string
+          funcionario_nome: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }[]
+      }
+      set_member_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
         Returns: undefined
       }
+      vincular_colaborador:
+        | {
+            Args: { _email: string; _funcionario_id: string }
+            Returns: undefined
+          }
+        | {
+            Args: {
+              _email: string
+              _funcionario_id: string
+              _role?: Database["public"]["Enums"]["app_role"]
+            }
+            Returns: undefined
+          }
     }
     Enums: {
       agendamento_status:
@@ -939,7 +975,13 @@ export type Database = {
         | "concluido"
         | "cancelado"
         | "nao_compareceu"
-      app_role: "owner" | "colaborador"
+      app_role:
+        | "owner"
+        | "colaborador"
+        | "admin"
+        | "gerente"
+        | "atendente"
+        | "lavador"
       assinatura_status:
         | "ativa"
         | "pausada"
@@ -1095,7 +1137,14 @@ export const Constants = {
         "cancelado",
         "nao_compareceu",
       ],
-      app_role: ["owner", "colaborador"],
+      app_role: [
+        "owner",
+        "colaborador",
+        "admin",
+        "gerente",
+        "atendente",
+        "lavador",
+      ],
       assinatura_status: [
         "ativa",
         "pausada",
