@@ -24,9 +24,16 @@ import { EmptyState } from "@/components/empty-state";
 import { ComissaoPorServicoDialog } from "@/components/equipe/comissao-por-servico-dialog";
 import { MarcarPagamentoDialog } from "@/components/equipe/marcar-pagamento-dialog";
 
+import { RequireRole } from "@/components/require-role";
+import { GESTAO } from "@/lib/rbac";
+
 export const Route = createFileRoute("/_authenticated/equipe")({
-  component: Page,
+  component: PageGuarded,
 });
+
+function PageGuarded() {
+  return <RequireRole roles={GESTAO}><Page /></RequireRole>;
+}
 
 type Periodo = "semana" | "quinzena" | "mes" | "custom";
 
