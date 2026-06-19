@@ -171,6 +171,21 @@ function Page() {
               </p>
             </div>
             <div>
+              <Label>Perfil de acesso</Label>
+              <select className="w-full h-9 rounded-md border bg-background px-3 text-sm"
+                      value={form.role}
+                      onChange={(e) => setForm({ ...form, role: e.target.value as any })}>
+                <option value="lavador">Lavador — só vê seus serviços</option>
+                <option value="atendente">Atendente — opera clientes, agenda e OS</option>
+                <option value="gerente">Gerente — vê relatórios e equipe</option>
+                <option value="admin">Administrador — acesso total (sem trocar dono)</option>
+              </select>
+              <p className="text-[11px] text-muted-foreground mt-1">
+                O perfil só é aplicado quando o colaborador é vinculado por e-mail.
+              </p>
+            </div>
+
+            <div>
               <Label>Modo de comissão</Label>
               <select className="w-full h-9 rounded-md border bg-background px-3 text-sm"
                       value={form.comissao_modo}
