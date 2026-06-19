@@ -77,7 +77,7 @@ function Page() {
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ ...defaultForm });
   const [comissaoOpen, setComissaoOpen] = useState<{ id: string; nome: string } | null>(null);
-  const [pagamentoOpen, setPagamentoOpen] = useState<{ id: string; nome: string; valor: number } | null>(null);
+  const [pagamentoOpen, setPagamentoOpen] = useState<{ id: string; nome: string; telefone?: string | null; valor: number } | null>(null);
 
   const mut = useMutation({
     mutationFn: () => {
@@ -281,7 +281,7 @@ function Page() {
                 <Button
                   size="sm" className="flex-1"
                   disabled={c.comissao_acumulada <= 0}
-                  onClick={() => setPagamentoOpen({ id: c.id, nome: c.nome, valor: c.comissao_acumulada })}
+                  onClick={() => setPagamentoOpen({ id: c.id, nome: c.nome, telefone: c.telefone, valor: c.comissao_acumulada })}
                 >
                   <DollarSign className="h-4 w-4 mr-1" /> Marcar como pago
                 </Button>
@@ -306,6 +306,7 @@ function Page() {
         <MarcarPagamentoDialog
           open={!!pagamentoOpen} onOpenChange={(v) => !v && setPagamentoOpen(null)}
           funcionarioId={pagamentoOpen.id} funcionarioNome={pagamentoOpen.nome}
+          funcionarioTelefone={pagamentoOpen.telefone}
           valorEstimado={pagamentoOpen.valor}
           periodoInicio={periodoInicio} periodoFim={periodoFim}
         />
