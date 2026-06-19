@@ -939,7 +939,13 @@ export type Database = {
         | "concluido"
         | "cancelado"
         | "nao_compareceu"
-      app_role: "owner" | "colaborador"
+      app_role:
+        | "owner"
+        | "colaborador"
+        | "admin"
+        | "gerente"
+        | "atendente"
+        | "lavador"
       assinatura_status:
         | "ativa"
         | "pausada"
@@ -1095,7 +1101,14 @@ export const Constants = {
         "cancelado",
         "nao_compareceu",
       ],
-      app_role: ["owner", "colaborador"],
+      app_role: [
+        "owner",
+        "colaborador",
+        "admin",
+        "gerente",
+        "atendente",
+        "lavador",
+      ],
       assinatura_status: [
         "ativa",
         "pausada",
