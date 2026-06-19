@@ -1088,7 +1088,7 @@ export const marcarPagamentoComissao = createServerFn({ method: "POST" })
         .update({ pagamento_id: pag.id }).in("id", ids);
       if (eUpd) throw eUpd;
     }
-    return { ok: true, valor };
+    return { ok: true, valor, quantidade_servicos: ids.length, pagamento_id: pag.id };
   });
 
 export const listPagamentosComissao = createServerFn({ method: "GET" })
@@ -1102,7 +1102,25 @@ export const listPagamentosComissao = createServerFn({ method: "GET" })
       .eq("funcionario_id", data.funcionario_id)
       .order("pago_em", { ascending: false })
       .limit(data.limit);
-    return { pagamentos: rows ?? [] };
+    const ids = (rows ?? []).map((p: any) => p.id);
+    const { data: comissoes } = ids.length > 0
+      ? await context.supabase
+        .from("comissoes")
+        .select("pagamento_id")
+        .eq("owner_id", context.userId)
+        .in("pagamento_id", ids)
+      : { data: [] };
+    const qtdByPagamento = new Map<string, number>();
+    (comissoes ?? []).forEach((c: any) => {
+      if (!c.pagamento_id) return;
+      qtdByPagamento.set(c.pagamento_id, (qtdByPagamento.get(c.pagamento_id) ?? 0) + 1);
+    });
+    return {
+      pagamentos: (rows ?? []).map((p: any) => ({
+        ...p,
+        quantidade_servicos: qtdByPagamento.get(p.id) ?? 0,
+      })),
+    };
   });
 
 // ============ CLIENTES — UPDATE COMPLETO ============
