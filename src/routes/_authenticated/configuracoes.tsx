@@ -8,12 +8,15 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getEmpresa, updateEmpresa, listServicos, upsertServico, getAgendaConfig, updateAgendaConfig } from "@/lib/lavaflow.functions";
+import { getEmpresa, updateEmpresa, listServicos, upsertServico, getAgendaConfig, updateAgendaConfig, listTenantMembers, setMemberRole } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { allTemplates, setTemplate, type WhatsAppTemplateKey } from "@/lib/whatsapp";
 import { FIDELIDADE_DEFAULTS, type TplKey as FidTplKey } from "@/lib/fidelidade-messages";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ROLE_LABELS, type AppRole } from "@/lib/rbac";
+import { useRole } from "@/hooks/use-role";
+import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 import { RequireRole } from "@/components/require-role";
