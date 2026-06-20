@@ -1292,8 +1292,8 @@ async function ensureComissoesEntregues(
   ]);
 
   const funcionariosById = new Map((funcionarios ?? []).map((f: any) => [f.id, f]));
-  const regrasByFuncServico = new Map(
-    (regrasServico ?? []).map((r: any) => [`${r.funcionario_id}:${r.servico_id}`, r]),
+  const regrasByFuncServico = new Map<string, any>(
+    (regrasServico ?? []).map((r: any) => [`${r.funcionario_id}:${r.servico_id}`, r] as [string, any]),
   );
   const ordensElegiveis = (ordens ?? []).filter((o: any) => {
     const ref = ordemComissaoDate(o);
