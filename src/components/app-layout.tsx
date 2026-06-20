@@ -19,7 +19,7 @@ type NavGroup = { label: string; items: NavItem[] };
 
 const groupsAll: NavGroup[] = [
   { label: "Visão", items: [
-    { to: "/dashboard", label: "Operacao do Dia", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
+    { to: "/dashboard", label: "Operação do Dia", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
     { to: "/oportunidades", label: "Oportunidades", icon: Sparkles, tour: "oportunidades", roles: OPERACIONAL },
     { to: "/assistente", label: "Assistente LavaFlow", icon: Bot, tour: "assistente", roles: GESTAO },
   ]},
@@ -73,10 +73,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between border-b bg-background/80 backdrop-blur px-4 h-14">
-        <Link to={colab ? "/meu-trabalho" : "/dashboard"} className="font-display text-lg font-bold tracking-tight">
+        <Link to={colab ? "/meu-trabalho" : "/dashboard"} className="inline-flex items-center gap-2 font-display text-lg font-bold leading-none tracking-tight">
           Lava<span className="text-primary">Flow</span>
         </Link>
-        <button onClick={() => setOpen(!open)} className="p-2 rounded-md hover:bg-accent" aria-label="Menu">
+        <button onClick={() => setOpen(!open)} className="grid h-10 w-10 place-content-center rounded-md hover:bg-accent" aria-label="Menu">
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
         </button>
       </header>

@@ -25,9 +25,9 @@ const STATUS_LABEL: Record<string, string> = {
   agendado: "Agendado",
   confirmado: "Confirmado",
   em_andamento: "Em atendimento",
-  concluido: "Concluido",
+  concluido: "Concluído",
   cancelado: "Cancelado",
-  nao_compareceu: "Nao compareceu",
+  nao_compareceu: "Não compareceu",
 };
 
 function Dashboard() {
@@ -44,7 +44,7 @@ function Dashboard() {
   if (isEmpty) {
     return (
       <>
-        <PageHeader title="Operacao do Dia" subtitle="Configure o LavaFlow para o painel comecar a orientar sua rotina." />
+        <PageHeader title="Operação do Dia" subtitle="Configure o LavaFlow para o painel começar a orientar sua rotina." />
         <SetupChecklist />
         <EmptyDashboard />
       </>
@@ -57,8 +57,8 @@ function Dashboard() {
   return (
     <>
       <PageHeader
-        title="Operacao do Dia"
-        subtitle="Agenda, fila, Leva e Traz e alertas para decidir o proximo passo."
+        title="Operação do Dia"
+        subtitle="Agenda, fila, Leva e Traz e alertas para decidir o próximo passo."
         actions={<Button asChild><Link to="/agendamentos">Abrir agenda <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>}
       />
 
@@ -69,7 +69,7 @@ function Dashboard() {
           <CardContent className="p-4 flex items-start gap-3">
             <AlertTriangle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
             <div className="min-w-0">
-              <p className="font-display font-semibold">Atencao operacional</p>
+              <p className="font-display font-semibold">Atenção operacional</p>
               <p className="text-sm text-muted-foreground">{urgentes[0]?.mensagem}</p>
             </div>
           </CardContent>
@@ -79,36 +79,36 @@ function Dashboard() {
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
         <Kpi icon={CalendarDays} label="Agendados hoje" value={String(cards.agendamentosHoje)} to="/agendamentos" />
         <Kpi icon={Car} label="Em atendimento" value={String(cards.veiculosEmAtendimento)} to="/fila" tone="warning" />
-        <Kpi icon={Wrench} label="Servicos pendentes" value={String(cards.servicosPendentes)} to="/ordens" />
-        <Kpi icon={DollarSign} label="Previsao do dia" value={brl(cards.previsaoFaturamentoDia)} tone="success" />
+        <Kpi icon={Wrench} label="Serviços pendentes" value={String(cards.servicosPendentes)} to="/ordens" />
+        <Kpi icon={DollarSign} label="Previsão do dia" value={brl(cards.previsaoFaturamentoDia)} tone="success" />
       </div>
 
       <div className="grid xl:grid-cols-[1.4fr_1fr] gap-4">
         <section className="space-y-4">
           <Card>
             <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="font-display font-semibold flex items-center gap-2"><Clock className="h-4 w-4 text-primary" />Agenda de hoje</h2>
-                <Button asChild variant="ghost" size="sm"><Link to="/agendamentos">Ver tudo</Link></Button>
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <h2 className="min-w-0 font-display font-semibold flex items-center gap-2"><Clock className="h-4 w-4 text-primary shrink-0" />Agenda de hoje</h2>
+                <Button asChild variant="ghost" size="sm" className="shrink-0 px-2 sm:px-3"><Link to="/agendamentos">Ver tudo</Link></Button>
               </div>
               {data.agendaHoje.length === 0 ? (
                 <p className="text-sm text-muted-foreground py-6 text-center">Nenhum agendamento para hoje.</p>
               ) : (
                 <div className="space-y-2">
                   {data.agendaHoje.slice(0, 8).map((a: any) => (
-                    <div key={a.id} className="flex items-center gap-3 rounded-md border p-3">
-                      <div className="w-14 shrink-0 text-center">
-                        <p className="font-display font-bold tabular-nums">{a.hora_agendada?.slice(0, 5)}</p>
+                    <div key={a.id} className="grid gap-2 rounded-md border p-3 sm:flex sm:items-center sm:gap-3">
+                      <div className="flex items-start justify-between gap-2 sm:block sm:w-14 sm:shrink-0 sm:text-center">
+                        <p className="font-display text-lg font-bold tabular-nums leading-none sm:text-base">{a.hora_agendada?.slice(0, 5)}</p>
+                        <Badge variant="secondary" className="shrink-0 sm:hidden">{STATUS_LABEL[a.status] ?? a.status}</Badge>
                       </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="font-medium truncate">{a.clientes?.nome ?? "Cliente"}</p>
-                        <p className="text-xs text-muted-foreground truncate">
-                          {a.servicos?.nome ?? "Servico"}{a.funcionarios?.nome ? ` · ${a.funcionarios.nome}` : ""}
-                        </p>
+                      <div className="min-w-0 flex-1 space-y-1">
+                        <p className="font-medium break-words">{a.clientes?.nome ?? "Cliente"}</p>
+                        <p className="text-xs text-muted-foreground break-words">{a.servicos?.nome ?? "Serviço"}</p>
+                        <p className="text-xs text-muted-foreground break-words">{a.funcionarios?.nome ?? "Sem colaborador definido"}</p>
                       </div>
-                      <div className="flex flex-col items-end gap-1">
-                        <Badge variant="secondary">{STATUS_LABEL[a.status] ?? a.status}</Badge>
-                        {a.leva_traz && <Badge className="bg-primary/10 text-primary"><MapPin className="h-3 w-3 mr-1" />Leva e Traz</Badge>}
+                      <div className="flex flex-wrap items-center gap-1 sm:flex-col sm:items-end">
+                        <Badge variant="secondary" className="hidden sm:inline-flex">{STATUS_LABEL[a.status] ?? a.status}</Badge>
+                        {a.leva_traz && <Badge className="max-w-full bg-primary/10 text-primary"><MapPin className="h-3 w-3 mr-1 shrink-0" />Leva e Traz</Badge>}
                       </div>
                     </div>
                   ))}
@@ -119,16 +119,16 @@ function Dashboard() {
 
           <Card>
             <CardContent className="p-4">
-              <h2 className="font-display font-semibold flex items-center gap-2 mb-3"><Play className="h-4 w-4 text-warning" />Veiculos em atendimento</h2>
+              <h2 className="font-display font-semibold flex items-center gap-2 mb-3"><Play className="h-4 w-4 text-warning" />Veículos em atendimento</h2>
               {data.veiculosEmAtendimento.length === 0 ? (
-                <p className="text-sm text-muted-foreground py-6 text-center">Nenhum veiculo em atendimento agora.</p>
+                <p className="text-sm text-muted-foreground py-6 text-center">Nenhum veículo em atendimento agora.</p>
               ) : (
                 <div className="divide-y">
                   {data.veiculosEmAtendimento.slice(0, 8).map((o: any) => (
                     <div key={o.id} className="py-3 flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <p className="font-medium truncate">{o.clientes?.nome ?? "Cliente"} · {o.veiculos?.placa ?? "Sem placa"}</p>
-                        <p className="text-xs text-muted-foreground truncate">{o.servicos?.nome ?? "Servico"}{o.funcionarios?.nome ? ` · ${o.funcionarios.nome}` : ""}</p>
+                        <p className="text-xs text-muted-foreground truncate">{o.servicos?.nome ?? "Serviço"}{o.funcionarios?.nome ? ` · ${o.funcionarios.nome}` : ""}</p>
                       </div>
                       <span className="font-display font-bold tabular-nums">{brl(Number(o.valor ?? 0))}</span>
                     </div>
@@ -167,7 +167,7 @@ function Dashboard() {
 
           <Card>
             <CardContent className="p-4">
-              <h2 className="font-display font-semibold flex items-center gap-2 mb-3"><UsersRound className="h-4 w-4 text-primary" />Distribuicao da equipe</h2>
+              <h2 className="font-display font-semibold flex items-center gap-2 mb-3"><UsersRound className="h-4 w-4 text-primary" />Distribuição da equipe</h2>
               {data.agendaHoje.length === 0 ? (
                 <p className="text-sm text-muted-foreground">Sem carga de trabalho prevista para hoje.</p>
               ) : (
@@ -184,10 +184,10 @@ function Dashboard() {
 function Kpi({ icon: Icon, label, value, tone, to }: { icon: any; label: string; value: string; tone?: "success" | "warning"; to?: string }) {
   const cls = tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : "";
   const content = (
-    <Card className={to ? "hover:border-primary/50 transition-colors" : ""}>
-      <CardContent className="p-4">
-        <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4" />{label}</div>
-        <p className={`font-display font-bold text-2xl mt-1 tabular-nums ${cls}`}>{value}</p>
+    <Card className={cn("h-full", to ? "hover:border-primary/50 transition-colors" : "")}>
+      <CardContent className="flex min-h-[104px] flex-col justify-between p-3 sm:p-4">
+        <div className="flex items-start gap-2 text-xs leading-tight text-muted-foreground"><Icon className="h-4 w-4 shrink-0" /><span className="min-w-0 break-words">{label}</span></div>
+        <p className={`font-display font-bold text-xl sm:text-2xl mt-2 tabular-nums break-words ${cls}`}>{value}</p>
       </CardContent>
     </Card>
   );
@@ -213,7 +213,7 @@ function EquipeResumo({ agendamentos }: { agendamentos: any[] }) {
       ))}
       {semResponsavel > 0 && (
         <div className="flex items-center justify-between rounded-md border border-warning/40 px-3 py-2 text-sm">
-          <span>Sem responsavel</span>
+          <span>Sem responsável</span>
           <Badge variant="outline">{semResponsavel}</Badge>
         </div>
       )}

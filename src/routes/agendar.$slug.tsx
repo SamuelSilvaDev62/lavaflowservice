@@ -16,7 +16,7 @@ export const Route = createFileRoute("/agendar/$slug")({
   component: Page,
   head: ({ params }) => ({
     meta: [
-      { title: `Agendar lavagem · ${params.slug}` },
+      { title: `Agendar lavagem - ${params.slug}` },
       { name: "description", content: "Reserve seu horário online em poucos cliques." },
       { property: "og:title", content: `Agendar lavagem` },
       { property: "og:description", content: "Reserve seu horário online em poucos cliques." },
@@ -60,7 +60,7 @@ function Page() {
     onError: (e: any) => toast.error(e?.message ?? "Não foi possível enviar"),
   });
 
-  if (isLoading) return <div className="min-h-screen grid place-content-center">Carregando…</div>;
+  if (isLoading) return <div className="min-h-screen grid place-content-center">Carregando.</div>;
   if (error || !data) return <div className="min-h-screen grid place-content-center px-6 text-center text-muted-foreground">Link inválido ou empresa não encontrada.</div>;
 
   const { empresa, servicos } = data;
@@ -82,51 +82,51 @@ function Page() {
   return (
     <div className="min-h-screen bg-background">
       <header className="border-b bg-card">
-        <div className="max-w-2xl mx-auto px-4 py-5">
+        <div className="mx-auto max-w-2xl px-3 py-5 sm:px-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-lg bg-gradient-to-br from-primary to-primary/60 grid place-content-center">
+            <div className="grid h-10 w-10 shrink-0 place-content-center rounded-lg bg-gradient-to-br from-primary to-primary/60">
               <Car className="h-5 w-5 text-primary-foreground" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold">{empresa.nome_fantasia}</h1>
-              <div className="text-xs text-muted-foreground flex flex-wrap gap-3 mt-0.5">
-                {empresa.telefone && <span className="flex items-center gap-1"><Phone className="h-3 w-3" />{empresa.telefone}</span>}
-                {empresa.endereco && <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{empresa.endereco}</span>}
+            <div className="min-w-0">
+              <h1 className="break-words text-xl font-bold leading-tight">{empresa.nome_fantasia}</h1>
+              <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                {empresa.telefone && <span className="inline-flex min-w-0 items-center gap-1 break-words"><Phone className="h-3 w-3 shrink-0" />{empresa.telefone}</span>}
+                {empresa.endereco && <span className="inline-flex min-w-0 items-center gap-1 break-words"><MapPin className="h-3 w-3 shrink-0" />{empresa.endereco}</span>}
               </div>
             </div>
           </div>
         </div>
       </header>
 
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        <Card><CardContent className="p-5 space-y-4">
+      <main className="mx-auto max-w-2xl px-3 py-5 sm:px-4 sm:py-6">
+        <Card><CardContent className="space-y-4 p-4 sm:p-5">
           <h2 className="text-lg font-semibold">Agende sua lavagem</h2>
           <form onSubmit={(e) => {
             e.preventDefault();
             if (!f.nome || !f.telefone) return toast.error("Preencha nome e telefone");
             if (!f.hora) return toast.error("Escolha um horário");
             mut.mutate();
-          }} className="space-y-3">
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div><Label>Seu nome *</Label><Input required value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} /></div>
-              <div><Label>WhatsApp *</Label><Input required value={f.telefone} onChange={(e) => setF({ ...f, telefone: e.target.value })} placeholder="(11) 99999-9999" /></div>
+          }} className="space-y-4">
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div className="space-y-2"><Label>Seu nome *</Label><Input required value={f.nome} onChange={(e) => setF({ ...f, nome: e.target.value })} /></div>
+              <div className="space-y-2"><Label>WhatsApp *</Label><Input required value={f.telefone} onChange={(e) => setF({ ...f, telefone: e.target.value })} placeholder="(11) 99999-9999" /></div>
             </div>
-            <div><Label>Veículo</Label><Input value={f.veiculo} onChange={(e) => setF({ ...f, veiculo: e.target.value })} placeholder="Ex: Civic prata ABC-1234" /></div>
-            <div><Label>Serviço</Label>
+            <div className="space-y-2"><Label>Veículo</Label><Input value={f.veiculo} onChange={(e) => setF({ ...f, veiculo: e.target.value })} placeholder="Ex: Civic prata ABC-1234" /></div>
+            <div className="space-y-2"><Label>Serviço</Label>
               <Select value={f.servico_id} onValueChange={(v) => setF({ ...f, servico_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Escolha um serviço" /></SelectTrigger>
                 <SelectContent>{servicos.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
               </Select>
             </div>
-            <div><Label>Data *</Label><Input type="date" required min={todayIso()} value={f.data} onChange={(e) => setF({ ...f, data: e.target.value, hora: "" })} /></div>
+            <div className="space-y-2"><Label>Data *</Label><Input type="date" required min={todayIso()} value={f.data} onChange={(e) => setF({ ...f, data: e.target.value, hora: "" })} /></div>
             <div>
               <Label>Horário *</Label>
-              <div className="grid grid-cols-4 sm:grid-cols-6 gap-2 mt-1">
+              <div className="mt-2 grid grid-cols-3 gap-2 min-[420px]:grid-cols-4 sm:grid-cols-6">
                 {(slotsData?.slots ?? []).length === 0 && <p className="text-xs text-muted-foreground col-span-full">Sem horários disponíveis nesta data.</p>}
                 {slotsData?.slots.map((s) => (
                   <button key={s.hora} type="button" disabled={!s.disponivel}
                     onClick={() => setF({ ...f, hora: s.hora })}
-                    className={`px-2 py-1.5 rounded-md text-sm border transition-colors ${
+                    className={`h-10 rounded-md border px-2 text-sm tabular-nums transition-colors ${
                       f.hora === s.hora ? "bg-primary text-primary-foreground border-primary"
                         : s.disponivel ? "hover:bg-accent" : "opacity-40 cursor-not-allowed line-through"
                     }`}>
@@ -135,8 +135,8 @@ function Page() {
                 ))}
               </div>
             </div>
-            <div><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
-            <Button type="submit" className="w-full" disabled={mut.isPending}>Enviar solicitação</Button>
+            <div className="space-y-2"><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
+            <Button type="submit" className="h-11 w-full" disabled={mut.isPending}>Enviar solicitação</Button>
           </form>
         </CardContent></Card>
       </main>

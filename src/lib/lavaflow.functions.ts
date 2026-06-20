@@ -1878,7 +1878,7 @@ export const createAgendamento = createServerFn({ method: "POST" })
     const colaboradores = await getFuncionariosDisponiveisInterno(supabase, ownerId, data.data_agendada, hora, data.servico_id);
     if (funcionario_id) {
       const escolhido = colaboradores.find((c: any) => c.id === funcionario_id);
-      if (!escolhido?.disponivel) throw new Error(escolhido?.motivo_indisponivel ?? "Colaborador indisponivel neste horario.");
+      if (!escolhido?.disponivel) throw new Error(escolhido?.motivo_indisponivel ?? "Colaborador indisponível neste horário.");
     } else {
       funcionario_id = colaboradores
         .filter((c: any) => c.disponivel)

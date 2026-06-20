@@ -108,7 +108,7 @@ function Page() {
         }
       />
 
-      {/* KPIs — grid no desktop, scroll horizontal no mobile */}
+      {/* KPIs - grid no desktop, scroll horizontal no mobile */}
       <div className="-mx-4 px-4 mb-4 flex gap-2 overflow-x-auto snap-x snap-mandatory sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 sm:gap-3 sm:overflow-visible">
         <KpiCard label="Hoje" value={st?.hoje ?? 0} />
         <KpiCard label="Confirmados" value={st?.confirmadosHoje ?? 0} tone="primary" />
@@ -226,8 +226,8 @@ function Page() {
               {ag!.agendamentos.map((a: any) => (
                 <div key={a.id} className="p-3 flex items-center justify-between gap-2">
                   <div className="min-w-0">
-                    <p className="font-medium truncate">{a.hora_agendada?.slice(0,5)} · {a.clientes?.nome}</p>
-                    <p className="text-xs text-muted-foreground truncate">{a.servicos?.nome ?? "—"} · {a.veiculos?.placa ?? "—"}</p>
+                    <p className="font-medium truncate">{a.hora_agendada?.slice(0,5)} - {a.clientes?.nome}</p>
+                    <p className="text-xs text-muted-foreground truncate">{a.servicos?.nome ?? "-"} - {a.veiculos?.placa ?? "-"}</p>
                   </div>
                   <Badge className={STATUS_COLOR[a.status as AgendamentoStatus]}>{STATUS_LABEL[a.status as AgendamentoStatus]}</Badge>
                 </div>
@@ -249,8 +249,8 @@ function Page() {
               <Plus className="h-6 w-6" />
             </Button>
           </DrawerTrigger>
-          <DrawerContent className="px-4 pb-6 max-h-[90vh]">
-            <DrawerHeader className="px-0"><DrawerTitle>Nova reserva</DrawerTitle></DrawerHeader>
+          <DrawerContent className="max-h-[92vh] overflow-hidden px-0 pb-0">
+            <DrawerHeader className="px-4 text-left"><DrawerTitle>Nova reserva</DrawerTitle></DrawerHeader>
             <NovoAgendamentoForm onClose={() => setOpen(false)} defaultDate={date} />
           </DrawerContent>
         </Drawer>
@@ -289,20 +289,20 @@ function AgendamentoCard({ a }: { a: any }) {
   });
   const start = useMutation({
     mutationFn: () => ini({ data: { id: a.id } }),
-    onSuccess: () => { invalidate(); toast.success("Atendimento iniciado — OS criada na fila"); setOpen(false); },
+    onSuccess: () => { invalidate(); toast.success("Atendimento iniciado - OS criada na fila"); setOpen(false); },
     onError: (e: any) => toast.error(e?.message ?? "Erro"),
   });
 
   const tel = a.clientes?.telefone;
-  const msgConfirm = `Olá ${a.clientes?.nome}!\n\nSeu horário foi reservado com sucesso.\n\n📅 Data: ${dateBr(a.data_agendada)}\n⏰ Horário: ${a.hora_agendada?.slice(0,5)}\n🚗 Serviço: ${a.servicos?.nome ?? "—"}\n\nAguardamos você.`;
-  const msgLembrete = `Olá ${a.clientes?.nome}!\n\nPassando para lembrar do seu agendamento ${dateBr(a.data_agendada)} às ${a.hora_agendada?.slice(0,5)}.\n\nEstamos te esperando 🚗✨`;
+  const msgConfirm = `Olá ${a.clientes?.nome}!\n\nSeu horário foi reservado com sucesso.\n\nData: ${dateBr(a.data_agendada)}\nHorário: ${a.hora_agendada?.slice(0,5)}\nServiço: ${a.servicos?.nome ?? "-"}\n\nAguardamos você.`;
+  const msgLembrete = `Olá ${a.clientes?.nome}!\n\nPassando para lembrar do seu agendamento ${dateBr(a.data_agendada)} às ${a.hora_agendada?.slice(0,5)}.\n\nEstamos te esperando.`;
   const ativo = a.status !== "concluido" && a.status !== "cancelado" && a.status !== "nao_compareceu";
 
   return (
     <Drawer open={open} onOpenChange={setOpen}>
       <DrawerTrigger asChild>
         <Card className="active:scale-[0.99] transition-transform cursor-pointer">
-          <CardContent className="p-3 flex items-stretch gap-3">
+          <CardContent className="flex items-stretch gap-3 p-3">
             <div className={cn(
               "flex flex-col items-center justify-center rounded-lg px-3 min-w-[60px]",
               a.status === "confirmado" ? "bg-primary/10" :
@@ -313,16 +313,21 @@ function AgendamentoCard({ a }: { a: any }) {
               <span className="text-lg font-bold tabular-nums leading-tight">{a.hora_agendada?.slice(0,5)}</span>
             </div>
             <div className="min-w-0 flex-1">
-              <p className="font-semibold truncate">{a.clientes?.nome}</p>
-              <p className="text-xs text-muted-foreground truncate">
-                {a.servicos?.nome ?? "Sem serviço"}{a.veiculos?.placa ? ` · ${a.veiculos.placa}` : ""}
+              <p className="break-words font-semibold">{a.clientes?.nome}</p>
+              <p className="break-words text-xs text-muted-foreground">
+                {a.servicos?.nome ?? "Sem serviço"}{a.veiculos?.placa ? ` - ${a.veiculos.placa}` : ""}
               </p>
               <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                 <Badge className={cn("text-[10px] py-0 h-4", STATUS_COLOR[a.status as AgendamentoStatus])}>
                   {STATUS_LABEL[a.status as AgendamentoStatus]}
                 </Badge>
                 {a.funcionarios?.nome && (
-                  <Badge variant="outline" className="text-[10px] py-0 h-4">👤 {a.funcionarios.nome}</Badge>
+                  <Badge variant="outline" className="h-auto max-w-full whitespace-normal py-0 text-[10px]">Colaborador: {a.funcionarios.nome}</Badge>
+                )}
+                {a.leva_traz && (
+                  <Badge className="h-auto max-w-full whitespace-normal bg-primary/10 py-0 text-[10px] text-primary">
+                    <MapPin className="mr-1 h-3 w-3 shrink-0" />Leva e Traz
+                  </Badge>
                 )}
               </div>
             </div>
@@ -331,17 +336,17 @@ function AgendamentoCard({ a }: { a: any }) {
         </Card>
       </DrawerTrigger>
 
-      <DrawerContent className="px-4 pb-6 max-h-[90vh]">
+      <DrawerContent className="max-h-[92vh] overflow-hidden px-4 pb-6">
         <DrawerHeader className="px-0 text-left">
-          <DrawerTitle>{a.hora_agendada?.slice(0,5)} · {a.clientes?.nome}</DrawerTitle>
+          <DrawerTitle>{a.hora_agendada?.slice(0,5)} - {a.clientes?.nome}</DrawerTitle>
           <Badge className={cn("w-fit mt-1", STATUS_COLOR[a.status as AgendamentoStatus])}>
             {STATUS_LABEL[a.status as AgendamentoStatus]}
           </Badge>
         </DrawerHeader>
 
         <div className="space-y-1 text-sm mb-4">
-          <Row label="Serviço" value={a.servicos?.nome ?? "—"} />
-          <Row label="Veículo" value={a.veiculos?.placa ?? "—"} />
+          <Row label="Serviço" value={a.servicos?.nome ?? "-"} />
+          <Row label="Veículo" value={a.veiculos?.placa ?? "-"} />
           <Row label="Data" value={dateBr(a.data_agendada)} />
           <Row label="Colaborador" value={a.funcionarios?.nome ?? "Sem definir"} />
           {a.observacoes && <Row label="Observações" value={a.observacoes} />}
@@ -409,11 +414,22 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function NovoAgendamentoDialog({ onClose, defaultDate }: { onClose: () => void; defaultDate: string }) {
   return (
-    <DialogContent>
-      <DialogHeader><DialogTitle>Nova reserva</DialogTitle></DialogHeader>
+    <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl overflow-hidden p-0">
+      <DialogHeader className="px-5 pt-5"><DialogTitle>Nova reserva</DialogTitle></DialogHeader>
       <NovoAgendamentoForm onClose={onClose} defaultDate={defaultDate} />
     </DialogContent>
   );
+}
+
+function colaboradorDisponibilidadeLabel(x: any) {
+  if (!x.disponivel) {
+    const motivo = String(x.motivo_indisponivel ?? "").toLowerCase();
+    if (motivo.includes("lotado") || Number(x.ocupacao ?? 0) >= Number(x.capacidade ?? 1)) return `${x.nome} - Lotado`;
+    return `${x.nome} - Indisponível neste horário`;
+  }
+
+  const vagas = Math.max(0, Number(x.capacidade ?? 1) - Number(x.ocupacao ?? 0));
+  return `${x.nome} - ${vagas} ${vagas === 1 ? "vaga disponível" : "vagas disponíveis"}`;
 }
 
 function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; defaultDate: string }) {
@@ -457,55 +473,69 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
     onError: (e: any) => toast.error(e?.message ?? "Erro"),
   });
 
+  const colaboradores = disponiveis?.colaboradores ?? [];
+  const semColaboradorDisponivel = colaboradores.length > 0 && colaboradores.every((x: any) => !x.disponivel);
+
   return (
-    <form onSubmit={(e) => { e.preventDefault(); if (!f.cliente_id) return toast.error("Selecione um cliente"); mut.mutate(); }} className="space-y-3 overflow-y-auto">
-      <div><Label>Cliente</Label>
+    <form onSubmit={(e) => { e.preventDefault(); if (!f.cliente_id) return toast.error("Selecione um cliente"); mut.mutate(); }} className="flex min-h-0 flex-1 flex-col">
+      <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4 pt-1 sm:px-5">
+      <div className="space-y-2"><Label>Cliente</Label>
         <Select value={f.cliente_id} onValueChange={(v) => setF({ ...f, cliente_id: v })}>
-          <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+          <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
           <SelectContent>{clientes?.clientes.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div><Label>Serviço</Label>
-        <Select value={f.servico_id} onValueChange={(v) => setF({ ...f, servico_id: v })}>
-          <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+      <div className="space-y-2"><Label>Serviço</Label>
+        <Select value={f.servico_id} onValueChange={(v) => setF({ ...f, servico_id: v, funcionario_id: "" })}>
+          <SelectTrigger><SelectValue placeholder="Selecione o serviço" /></SelectTrigger>
           <SelectContent>{servicos?.servicos.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div><Label>Colaborador responsável (opcional)</Label>
+      <div className="order-5 space-y-2"><Label>Colaborador responsável</Label>
         <Select value={f.funcionario_id || "__none__"} onValueChange={(v) => setF({ ...f, funcionario_id: v === "__none__" ? "" : v })}>
           <SelectTrigger><SelectValue placeholder="Sem definir" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">Sem definir</SelectItem>
-            {disponiveis?.colaboradores.map((x: any) => (
+            {colaboradores.map((x: any) => (
               <SelectItem key={x.id} value={x.id} disabled={!x.disponivel}>
-                {x.nome} {x.disponivel ? `(${x.ocupacao}/${x.capacidade})` : `- ${x.motivo_indisponivel}`}
+                {colaboradorDisponibilidadeLabel(x)}
               </SelectItem>
             ))}
           </SelectContent>
         </Select>
+        {semColaboradorDisponivel && (
+          <p className="text-xs text-muted-foreground">
+            Nenhum colaborador disponível para este horário. Escolha outro horário ou altere a data.
+          </p>
+        )}
       </div>
-      <div className="grid grid-cols-2 gap-3">
-        <div><Label>Data</Label><Input type="date" required value={f.data_agendada} onChange={(e) => setF({ ...f, data_agendada: e.target.value })} /></div>
-        <div><Label>Horário</Label><Input type="time" required value={f.hora_agendada} onChange={(e) => setF({ ...f, hora_agendada: e.target.value })} /></div>
+      <div className="order-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-2"><Label>Data</Label><Input type="date" required value={f.data_agendada} onChange={(e) => setF({ ...f, data_agendada: e.target.value, funcionario_id: "" })} /></div>
+        <div className="space-y-2"><Label>Horário</Label><Input type="time" required value={f.hora_agendada} onChange={(e) => setF({ ...f, hora_agendada: e.target.value, funcionario_id: "" })} /></div>
       </div>
-      <div><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
-      <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+      <div className="order-6 space-y-2"><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
+      <label className="order-7 flex items-center gap-2 rounded-md border p-3 text-sm">
         <input type="checkbox" checked={f.leva_traz} onChange={(e) => setF({ ...f, leva_traz: e.target.checked })} />
         <span>Adicionar Leva e Traz</span>
       </label>
       {f.leva_traz && (
-        <div className="rounded-md border p-3 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <div><Label>Retirada</Label><Input type="time" value={f.horario_retirada} onChange={(e) => setF({ ...f, horario_retirada: e.target.value })} /></div>
-            <div><Label>Devolucao</Label><Input type="time" value={f.horario_devolucao} onChange={(e) => setF({ ...f, horario_devolucao: e.target.value })} /></div>
+        <div className="order-8 space-y-3 rounded-md border p-3">
+          <p className="font-display text-sm font-semibold">Leva e Traz</p>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="space-y-2"><Label>Horário de retirada</Label><Input type="time" placeholder="Selecione o horário de retirada" value={f.horario_retirada} onChange={(e) => setF({ ...f, horario_retirada: e.target.value })} /></div>
+            <div className="space-y-2"><Label>Horário de devolução</Label><Input type="time" placeholder="Selecione o horário de devolução" value={f.horario_devolucao} onChange={(e) => setF({ ...f, horario_devolucao: e.target.value })} /></div>
           </div>
-          <div><Label>Endereco de retirada</Label><Input value={f.endereco_retirada} onChange={(e) => setF({ ...f, endereco_retirada: e.target.value })} /></div>
-          <div><Label>Endereco de devolucao</Label><Input value={f.endereco_devolucao} onChange={(e) => setF({ ...f, endereco_devolucao: e.target.value })} /></div>
-          <div><Label>Taxa de Leva e Traz</Label><Input type="number" min="0" step="0.01" value={f.taxa_leva_traz} onChange={(e) => setF({ ...f, taxa_leva_traz: Number(e.target.value) || 0 })} /></div>
-          <div><Label>Observacoes do transporte</Label><Textarea rows={2} value={f.observacoes_leva_traz} onChange={(e) => setF({ ...f, observacoes_leva_traz: e.target.value })} /></div>
+          <div className="space-y-2"><Label>Endereço de retirada</Label><Input placeholder="Digite o endereço onde o veículo será buscado" value={f.endereco_retirada} onChange={(e) => setF({ ...f, endereco_retirada: e.target.value })} /></div>
+          <div className="space-y-2"><Label>Endereço de devolução</Label><Input placeholder="Digite o endereço onde o veículo será entregue" value={f.endereco_devolucao} onChange={(e) => setF({ ...f, endereco_devolucao: e.target.value })} /></div>
+          <div className="space-y-2"><Label>Taxa de Leva e Traz</Label><Input type="number" min="0" step="0.01" value={f.taxa_leva_traz} onChange={(e) => setF({ ...f, taxa_leva_traz: Number(e.target.value) || 0 })} /></div>
+          <div className="space-y-2"><Label>Observações do transporte</Label><Textarea rows={2} value={f.observacoes_leva_traz} onChange={(e) => setF({ ...f, observacoes_leva_traz: e.target.value })} /></div>
         </div>
       )}
-      <Button type="submit" className="w-full h-12" disabled={mut.isPending}>Salvar agendamento</Button>
+      </div>
+      <div className="sticky bottom-0 flex gap-2 border-t bg-background p-4 sm:px-5">
+        <Button type="button" variant="outline" className="h-11 flex-1" onClick={onClose}>Cancelar</Button>
+        <Button type="submit" className="h-11 flex-1" disabled={mut.isPending}>Salvar reserva</Button>
+      </div>
     </form>
   );
 }
@@ -524,9 +554,9 @@ function DistribuicaoEquipe({ agendamentos }: { agendamentos: any[] }) {
     <div className="mb-3 flex flex-wrap gap-1.5">
       <span className="text-xs text-muted-foreground self-center mr-1">Distribuição:</span>
       {Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([nome, qtd]) => (
-        <Badge key={nome} variant="secondary" className="font-normal">👤 {nome} · {qtd}</Badge>
+        <Badge key={nome} variant="secondary" className="font-normal">?? {nome} - {qtd}</Badge>
       ))}
-      {semDef > 0 && <Badge variant="outline">Sem definir · {semDef}</Badge>}
+      {semDef > 0 && <Badge variant="outline">Sem definir - {semDef}</Badge>}
     </div>
   );
 }
