@@ -158,29 +158,186 @@ function ServicosTab() {
   const up = useServerFn(upsertServico);
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["servicos"], queryFn: () => fn() });
-  const [novo, setNovo] = useState({ nome: "", preco_padrao: 0 });
+  const emptyServico = {
+    id: undefined as string | undefined,
+    nome: "",
+    categoria: "",
+    preco_padrao: 0,
+    tempo_estimado_min: 30,
+    pontos_gerados: 0,
+    comissao_tipo: "" as "" | "fixo" | "percentual",
+    comissao_valor: 0,
+    descricao: "",
+    foto_url: "",
+    disponivel_online: true,
+    ativo: true,
+  };
+  const [form, setForm] = useState(emptyServico);
   const mut = useMutation({
-    mutationFn: (v: any) => up({ data: v }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["servicos"] }); setNovo({ nome: "", preco_padrao: 0 }); toast.success("Salvo"); },
+    mutationFn: (v: typeof emptyServico) => up({
+      data: {
+        ...v,
+        categoria: v.categoria || null,
+        descricao: v.descricao || null,
+        foto_url: v.foto_url || null,
+        comissao_tipo: v.comissao_tipo || null,
+        preco_padrao: Number(v.preco_padrao),
+        tempo_estimado_min: Number(v.tempo_estimado_min) || 30,
+        pontos_gerados: Number(v.pontos_gerados) || 0,
+        comissao_valor: Number(v.comissao_valor) || 0,
+      },
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["servicos"] });
+      setForm(emptyServico);
+      toast.success("Serviço salvo");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar serviço"),
   });
+
+  function editServico(s: any) {
+    setForm({
+      id: s.id,
+      nome: s.nome ?? "",
+      categoria: s.categoria ?? "",
+      preco_padrao: Number(s.preco_padrao ?? 0),
+      tempo_estimado_min: Number(s.tempo_estimado_min ?? 30),
+      pontos_gerados: Number(s.pontos_gerados ?? 0),
+      comissao_tipo: s.comissao_tipo ?? "",
+      comissao_valor: Number(s.comissao_valor ?? 0),
+      descricao: s.descricao ?? "",
+      foto_url: s.foto_url ?? "",
+      disponivel_online: s.disponivel_online ?? true,
+      ativo: s.ativo ?? true,
+    });
+  }
+
+  function duplicateServico(s: any) {
+    editServico({ ...s, id: undefined, nome: `${s.nome} (cópia)` });
+  }
+
   return (
-    <Card><CardContent className="p-5 space-y-3">
-      <div className="space-y-2">
-        {data?.servicos.map((s: any) => (
-          <div key={s.id} className="flex items-center justify-between p-3 bg-muted rounded-md">
-            <span className="font-medium">{s.nome}</span><span>{brl(s.preco_padrao)}</span>
+    <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
+      <Card><CardContent className="p-5 space-y-4">
+        <div>
+          <h3 className="font-display font-semibold">Catálogo de serviços</h3>
+          <p className="text-xs text-muted-foreground">Configure duração, pontuação, comissão e disponibilidade online.</p>
+        </div>
+        <div className="space-y-2">
+          {data?.servicos.map((s: any) => (
+            <div key={s.id} className="rounded-md border p-3 space-y-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium break-words">{s.nome}</span>
+                    {s.categoria && <Badge variant="outline">{s.categoria}</Badge>}
+                    {!s.ativo && <Badge variant="secondary">Arquivado</Badge>}
+                    {s.disponivel_online === false && <Badge variant="secondary">Offline</Badge>}
+                  </div>
+                  <p className="text-sm text-muted-foreground">
+                    {brl(s.preco_padrao)} · {s.tempo_estimado_min ?? 30} min · {s.pontos_gerados ?? 0} pts
+                  </p>
+                  {s.descricao && <p className="text-xs text-muted-foreground max-h-10 overflow-hidden">{s.descricao}</p>}
+                </div>
+                <div className="flex shrink-0 gap-2">
+                  <Button type="button" size="sm" variant="outline" onClick={() => editServico(s)}>Editar</Button>
+                  <Button type="button" size="sm" variant="ghost" onClick={() => duplicateServico(s)}>Duplicar</Button>
+                </div>
+              </div>
+            </div>
+          ))}
+          {(data?.servicos ?? []).length === 0 && (
+            <div className="rounded-md border border-dashed p-6 text-center text-sm text-muted-foreground">
+              Nenhum serviço cadastrado ainda.
+            </div>
+          )}
+        </div>
+      </CardContent></Card>
+
+      <Card><CardContent className="p-5">
+        <form onSubmit={(e) => { e.preventDefault(); mut.mutate(form); }} className="space-y-4">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <h3 className="font-display font-semibold">{form.id ? "Editar serviço" : "Novo serviço"}</h3>
+              <p className="text-xs text-muted-foreground">Dados usados na agenda, fidelidade e reserva pública.</p>
+            </div>
+            {form.id && <Button type="button" variant="ghost" size="sm" onClick={() => setForm(emptyServico)}>Limpar</Button>}
           </div>
-        ))}
-      </div>
-      <form onSubmit={(e) => { e.preventDefault(); mut.mutate({ ...novo, ativo: true }); }} className="grid grid-cols-[1fr_auto_auto] gap-2 items-end">
-        <div><Label>Novo serviço</Label><Input required value={novo.nome} onChange={(e) => setNovo({ ...novo, nome: e.target.value })} /></div>
-        <div><Label>Preço</Label><Input type="number" step="0.01" inputMode="decimal" placeholder="0,00" required value={novo.preco_padrao === 0 ? "" : novo.preco_padrao} onChange={(e) => setNovo({ ...novo, preco_padrao: e.target.value === "" ? 0 : Number(e.target.value) })} className="w-24" /></div>
-        <Button type="submit">Adicionar</Button>
-      </form>
-    </CardContent></Card>
+
+          <div className="space-y-2">
+            <Label>Nome do serviço</Label>
+            <Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Categoria</Label>
+              <Input placeholder="Ex.: Lavagem, estética" value={form.categoria} onChange={(e) => setForm({ ...form, categoria: e.target.value })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Preço padrão</Label>
+              <Input type="number" step="0.01" inputMode="decimal" placeholder="0,00" required value={form.preco_padrao === 0 ? "" : form.preco_padrao} onChange={(e) => setForm({ ...form, preco_padrao: e.target.value === "" ? 0 : Number(e.target.value) })} />
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Tempo estimado (min)</Label>
+              <Input type="number" min={1} required value={form.tempo_estimado_min} onChange={(e) => setForm({ ...form, tempo_estimado_min: Number(e.target.value) })} />
+            </div>
+            <div className="space-y-2">
+              <Label>Pontos gerados</Label>
+              <Input type="number" min={0} value={form.pontos_gerados} onChange={(e) => setForm({ ...form, pontos_gerados: Number(e.target.value) })} />
+            </div>
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div className="space-y-2">
+              <Label>Tipo de comissão</Label>
+              <Select value={form.comissao_tipo || "__none__"} onValueChange={(v) => setForm({ ...form, comissao_tipo: v === "__none__" ? "" : v as "fixo" | "percentual" })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="__none__">Sem comissão</SelectItem>
+                  <SelectItem value="fixo">Valor fixo</SelectItem>
+                  <SelectItem value="percentual">Percentual</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Valor da comissão</Label>
+              <Input type="number" min={0} step="0.01" disabled={!form.comissao_tipo} value={form.comissao_valor === 0 ? "" : form.comissao_valor} onChange={(e) => setForm({ ...form, comissao_valor: e.target.value === "" ? 0 : Number(e.target.value) })} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Descrição</Label>
+            <Textarea rows={3} placeholder="Detalhe o que está incluso no serviço" value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Foto ou imagem</Label>
+            <Input placeholder="https://..." value={form.foto_url} onChange={(e) => setForm({ ...form, foto_url: e.target.value })} />
+          </div>
+
+          <div className="grid sm:grid-cols-2 gap-3">
+            <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+              <input type="checkbox" checked={form.disponivel_online} onChange={(e) => setForm({ ...form, disponivel_online: e.target.checked })} />
+              Disponível online
+            </label>
+            <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+              <input type="checkbox" checked={form.ativo} onChange={(e) => setForm({ ...form, ativo: e.target.checked })} />
+              Serviço ativo
+            </label>
+          </div>
+
+          <Button type="submit" className="w-full" disabled={mut.isPending}>
+            {form.id ? "Salvar alterações" : "Adicionar serviço"}
+          </Button>
+        </form>
+      </CardContent></Card>
+    </div>
   );
 }
-
 function MsgTab() {
   const [tpls, setTpls] = useState(() => allTemplates());
   function save(key: WhatsAppTemplateKey, value: string) {

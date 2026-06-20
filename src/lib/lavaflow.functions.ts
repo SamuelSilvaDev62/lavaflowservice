@@ -1113,6 +1113,14 @@ export const upsertServico = createServerFn({ method: "POST" })
     id: z.string().uuid().optional(),
     nome: z.string().min(1).max(80),
     preco_padrao: z.number().min(0),
+    categoria: z.string().max(80).optional().nullable(),
+    descricao: z.string().max(1000).optional().nullable(),
+    tempo_estimado_min: z.number().int().min(1).max(1440).default(30),
+    pontos_gerados: z.number().int().min(0).max(100000).default(0),
+    comissao_tipo: z.enum(["fixo", "percentual"]).optional().nullable(),
+    comissao_valor: z.number().min(0).max(100000).default(0),
+    disponivel_online: z.boolean().default(true),
+    foto_url: z.string().max(500).optional().nullable(),
     ativo: z.boolean().default(true),
   }).parse(d))
   .handler(async ({ data, context }) => {

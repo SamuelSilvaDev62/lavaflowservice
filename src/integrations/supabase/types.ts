@@ -883,24 +883,48 @@ export type Database = {
       servicos: {
         Row: {
           ativo: boolean
+          categoria: string | null
+          comissao_tipo: string | null
+          comissao_valor: number
+          descricao: string | null
+          disponivel_online: boolean
+          foto_url: string | null
           id: string
           nome: string
           owner_id: string
+          pontos_gerados: number
           preco_padrao: number
+          tempo_estimado_min: number
         }
         Insert: {
           ativo?: boolean
+          categoria?: string | null
+          comissao_tipo?: string | null
+          comissao_valor?: number
+          descricao?: string | null
+          disponivel_online?: boolean
+          foto_url?: string | null
           id?: string
           nome: string
           owner_id: string
+          pontos_gerados?: number
           preco_padrao?: number
+          tempo_estimado_min?: number
         }
         Update: {
           ativo?: boolean
+          categoria?: string | null
+          comissao_tipo?: string | null
+          comissao_valor?: number
+          descricao?: string | null
+          disponivel_online?: boolean
+          foto_url?: string | null
           id?: string
           nome?: string
           owner_id?: string
+          pontos_gerados?: number
           preco_padrao?: number
+          tempo_estimado_min?: number
         }
         Relationships: []
       }
