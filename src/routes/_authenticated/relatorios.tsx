@@ -84,11 +84,11 @@ function Page() {
                   <Mini icon={Car} label="Servicos" value={String(data.levaTraz.quantidade)} />
                   <Mini icon={DollarSign} label="Receita" value={brl(data.levaTraz.receita)} />
                 </div>
-                {data.levaTraz.topClientes.length === 0 ? (
+                {data.levaTraz.clientes.length === 0 ? (
                   <p className="text-sm text-muted-foreground">Ainda nao ha volume relevante de Leva e Traz nos ultimos 90 dias.</p>
                 ) : (
                   <div className="space-y-2">
-                    {data.levaTraz.topClientes.slice(0, 5).map((c: any) => (
+                    {data.levaTraz.clientes.slice(0, 5).map((c: any) => (
                       <div key={c.nome} className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
                         <span className="truncate">{c.nome}</span>
                         <span className="font-medium">{c.qtd} · {brl(c.valor)}</span>

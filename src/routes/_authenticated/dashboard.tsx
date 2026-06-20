@@ -70,7 +70,7 @@ function Dashboard() {
             <AlertTriangle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
             <div className="min-w-0">
               <p className="font-display font-semibold">Atencao operacional</p>
-              <p className="text-sm text-muted-foreground">{urgentes[0].mensagem}</p>
+              <p className="text-sm text-muted-foreground">{urgentes[0]?.mensagem}</p>
             </div>
           </CardContent>
         </Card>

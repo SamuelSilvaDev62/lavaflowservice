@@ -22,6 +22,7 @@ export type Database = {
           hora_inicio: string
           intervalo_min: number
           owner_id: string
+          permitir_escolha_profissional: boolean
           updated_at: string
         }
         Insert: {
@@ -31,6 +32,7 @@ export type Database = {
           hora_inicio?: string
           intervalo_min?: number
           owner_id: string
+          permitir_escolha_profissional?: boolean
           updated_at?: string
         }
         Update: {
@@ -40,6 +42,7 @@ export type Database = {
           hora_inicio?: string
           intervalo_min?: number
           owner_id?: string
+          permitir_escolha_profissional?: boolean
           updated_at?: string
         }
         Relationships: []
@@ -52,15 +55,23 @@ export type Database = {
           confirmado_em: string | null
           created_at: string
           data_agendada: string
+          endereco_devolucao: string | null
+          endereco_retirada: string | null
           funcionario_id: string | null
           hora_agendada: string
+          horario_devolucao: string | null
+          horario_retirada: string | null
           id: string
+          leva_traz: boolean
+          leva_traz_status: string
           observacoes: string | null
+          observacoes_leva_traz: string | null
           ordem_id: string | null
           origem: string
           owner_id: string
           servico_id: string | null
           status: Database["public"]["Enums"]["agendamento_status"]
+          taxa_leva_traz: number
           veiculo_id: string | null
         }
         Insert: {
@@ -70,15 +81,23 @@ export type Database = {
           confirmado_em?: string | null
           created_at?: string
           data_agendada: string
+          endereco_devolucao?: string | null
+          endereco_retirada?: string | null
           funcionario_id?: string | null
           hora_agendada: string
+          horario_devolucao?: string | null
+          horario_retirada?: string | null
           id?: string
+          leva_traz?: boolean
+          leva_traz_status?: string
           observacoes?: string | null
+          observacoes_leva_traz?: string | null
           ordem_id?: string | null
           origem?: string
           owner_id: string
           servico_id?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
+          taxa_leva_traz?: number
           veiculo_id?: string | null
         }
         Update: {
@@ -88,15 +107,23 @@ export type Database = {
           confirmado_em?: string | null
           created_at?: string
           data_agendada?: string
+          endereco_devolucao?: string | null
+          endereco_retirada?: string | null
           funcionario_id?: string | null
           hora_agendada?: string
+          horario_devolucao?: string | null
+          horario_retirada?: string | null
           id?: string
+          leva_traz?: boolean
+          leva_traz_status?: string
           observacoes?: string | null
+          observacoes_leva_traz?: string | null
           ordem_id?: string | null
           origem?: string
           owner_id?: string
           servico_id?: string | null
           status?: Database["public"]["Enums"]["agendamento_status"]
+          taxa_leva_traz?: number
           veiculo_id?: string | null
         }
         Relationships: [
@@ -485,41 +512,59 @@ export type Database = {
         Row: {
           ativo: boolean
           auth_user_id: string | null
+          capacidade_por_horario: number
           cargo: string | null
           comissao_modo: string
           comissao_tipo: string
           comissao_valor: number
+          dias_disponiveis: number[]
           email: string | null
+          especialidades: string[]
+          horario_fim: string
+          horario_inicio: string
           id: string
           nome: string
           owner_id: string
           telefone: string | null
+          tempo_medio_servicos: Json
         }
         Insert: {
           ativo?: boolean
           auth_user_id?: string | null
+          capacidade_por_horario?: number
           cargo?: string | null
           comissao_modo?: string
           comissao_tipo?: string
           comissao_valor?: number
+          dias_disponiveis?: number[]
           email?: string | null
+          especialidades?: string[]
+          horario_fim?: string
+          horario_inicio?: string
           id?: string
           nome: string
           owner_id: string
           telefone?: string | null
+          tempo_medio_servicos?: Json
         }
         Update: {
           ativo?: boolean
           auth_user_id?: string | null
+          capacidade_por_horario?: number
           cargo?: string | null
           comissao_modo?: string
           comissao_tipo?: string
           comissao_valor?: number
+          dias_disponiveis?: number[]
           email?: string | null
+          especialidades?: string[]
+          horario_fim?: string
+          horario_inicio?: string
           id?: string
           nome?: string
           owner_id?: string
           telefone?: string | null
+          tempo_medio_servicos?: Json
         }
         Relationships: []
       }
@@ -557,6 +602,51 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notificacoes: {
+        Row: {
+          created_at: string
+          id: string
+          ignorada: boolean
+          lida: boolean
+          mensagem: string
+          owner_id: string
+          prioridade: string
+          referencia_id: string | null
+          referencia_tipo: string | null
+          rota: string | null
+          tipo: string
+          titulo: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          ignorada?: boolean
+          lida?: boolean
+          mensagem: string
+          owner_id: string
+          prioridade?: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          rota?: string | null
+          tipo: string
+          titulo: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          ignorada?: boolean
+          lida?: boolean
+          mensagem?: string
+          owner_id?: string
+          prioridade?: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          rota?: string | null
+          tipo?: string
+          titulo?: string
+        }
+        Relationships: []
       }
       ordens_servico: {
         Row: {

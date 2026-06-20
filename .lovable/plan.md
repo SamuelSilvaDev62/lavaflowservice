@@ -1,133 +1,58 @@
+## Diagnóstico
 
-# RBAC completo — Onda 2 ✅ APLICADA
+A última rodada criou a migration `20260619142000_operational_dashboard_leva_traz_capacity.sql` (Leva e Traz, capacidade dos colaboradores, escolha de profissional, tabela `notificacoes`) **mas a migration ainda não foi aplicada no banco**. Por isso `src/integrations/supabase/types.ts` não conhece os novos campos/tabelas, e o código que já os usa (`src/lib/lavaflow.functions.ts`) está com cascata de erros TypeScript.
 
-Migrations executadas, helpers/policies criadas, server fns e UI atualizadas. Ver `.lovable/rbac-tests.md`.
+Erros confirmados via `tsc --noEmit` (todos no mesmo arquivo):
+- Tabela `notificacoes` desconhecida (linhas 273, 363) → quebra `listarNotificacoes`/`marcarNotificacaoLida`/`ignorarNotificacao`.
+- Coluna `leva_traz`/`taxa_leva_traz`/`leva_traz_status` desconhecidas em `agendamentos` (l.1808, 1838+) → cascateia em ~25 erros de propriedades inexistentes no select da tela de Agendamentos / Leva e Traz.
+- Coluna `permitir_escolha_profissional` desconhecida em `agenda_config` (l.2016) → quebra salvar configurações.
+- Novos campos de `funcionarios` (`especialidades`, `horario_inicio/fim`, `dias_disponiveis`, `capacidade_por_horario`, `tempo_medio_servicos`) desconhecidos → quebra editar Equipe.
+- Erro menor: `Map<unknown,unknown>` vs `Map<string,any>` em util de disponibilidade (l.1320) — tipagem do `new Map()` precisa anotação.
 
----
+Além disso:
+- `.env` **não está no `.gitignore`** (atualmente lista só `.dev.vars`). Há um `.env` no projeto com chaves publishable (não é segredo, mas deve ser ignorado por convenção, com `.env.example` documentando).
+- Não foi observada quebra de runtime adicional além das que decorrem desses erros de schema; build estabiliza assim que a migration aplica e os tipos regeneram.
 
+## Causa raiz única
 
+**A migration de 19/06 está pendente.** Aplicá-la regenera `types.ts` e elimina ~95% dos erros sem alterar nenhuma tela. O restante são 2 ajustes de tipagem locais.
 
-Implementa a Onda 2 do plano de segurança: expande o enum `app_role`, cria helpers de autorização no banco e no front, aplica RLS por papel e adiciona guards de UI em cada tela.
+## Plano de correção (estabilização, sem novas features)
 
-## 1. Banco — enum, helpers e RLS por papel
+### Passo 1 — Aplicar a migration pendente
+Re-submeter o conteúdo de `20260619142000_operational_dashboard_leva_traz_capacity.sql` via `supabase--migration` (mesmo SQL idempotente, usa `IF NOT EXISTS` em tudo — seguro, não apaga dados). Após aprovação, `types.ts` é regenerado automaticamente e os ~30 erros de "coluna/tabela não existe" desaparecem.
 
-**Migration única**, em ordem segura (ADD VALUE precisa de commit antes de uso, então a migração é dividida em dois passos: 1) `ALTER TYPE` + 2) bloco com helpers e policies em transação separada — feito num único arquivo SQL com `COMMIT;` entre eles).
+### Passo 2 — Corrigir 2 tipagens residuais em `src/lib/lavaflow.functions.ts`
+- L.1320: tipar `new Map<string, any>()` explicitamente onde está sendo inferido como `Map<unknown,unknown>`.
+- Revisar e fazer rebuild do `tsc --noEmit` após o passo 1 para garantir lista zerada (qualquer outro detalhe é ajuste pontual de cast).
 
-### 1.1 Expansão do enum
-```sql
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'admin';
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'gerente';
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'atendente';
-ALTER TYPE public.app_role ADD VALUE IF NOT EXISTS 'lavador';
-```
-Mantém `owner` e `colaborador` por compatibilidade. `colaborador` legado é tratado como `lavador` pelas helpers.
+### Passo 3 — Higienizar `.env`
+- Adicionar ao `.gitignore`:
+  ```
+  .env
+  .env.*
+  !.env.example
+  ```
+- Criar `.env.example` com as chaves (`VITE_SUPABASE_URL=`, `VITE_SUPABASE_PUBLISHABLE_KEY=`, `VITE_SUPABASE_PROJECT_ID=`, e suas contrapartes server) **sem valores reais**.
+- Não remover o `.env` atual do disco (o preview precisa dele para rodar).
 
-### 1.2 Helpers SECURITY DEFINER
-```sql
--- Qualquer um dos papéis informados
-CREATE FUNCTION public.has_any_role(_user uuid, _roles app_role[]) RETURNS boolean ...
+### Passo 4 — Verificação de estabilidade (sem refactor)
+Validar, **sem alterar UI**, que as telas críticas montam:
+- `/dashboard`, `/agendamentos`, `/equipe`, `/configuracoes`, `/relatorios`, `/agendar/:slug`.
+- Rodar `tsc --noEmit` final → deve ficar limpo.
+- Conferir console do preview por erros de runtime nas telas listadas.
 
--- Papel efetivo do usuário no tenant atual (maior privilégio)
-CREATE FUNCTION public.current_user_role() RETURNS app_role ...
--- ordem: owner > admin > gerente > atendente > lavador/colaborador
+### O que NÃO vou tocar nesta rodada
+- Nenhuma refatoração de Dashboard, Relatórios, Agendamentos, Equipe, Configurações, página pública ou Assistente.
+- Nenhum ajuste de UX, layout, responsividade ou lógica de disponibilidade — toda essa lógica **já está implementada** no código atual; ela só não compila porque a migration está pendente. Depois de aplicada, validamos comportamento real e abrimos uma 2ª rodada de ajustes pontuais somente para o que efetivamente quebrar em runtime.
+- Nenhuma alteração de RLS/segurança (a rodada anterior já endureceu isolamento por tenant).
 
--- Pertence ao tenant?
-CREATE FUNCTION public.in_current_tenant() RETURNS boolean ...
-```
-EXECUTE só para `authenticated`.
+## Entregáveis ao final
+- Migration aplicada (idempotente, sem perda de dados).
+- `types.ts` regenerado.
+- 1–2 ajustes de tipagem em `lavaflow.functions.ts`.
+- `.gitignore` + `.env.example`.
+- Relatório final: arquivos alterados, erros corrigidos, pontos que pedem validação manual no preview (criar agendamento com Leva e Traz, editar colaborador, ativar "escolha de profissional", abrir relatórios e página pública).
 
-### 1.3 RLS refinada por papel
-Matriz aplicada nas policies:
-
-| Tabela | SELECT | INSERT/UPDATE/DELETE |
-|---|---|---|
-| `empresa`, `agenda_config`, `fidelidade_config`, `planos_assinatura`, `recompensas` | owner+admin+gerente+atendente | owner+admin |
-| `servicos`, `comissoes_servico` | todos do tenant | owner+admin |
-| `funcionarios`, `user_roles` | owner+admin (read), gerente vê funcionarios | owner+admin |
-| `clientes`, `veiculos` | owner+admin+gerente+atendente | owner+admin+gerente+atendente |
-| `agendamentos` | mesmos + lavador (só os seus) | owner+admin+gerente+atendente |
-| `ordens_servico` | mesmos + lavador (só `funcionario_id = me`) | owner+admin+gerente+atendente; lavador só UPDATE de status nas suas OS |
-| `comissoes`, `pagamentos_comissao` | owner+admin; lavador vê só as suas | owner+admin |
-| `assinaturas_clientes` | owner+admin+gerente+atendente | owner+admin+gerente |
-| `interacoes_clientes`, `avaliacoes`, `pontos_movimentos` | owner+admin+gerente+atendente | owner+admin+gerente+atendente |
-
-Todas as policies viram `TO authenticated` com `USING` e `WITH CHECK` simétricos baseados em `current_owner_id() = owner_id AND has_any_role(...)`.
-
-### 1.4 `vincular_colaborador` aceita papel
-```sql
-CREATE OR REPLACE FUNCTION public.vincular_colaborador(
-  _funcionario_id uuid, _email text, _role app_role DEFAULT 'lavador'
-) ...
-```
-Só `owner` ou `admin` podem chamar. Valida que `_role` ∈ {admin, gerente, atendente, lavador}.
-
-## 2. Server functions — autorização no backend
-
-Cada server fn em `src/lib/lavaflow.functions.ts` recebe um guard explícito antes do query. Padrão:
-
-```ts
-async function requireRoles(ctx, roles: AppRole[]) {
-  const { data } = await ctx.supabase.rpc('current_user_role')
-  if (!roles.includes(data)) throw new Error('Forbidden')
-  return data
-}
-```
-
-Mapeamento por endpoint (todas já têm `requireSupabaseAuth`):
-- Dashboard/relatórios financeiros, equipe, comissões, pagamentos, configurações, fidelidade, planos: **owner+admin**
-- Equipe (somente leitura), faturamento agregado: **+ gerente**
-- Clientes, veículos, agendamentos, OS (CRUD operacional): **owner+admin+gerente+atendente**
-- `getMeuTrabalho`, `iniciarOs`, `finalizarOs`: **+ lavador** (já filtra por `funcionario_id`)
-- `vincular_colaborador`, `updateFuncionario`, `marcarPagamento`, `comissaoPorServico`: **owner+admin**
-
-RLS continua sendo a barreira real; o guard dá erro amigável em vez de "row violates RLS".
-
-## 3. Front — hook, guard e roteamento por papel
-
-**Novos arquivos:**
-- `src/hooks/use-role.ts` — `useRole()` consulta `current_user_role` via server fn `getMeuPapel`, cacheia em React Query (`staleTime: Infinity`, invalida em `SIGNED_IN`).
-- `src/components/require-role.tsx` — `<RequireRole roles={[...]}>{children}</RequireRole>`; renderiza fallback "Sem permissão" se não bate.
-- `src/lib/rbac.ts` — constantes (`ADMINS`, `OPERACIONAL`, `GESTAO`) e tipo `AppRole`.
-
-**Edições:**
-- `src/routes/_authenticated/route.tsx`: após carregar papel, se for `lavador`/`colaborador` e rota atual não for `/meu-trabalho`, redireciona para `/meu-trabalho`. Demais papéis vão para `/dashboard` normalmente.
-- `src/components/app-layout.tsx`: filtra itens do menu conforme matriz (lavador só vê "Meu trabalho"; atendente esconde Equipe/Relatórios/Configurações/Fidelidade; gerente vê tudo menos Configurações da empresa).
-- Cada rota sensível embrulha o conteúdo em `<RequireRole>`:
-  - `/equipe`, `/relatorios`, `/configuracoes`, `/fidelidade`, `/assinaturas` (criar/editar plano) → owner+admin
-  - `/dashboard` financeiro → owner+admin+gerente (gerente vê sem botões de exportar/pagamentos)
-  - `/clientes`, `/agendamentos`, `/ordens`, `/oportunidades` → owner+admin+gerente+atendente
-- `src/routes/_authenticated/equipe.tsx`: ao vincular colaborador, novo `<Select>` de papel (admin/gerente/atendente/lavador) — default `lavador`. Chama `vincular_colaborador` com o papel escolhido.
-- `src/routes/_authenticated/configuracoes.tsx`: nova seção "Membros e papéis" listando `user_roles` do tenant, com troca de papel inline (somente owner pode promover/rebaixar admin; admin gerencia gerente/atendente/lavador).
-
-## 4. Testes manuais documentados
-
-Adiciono `.lovable/rbac-tests.md` com 12 cenários:
-- Lavador tenta abrir `/equipe` → redirect/sem permissão
-- Atendente tenta criar plano de assinatura → bloqueado por RLS e UI
-- Gerente vê dashboard mas não vê "Marcar como pago"
-- Owner promove um lavador a admin → menu atualiza
-- Admin não consegue rebaixar o owner
-- Lavador vê apenas suas próprias OS em `/meu-trabalho`
-- Lavador tenta `UPDATE` de OS de outro lavador via RPC → RLS bloqueia
-- Atendente cria agendamento → OK; tenta alterar `owner_id` → bloqueado
-- Owner de tenant A não vê dados do tenant B em nenhuma tela
-- `vincular_colaborador` chamado por gerente → erro
-- Troca de papel invalida `useRole()` cache
-- Logout limpa cache e redireciona
-
-## 5. Entregáveis
-
-- 1 migration SQL
-- 3 arquivos novos (`use-role.ts`, `require-role.tsx`, `rbac.ts`)
-- ~8 arquivos editados (lavaflow.functions, route guard, app-layout, equipe, configuracoes, dashboard, relatorios, agendamentos)
-- 1 doc de testes
-
-Nenhuma quebra de fluxo existente para `owner`. Usuários `colaborador` legados continuam funcionando como `lavador`.
-
-## Score esperado após aplicar
-Multi-tenant + RBAC: **8.0 → 9.0/10**. Resta apenas a Onda 3 (audit logs, soft delete, MFA, rate limit) para chegar a 9.5+.
-
-## Pergunta antes de implementar
-- **Gerente pode ver faturamento total?** Plano acima diz "sim, mas sem ações de pagamento". Confirma ou prefere esconder valores financeiros do gerente?
-
-Se não responder, sigo com o que está acima.
+## Pergunta antes de executar
+A migration pendente cria a tabela `notificacoes` e adiciona colunas em `agendamentos`, `funcionarios` e `agenda_config` — todas com `IF NOT EXISTS` e defaults seguros, então não quebra dados antigos. Posso aplicá-la?
