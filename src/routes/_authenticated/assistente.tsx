@@ -10,7 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
-import { getMissaoDoDia } from "@/lib/lavaflow.functions";
+import { getMissaoDoDia, getSaudeNegocio } from "@/lib/lavaflow.functions";
 import { AlertTriangle, Bot, CalendarDays, CheckCircle2, Loader2, MessageCircle, RefreshCw, Send, Sparkles, Target, User } from "lucide-react";
 import { toast } from "sonner";
 
@@ -69,6 +69,7 @@ function priorityVariant(priority: ConsultorOpportunity["priority"]) {
 
 function Page() {
   const fetchMissao = useServerFn(getMissaoDoDia);
+  const fetchSaude = useServerFn(getSaudeNegocio);
   const [token, setToken] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [consultor, setConsultor] = useState<ConsultorData | null>(null);
@@ -148,6 +149,7 @@ function Page() {
 
   const totalImpact = consultor?.topOpportunities.reduce((sum, item) => sum + item.estimatedImpact, 0) ?? 0;
   const { data: missao } = useQuery({ queryKey: ["missao-do-dia"], queryFn: () => fetchMissao(), enabled: !!token });
+  const { data: saude } = useQuery({ queryKey: ["saude-negocio"], queryFn: () => fetchSaude(), enabled: !!token });
 
   return (
     <div className="space-y-5">
@@ -278,6 +280,30 @@ function Page() {
           </div>
 
           <aside className="space-y-4">
+            {saude && (
+              <section className="rounded-md border border-border bg-card p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm text-muted-foreground">Saúde do negócio</p>
+                    <p className="font-display text-3xl font-semibold">{saude.score}<span className="text-base text-muted-foreground">/100</span></p>
+                  </div>
+                  <Badge variant={saude.score >= 65 ? "default" : saude.score >= 45 ? "secondary" : "destructive"} className="capitalize">{saude.status}</Badge>
+                </div>
+                <p className="mt-3 text-sm text-muted-foreground">{saude.resumo}</p>
+                <div className="mt-3 space-y-2">
+                  {(saude.riscos ?? []).map((fator: any) => (
+                    <div key={fator.id} className="rounded-md border p-2">
+                      <div className="mb-1 flex items-center justify-between text-xs">
+                        <span className="font-medium">{fator.label}</span>
+                        <span className="tabular-nums text-muted-foreground">{fator.valor}/100</span>
+                      </div>
+                      <p className="text-xs text-muted-foreground">{fator.detalhe}</p>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
             <section className="rounded-md border border-border bg-card p-4">
               <div className="flex items-center gap-2">
                 <CalendarDays className="h-4 w-4 text-primary" />

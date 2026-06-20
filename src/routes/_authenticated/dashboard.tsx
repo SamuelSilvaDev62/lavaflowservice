@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getDashboardOperacional, getMissaoDoDia } from "@/lib/lavaflow.functions";
+import { getDashboardOperacional, getMissaoDoDia, getSaudeNegocio } from "@/lib/lavaflow.functions";
 import { getOnboardingState as getOnboardingStateFn } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
@@ -33,9 +33,11 @@ const STATUS_LABEL: Record<string, string> = {
 function Dashboard() {
   const fetchOps = useServerFn(getDashboardOperacional);
   const fetchMissao = useServerFn(getMissaoDoDia);
+  const fetchSaude = useServerFn(getSaudeNegocio);
   const fetchState = useServerFn(getOnboardingStateFn);
   const { data, isLoading } = useQuery({ queryKey: ["dashboard-operacional"], queryFn: () => fetchOps(), refetchInterval: 60_000 });
   const { data: missao } = useQuery({ queryKey: ["missao-do-dia"], queryFn: () => fetchMissao(), refetchInterval: 60_000 });
+  const { data: saude } = useQuery({ queryKey: ["saude-negocio"], queryFn: () => fetchSaude(), refetchInterval: 60_000 });
   const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
 
   if (isLoading || !data) {
@@ -67,6 +69,7 @@ function Dashboard() {
       <SetupChecklist />
 
       {missao && <MissaoDoDia missao={missao} />}
+      {saude && <SaudeNegocioCard saude={saude} />}
 
       {urgentes.length > 0 && (
         <Card className="mb-4 border-warning/40 bg-warning/10">
@@ -182,6 +185,53 @@ function Dashboard() {
         </aside>
       </div>
     </>
+  );
+}
+
+function SaudeNegocioCard({ saude }: { saude: any }) {
+  const statusTone =
+    saude.status === "excelente" ? "text-success" :
+    saude.status === "bom" ? "text-primary" :
+    saude.status === "atenção" ? "text-warning" :
+    "text-destructive";
+
+  return (
+    <Card className="mb-4">
+      <CardContent className="p-4">
+        <div className="grid gap-4 lg:grid-cols-[220px_1fr]">
+          <div className="rounded-md bg-muted p-4">
+            <p className="text-xs font-medium uppercase text-muted-foreground">Saúde do negócio</p>
+            <p className={`mt-1 font-display text-4xl font-bold ${statusTone}`}>{saude.score}<span className="text-base text-muted-foreground">/100</span></p>
+            <p className="mt-1 text-sm capitalize text-muted-foreground">{saude.status}</p>
+          </div>
+          <div className="min-w-0">
+            <p className="text-sm text-muted-foreground">{saude.resumo}</p>
+            <div className="mt-3 grid gap-2 sm:grid-cols-3">
+              {(saude.fatores ?? []).slice(0, 6).map((fator: any) => (
+                <div key={fator.id} className="rounded-md border p-2">
+                  <div className="mb-1 flex items-center justify-between gap-2">
+                    <span className="truncate text-xs font-medium">{fator.label}</span>
+                    <span className="text-xs tabular-nums text-muted-foreground">{fator.valor}</span>
+                  </div>
+                  <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                    <div className="h-full rounded-full bg-primary" style={{ width: `${Math.max(4, Math.min(100, fator.valor))}%` }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            {(saude.recomendacoes ?? []).length > 0 && (
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {saude.recomendacoes.slice(0, 2).map((rec: any) => (
+                  <div key={rec.fator} className="rounded-md border border-warning/40 bg-warning/10 p-2 text-xs">
+                    <span className="font-medium">{rec.fator}: </span>{rec.acao}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 

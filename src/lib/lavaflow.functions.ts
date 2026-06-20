@@ -531,6 +531,155 @@ export const getMissaoDoDia = createServerFn({ method: "GET" })
     };
   });
 
+export const getSaudeNegocio = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const now = new Date();
+    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const lastMonthStart = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
+    const lastMonthEnd = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59).toISOString();
+    const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    const thirtyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+
+    const [
+      { data: ordens90 },
+      { data: ordensMes },
+      { data: ordensMesAnterior },
+      { data: clientes },
+      { data: assinaturas },
+      { data: agendamentos30 },
+      { data: funcionarios },
+    ] = await Promise.all([
+      supabase.from("ordens_servico")
+        .select("id, cliente_id, funcionario_id, valor, status, created_at")
+        .eq("owner_id", ownerId)
+        .gte("created_at", ninetyAgo),
+      supabase.from("ordens_servico")
+        .select("id, cliente_id, valor, status, created_at")
+        .eq("owner_id", ownerId)
+        .gte("created_at", startMonth),
+      supabase.from("ordens_servico")
+        .select("id, cliente_id, valor, status, created_at")
+        .eq("owner_id", ownerId)
+        .gte("created_at", lastMonthStart)
+        .lte("created_at", lastMonthEnd),
+      supabase.from("clientes").select("id, created_at").eq("owner_id", ownerId),
+      supabase.from("assinaturas_clientes")
+        .select("id, cliente_id, status, planos_assinatura:plano_id(valor_mensal)")
+        .eq("owner_id", ownerId),
+      supabase.from("agendamentos")
+        .select("id, status, data_agendada")
+        .eq("owner_id", ownerId)
+        .gte("data_agendada", thirtyAgo.slice(0, 10)),
+      supabase.from("funcionarios").select("id, ativo").eq("owner_id", ownerId),
+    ]);
+
+    const ordensRows = ordens90 ?? [];
+    const ordensMesRows = ordensMes ?? [];
+    const ordensMesAnteriorRows = ordensMesAnterior ?? [];
+    const clientesRows = clientes ?? [];
+    const assinaturasAtivas = (assinaturas ?? []).filter((row: any) => row.status === "ativa");
+    const funcionariosAtivos = (funcionarios ?? []).filter((row: any) => row.ativo);
+
+    const receita90 = ordensRows.reduce((sum: number, row: any) => sum + Number(row.valor ?? 0), 0);
+    const receitaMes = ordensMesRows.reduce((sum: number, row: any) => sum + Number(row.valor ?? 0), 0);
+    const receitaMesAnterior = ordensMesAnteriorRows.reduce((sum: number, row: any) => sum + Number(row.valor ?? 0), 0);
+    const crescimento = receitaMesAnterior > 0 ? (receitaMes - receitaMesAnterior) / receitaMesAnterior : (receitaMes > 0 ? 1 : 0);
+    const ticketMedio = ordensRows.length ? receita90 / ordensRows.length : 0;
+    const mrr = assinaturasAtivas.reduce((sum: number, row: any) => sum + Number(row.planos_assinatura?.valor_mensal ?? 0), 0);
+
+    const clientesAtivos90 = new Set(ordensRows.map((row: any) => row.cliente_id).filter(Boolean));
+    const clientesRecentes30 = new Set(ordensRows.filter((row: any) => row.created_at >= thirtyAgo).map((row: any) => row.cliente_id).filter(Boolean));
+    const retencao = clientesAtivos90.size ? clientesRecentes30.size / clientesAtivos90.size : 0;
+    const clientesInativos = Math.max(0, clientesRows.length - clientesRecentes30.size);
+
+    const ag30 = agendamentos30 ?? [];
+    const cancelados = ag30.filter((row: any) => ["cancelado", "nao_compareceu"].includes(row.status)).length;
+    const taxaComparecimento = ag30.length ? (ag30.length - cancelados) / ag30.length : 0;
+    const ordensPorFuncionario = funcionariosAtivos.length ? ordensMesRows.length / funcionariosAtivos.length : ordensMesRows.length;
+
+    const fatores = [
+      {
+        id: "receita",
+        label: "Receita",
+        valor: Math.round(Math.max(0, Math.min(100, receitaMes > 0 ? 65 + Math.min(35, crescimento * 70) : 0))),
+        detalhe: receitaMes > 0
+          ? `Faturamento do mês: ${roundMoney(receitaMes).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`
+          : "Ainda não há faturamento registrado neste mês.",
+      },
+      {
+        id: "retencao",
+        label: "Retenção",
+        valor: Math.round(Math.max(0, Math.min(100, retencao * 100))),
+        detalhe: `${clientesRecentes30.size} de ${clientesAtivos90.size || clientesRows.length} clientes retornaram recentemente.`,
+      },
+      {
+        id: "ticket",
+        label: "Ticket médio",
+        valor: Math.round(Math.max(0, Math.min(100, (ticketMedio / 80) * 100))),
+        detalhe: `Ticket médio dos últimos 90 dias: ${roundMoney(ticketMedio).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`,
+      },
+      {
+        id: "recorrencia",
+        label: "Recorrência",
+        valor: Math.round(Math.max(0, Math.min(100, clientesRows.length ? (assinaturasAtivas.length / clientesRows.length) * 220 : 0))),
+        detalhe: `${assinaturasAtivas.length} assinatura(s) ativa(s), MRR de ${roundMoney(mrr).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`,
+      },
+      {
+        id: "agenda",
+        label: "Agenda",
+        valor: Math.round(Math.max(0, Math.min(100, ag30.length ? taxaComparecimento * 100 : 45))),
+        detalhe: ag30.length ? `${ag30.length - cancelados} de ${ag30.length} agendamentos seguiram válidos.` : "Poucos agendamentos recentes para medir presença.",
+      },
+      {
+        id: "equipe",
+        label: "Equipe",
+        valor: Math.round(Math.max(0, Math.min(100, funcionariosAtivos.length ? 55 + Math.min(45, ordensPorFuncionario * 5) : 35))),
+        detalhe: funcionariosAtivos.length ? `${funcionariosAtivos.length} colaborador(es) ativo(s), média de ${roundMoney(ordensPorFuncionario)} OS no mês.` : "Cadastre colaboradores para medir produtividade.",
+      },
+    ];
+
+    const score = Math.round(fatores.reduce((sum, item) => sum + item.valor, 0) / fatores.length);
+    const status = score >= 80 ? "excelente" : score >= 65 ? "bom" : score >= 45 ? "atenção" : "crítico";
+    const topRiscos = fatores.slice().sort((a, b) => a.valor - b.valor).slice(0, 2);
+    const pontosFortes = fatores.slice().sort((a, b) => b.valor - a.valor).slice(0, 2);
+    const recomendacoes = topRiscos.map((fator) => {
+      const mapa: Record<string, string> = {
+        receita: "Preencha horários livres e priorize clientes com maior chance de retorno hoje.",
+        retencao: "Execute uma campanha curta para clientes sem retorno nos últimos 45 dias.",
+        ticket: "Divulgue um serviço premium ou adicione um opcional na próxima confirmação de reserva.",
+        recorrencia: "Ofereça um plano simples para clientes com 4 ou mais visitas recentes.",
+        agenda: "Confirme reservas por WhatsApp e reduza cancelamentos/no-show.",
+        equipe: "Distribua os próximos serviços por colaborador e revise capacidade por horário.",
+      };
+      return {
+        fator: fator.label,
+        acao: mapa[fator.id] ?? "Revise este indicador com atenção.",
+      };
+    });
+
+    return {
+      score,
+      status,
+      resumo: `Saúde ${status}: ${score}/100. ${topRiscos[0]?.label ?? "Operação"} é o ponto que mais merece atenção agora.`,
+      fatores,
+      pontosFortes,
+      riscos: topRiscos,
+      recomendacoes,
+      metricas: {
+        receitaMes: roundMoney(receitaMes),
+        crescimento: roundMoney(crescimento),
+        ticketMedio: roundMoney(ticketMedio),
+        retencao: roundMoney(retencao),
+        mrr: roundMoney(mrr),
+        clientesInativos,
+        taxaComparecimento: roundMoney(taxaComparecimento),
+      },
+    };
+  });
+
 export const getAlertasOperacionais = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
