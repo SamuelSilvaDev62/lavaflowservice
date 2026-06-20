@@ -3,121 +3,221 @@ import { convertToModelMessages, streamText, stepCountIs, tool, type UIMessage }
 import { z } from "zod";
 import { createClient } from "@supabase/supabase-js";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
+import { buildBusinessContext, resolveOwnerScope } from "@/lib/ai/lavaflow-context";
+import { buildRulesConsultorResponse, LAVAFLOW_CONSULTOR_SYSTEM_PROMPT, runConsultor } from "@/lib/ai/lavaflow-consultor";
+import { createOpenAIProvider, getOpenAIModel, hasOpenAIConfig } from "@/lib/ai/openai";
+
+const RATE_LIMIT_MESSAGE = "Voce atingiu o limite temporario de consultas do Consultor LavaFlow IA. Tente novamente mais tarde.";
+
+function json(data: unknown, init?: ResponseInit) {
+  return new Response(JSON.stringify(data), {
+    ...init,
+    headers: { "content-type": "application/json", ...(init?.headers ?? {}) },
+  });
+}
+
+async function createAuthedSupabase(request: Request) {
+  const authHeader = request.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) return { error: new Response("Unauthorized", { status: 401 }) };
+
+  const token = authHeader.slice(7);
+  const SUPABASE_URL = process.env.SUPABASE_URL;
+  const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY;
+  if (!SUPABASE_URL || !SUPABASE_PUBLISHABLE_KEY) {
+    return { error: new Response("Missing Supabase server configuration", { status: 500 }) };
+  }
+
+  const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
+    global: { headers: { Authorization: `Bearer ${token}` } },
+    auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
+  });
+
+  const { data: userData, error: userErr } = await supabase.auth.getUser(token);
+  if (userErr || !userData.user) return { error: new Response("Unauthorized", { status: 401 }) };
+
+  const userId = userData.user.id;
+  const { ownerId, role } = await resolveOwnerScope(supabase, userId);
+  if (!["owner", "admin", "gerente"].includes(role)) {
+    return { error: new Response("Forbidden", { status: 403 }) };
+  }
+
+  return { supabase, userId, ownerId, role };
+}
+
+async function checkRateLimit(supabase: any, ownerId: string) {
+  const hourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
+  const dayAgo = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
+  const [{ count: hourly }, { count: daily }] = await Promise.all([
+    supabase.from("ai_usage_logs").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).gte("created_at", hourAgo),
+    supabase.from("ai_usage_logs").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).gte("created_at", dayAgo),
+  ]);
+
+  return Number(hourly ?? 0) < 30 && Number(daily ?? 0) < 300;
+}
+
+async function logUsage(supabase: any, input: {
+  ownerId: string;
+  userId: string;
+  route: string;
+  tokensInput?: number;
+  tokensOutput?: number;
+}) {
+  await supabase.from("ai_usage_logs").insert({
+    owner_id: input.ownerId,
+    user_id: input.userId,
+    route: input.route,
+    tokens_input: input.tokensInput ?? 0,
+    tokens_output: input.tokensOutput ?? 0,
+    estimated_cost: 0,
+  });
+}
+
+async function saveRecommendations(supabase: any, ownerId: string, userId: string, recommendations: any[]) {
+  const rows = recommendations.map((item) => ({
+    owner_id: ownerId,
+    user_id: userId,
+    type: item.category,
+    priority: item.priority,
+    title: item.title,
+    description: item.description,
+    estimated_impact: item.estimatedImpact,
+    payload: item,
+    status: "nova",
+  }));
+  if (rows.length > 0) await supabase.from("ai_recommendations").insert(rows);
+}
 
 export const Route = createFileRoute("/api/assistente-chat")({
   server: {
     handlers: {
+      GET: async ({ request }) => {
+        try {
+          const auth = await createAuthedSupabase(request);
+          if ("error" in auth) return auth.error;
+          const { supabase, userId, ownerId } = auth;
+          const url = new URL(request.url);
+          const period = url.searchParams.get("period") ?? "30d";
+
+          const allowed = await checkRateLimit(supabase, ownerId);
+          if (!allowed) return json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });
+
+          const context = await buildBusinessContext(supabase, ownerId, period);
+          let payload;
+          let tokensInput = 0;
+          let tokensOutput = 0;
+
+          if (hasOpenAIConfig()) {
+            try {
+              const result = await runConsultor({ context });
+              payload = result.data;
+              tokensInput = result.usage.inputTokens;
+              tokensOutput = result.usage.outputTokens;
+            } catch (error) {
+              console.warn("[consultor-ia] fallback", error);
+              payload = buildRulesConsultorResponse(context, true);
+            }
+          } else {
+            payload = buildRulesConsultorResponse(context, true);
+          }
+
+          await Promise.all([
+            logUsage(supabase, { ownerId, userId, route: "/api/assistente-chat:GET", tokensInput, tokensOutput }),
+            saveRecommendations(supabase, ownerId, userId, payload.topOpportunities ?? []),
+          ]);
+
+          return json({ ...payload, contextMetrics: context.metrics });
+        } catch (err) {
+          console.error("[assistente-consultor]", err);
+          return json({ error: "Nao foi possivel carregar o Consultor LavaFlow IA." }, { status: 500 });
+        }
+      },
       POST: async ({ request }) => {
         try {
-          const authHeader = request.headers.get("authorization");
-          if (!authHeader?.startsWith("Bearer ")) {
-            return new Response("Unauthorized", { status: 401 });
-          }
-          const token = authHeader.slice(7);
+          const auth = await createAuthedSupabase(request);
+          if ("error" in auth) return auth.error;
+          const { supabase, userId, ownerId } = auth;
 
-          const SUPABASE_URL = process.env.SUPABASE_URL!;
-          const SUPABASE_PUBLISHABLE_KEY = process.env.SUPABASE_PUBLISHABLE_KEY!;
-          const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
-          if (!LOVABLE_API_KEY) return new Response("Missing LOVABLE_API_KEY", { status: 500 });
-
-          const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY, {
-            global: { headers: { Authorization: `Bearer ${token}` } },
-            auth: { persistSession: false, autoRefreshToken: false, storage: undefined },
-          });
-
-          const { data: userData, error: userErr } = await supabase.auth.getUser(token);
-          if (userErr || !userData.user) return new Response("Unauthorized", { status: 401 });
-          const userId = userData.user.id;
-          const { data: roles } = await supabase.from("user_roles").select("owner_id, role").eq("user_id", userId);
-          const rolePriority: Record<string, number> = { owner: 1, admin: 2, gerente: 3, atendente: 4, lavador: 5, colaborador: 5 };
-          const ownerId = (roles ?? [])
-            .slice()
-            .sort((a: any, b: any) => (rolePriority[a.role] ?? 9) - (rolePriority[b.role] ?? 9))[0]?.owner_id ?? userId;
+          const allowed = await checkRateLimit(supabase, ownerId);
+          if (!allowed) return json({ error: RATE_LIMIT_MESSAGE }, { status: 429 });
 
           const body = (await request.json()) as { messages?: UIMessage[] };
           const messages = body.messages;
           if (!Array.isArray(messages)) return new Response("Bad request", { status: 400 });
 
-          // Coletar contexto resumido do negócio para o system prompt
-          const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
-          const startMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
-
-          const [{ data: empresa }, { data: ordensMes }, { data: clientesCount }, { data: assinaturas }] = await Promise.all([
-            supabase.from("empresa").select("nome_fantasia, whatsapp").eq("owner_id", ownerId).maybeSingle(),
-            supabase.from("ordens_servico").select("valor, status, created_at").eq("owner_id", ownerId).gte("created_at", startMonth),
-            supabase.from("clientes").select("id", { count: "exact", head: true }).eq("owner_id", ownerId),
-            supabase.from("assinaturas_clientes").select("id, planos_assinatura:plano_id(valor_mensal)").eq("owner_id", ownerId).eq("status", "ativa"),
-          ]);
-
-          const faturamentoMes = (ordensMes ?? []).reduce((s, o: any) => s + Number(o.valor ?? 0), 0);
-          const lavagensMes = (ordensMes ?? []).length;
-          const ticket = lavagensMes ? faturamentoMes / lavagensMes : 0;
-          const mrr = (assinaturas ?? []).reduce((s, a: any) => s + Number(a.planos_assinatura?.valor_mensal ?? 0), 0);
-          const totalClientes = (clientesCount as any)?.count ?? 0;
+          const context = await buildBusinessContext(supabase, ownerId, "30d");
+          const empresa = context.business?.nome_empresa ?? "lava-rapido";
+          const metrics = context.metrics ?? {};
           const fmt = (v: number) => v.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+          const systemPrompt = `${LAVAFLOW_CONSULTOR_SYSTEM_PROMPT}
 
-          const systemPrompt = `Você é o Assistente de Crescimento da ${empresa?.nome_fantasia ?? "lava-rápido"}, um consultor de negócios especializado em lava-rápidos brasileiros. Fale em português brasileiro, com tom direto, prático e amigável. Use markdown (listas, negrito) para clareza.
+CONTEXTO AGREGADO DO NEGOCIO:
+${JSON.stringify(context)}
 
-CONTEXTO ATUAL DO NEGÓCIO:
-- Faturamento do mês: ${fmt(faturamentoMes)} em ${lavagensMes} lavagens
-- Ticket médio: ${fmt(ticket)}
-- MRR (assinaturas ativas): ${fmt(mrr)}
-- Total de clientes cadastrados: ${totalClientes}
-- Data de hoje: ${new Date().toLocaleDateString("pt-BR")}
+INSTRUCOES PARA O CHAT:
+- Responda em portugues brasileiro, com markdown curto.
+- Use apenas numeros do contexto agregado ou das ferramentas server-side.
+- Se nao houver dados suficientes, diga: "Ainda nao tenho dados suficientes para uma analise confiavel. Recomendo registrar mais ordens de servico e clientes para melhorar minhas recomendacoes."
+- Nao exponha IDs internos, tokens, chaves ou telefone completo.
 
-SUAS CAPACIDADES (use as ferramentas quando relevante):
-- listar_clientes_inativos: clientes sem visita há N dias
-- top_clientes: clientes que mais gastaram nos últimos 90d
-- analise_dia_semana: receita por dia da semana
-- top_servicos: serviços que mais geram receita
-- clientes_com_recompensa_disponivel: clientes elegíveis a resgatar benefícios do programa de fidelidade
-- clientes_proximos_recompensa: clientes a poucos pontos da próxima recompensa
-- gerar_mensagem_whatsapp: redigir mensagem persuasiva personalizada
+Resumo rapido: ${empresa}; receita do periodo ${fmt(Number(metrics.receita_periodo ?? 0))}; ticket medio ${fmt(Number(metrics.ticket_medio ?? 0))}; clientes inativos ${metrics.clientes_inativos ?? 0}; MRR ${fmt(Number(metrics.mrr ?? 0))}.`;
 
-INSIGHT DE NEGÓCIO (use proativamente):
-- Clientes que utilizam o programa de fidelidade tendem a retornar até 34% mais. Sempre que detectar clientes elegíveis a benefícios não resgatados, sugira contato direto.
+          const openaiProvider = createOpenAIProvider();
+          const LOVABLE_API_KEY = process.env.LOVABLE_API_KEY;
+          const model = openaiProvider
+            ? openaiProvider(getOpenAIModel())
+            : LOVABLE_API_KEY
+              ? createLovableAiGatewayProvider(LOVABLE_API_KEY)("google/gemini-3-flash-preview")
+              : null;
 
-REGRAS:
-- Sempre cite números concretos quando responder.
-- Sugira AÇÕES executáveis (não apenas insights).
-- Se o usuário pedir para "enviar WhatsApp", primeiro use gerar_mensagem_whatsapp e mostre a mensagem; a execução real é manual via a tela /oportunidades.
-- Seja conciso: máximo 4-5 linhas por resposta, a menos que seja pedido relatório completo.`;
+          if (!model) {
+            const fallback = buildRulesConsultorResponse(context, true);
+            return json({
+              messages,
+              error: fallback.fallbackNotice,
+              answer: fallback.summary,
+            }, { status: 503 });
+          }
 
-          const gateway = createLovableAiGatewayProvider(LOVABLE_API_KEY);
+          await logUsage(supabase, { ownerId, userId, route: "/api/assistente-chat:POST" });
 
+          const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
           const result = streamText({
-            model: gateway("google/gemini-3-flash-preview"),
+            model,
             system: systemPrompt,
             messages: await convertToModelMessages(messages),
             stopWhen: stepCountIs(50),
             tools: {
               listar_clientes_inativos: tool({
-                description: "Lista clientes sem visita há N dias. Use quando o usuário pedir clientes inativos, sumidos, para reativar.",
+                description: "Lista clientes sem visita ha N dias. Retorna nome e dados agregados, sem telefone.",
                 inputSchema: z.object({ dias: z.number().int().min(7).max(365).default(60) }),
                 execute: async ({ dias }) => {
                   const [{ data: clientes }, { data: ordens }] = await Promise.all([
-                    supabase.from("clientes").select("id, nome, telefone").eq("owner_id", ownerId),
-                    supabase.from("ordens_servico").select("cliente_id, created_at").eq("owner_id", ownerId),
+                    supabase.from("clientes").select("id, nome, pontos_saldo").eq("owner_id", ownerId),
+                    supabase.from("ordens_servico").select("cliente_id, created_at, valor").eq("owner_id", ownerId),
                   ]);
-                  const last = new Map<string, string>();
+                  const last = new Map<string, { data: string; total: number }>();
                   (ordens ?? []).forEach((o: any) => {
-                    if (!last.has(o.cliente_id) || last.get(o.cliente_id)! < o.created_at) last.set(o.cliente_id, o.created_at);
+                    const cur = last.get(o.cliente_id) ?? { data: o.created_at, total: 0 };
+                    if (cur.data < o.created_at) cur.data = o.created_at;
+                    cur.total += Number(o.valor ?? 0);
+                    last.set(o.cliente_id, cur);
                   });
                   const limit = Date.now() - dias * 86_400_000;
                   const inativos = (clientes ?? [])
-                    .map((c: any) => ({ ...c, ultima: last.get(c.id) }))
-                    .filter((c) => !c.ultima || new Date(c.ultima).getTime() < limit)
+                    .map((c: any) => ({ ...c, ultima: last.get(c.id)?.data, total_gasto: last.get(c.id)?.total ?? 0 }))
+                    .filter((c: any) => !c.ultima || new Date(c.ultima).getTime() < limit)
                     .slice(0, 20)
-                    .map((c) => ({
+                    .map((c: any) => ({
                       nome: c.nome,
-                      telefone: c.telefone,
                       dias_sem_voltar: c.ultima ? Math.floor((Date.now() - new Date(c.ultima).getTime()) / 86_400_000) : null,
+                      total_gasto: Math.round(c.total_gasto * 100) / 100,
+                      pontos: Number(c.pontos_saldo ?? 0),
                     }));
                   return { total: inativos.length, clientes: inativos };
                 },
               }),
               top_clientes: tool({
-                description: "Top N clientes que mais gastaram nos últimos 90 dias.",
+                description: "Top N clientes que mais gastaram nos ultimos 90 dias, sem telefone.",
                 inputSchema: z.object({ limit: z.number().int().min(3).max(20).default(10) }),
                 execute: async ({ limit }) => {
                   const { data } = await supabase
@@ -127,19 +227,17 @@ REGRAS:
                     .gte("created_at", ninetyAgo);
                   const totals = new Map<string, { nome: string; total: number; visitas: number }>();
                   (data ?? []).forEach((o: any) => {
-                    const k = o.cliente_id;
-                    const cur = totals.get(k) ?? { nome: o.clientes?.nome ?? "—", total: 0, visitas: 0 };
+                    const key = o.cliente_id;
+                    const cur = totals.get(key) ?? { nome: o.clientes?.nome ?? "Cliente", total: 0, visitas: 0 };
                     cur.total += Number(o.valor ?? 0);
                     cur.visitas += 1;
-                    totals.set(k, cur);
+                    totals.set(key, cur);
                   });
-                  return {
-                    top: Array.from(totals.values()).sort((a, b) => b.total - a.total).slice(0, limit),
-                  };
+                  return { top: Array.from(totals.values()).sort((a, b) => b.total - a.total).slice(0, limit) };
                 },
               }),
               analise_dia_semana: tool({
-                description: "Receita por dia da semana nos últimos 90 dias. Útil para sugerir dias para promoções.",
+                description: "Receita por dia da semana nos ultimos 90 dias.",
                 inputSchema: z.object({}),
                 execute: async () => {
                   const { data } = await supabase
@@ -147,16 +245,16 @@ REGRAS:
                     .select("valor, created_at")
                     .eq("owner_id", ownerId)
                     .gte("created_at", ninetyAgo);
-                  const labels = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
+                  const labels = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
                   const por = Array(7).fill(0);
                   (data ?? []).forEach((o: any) => {
                     por[new Date(o.created_at).getDay()] += Number(o.valor ?? 0);
                   });
-                  return { por_dia: labels.map((l, i) => ({ dia: l, receita: Math.round(por[i] * 100) / 100 })) };
+                  return { por_dia: labels.map((label, index) => ({ dia: label, receita: Math.round(por[index] * 100) / 100 })) };
                 },
               }),
               top_servicos: tool({
-                description: "Serviços que mais geraram receita nos últimos 90 dias.",
+                description: "Servicos que mais geraram receita nos ultimos 90 dias.",
                 inputSchema: z.object({}),
                 execute: async () => {
                   const { data } = await supabase
@@ -166,70 +264,30 @@ REGRAS:
                     .gte("created_at", ninetyAgo);
                   const por = new Map<string, { receita: number; qtd: number }>();
                   (data ?? []).forEach((o: any) => {
-                    const n = o.servicos?.nome ?? "—";
-                    const cur = por.get(n) ?? { receita: 0, qtd: 0 };
+                    const nome = o.servicos?.nome ?? "Sem servico";
+                    const cur = por.get(nome) ?? { receita: 0, qtd: 0 };
                     cur.receita += Number(o.valor ?? 0);
                     cur.qtd += 1;
-                    por.set(n, cur);
+                    por.set(nome, cur);
                   });
-                  return {
-                    servicos: Array.from(por, ([nome, v]) => ({ nome, ...v })).sort((a, b) => b.receita - a.receita).slice(0, 10),
-                  };
+                  return { servicos: Array.from(por, ([nome, value]) => ({ nome, ...value })).sort((a, b) => b.receita - a.receita).slice(0, 10) };
                 },
               }),
               gerar_mensagem_whatsapp: tool({
-                description: "Gera uma mensagem de WhatsApp persuasiva, curta e personalizada. Use quando o usuário pedir para redigir uma promoção, lembrete, reativação ou convite.",
+                description: "Gera uma mensagem curta e editavel de WhatsApp.",
                 inputSchema: z.object({
-                  objetivo: z.enum(["reativacao", "promocao", "lembrete_assinatura", "agradecimento"]),
+                  objetivo: z.enum(["reativacao", "promocao", "lembrete_assinatura", "agradecimento", "recompensa_disponivel", "proximo_recompensa"]),
                   contexto_extra: z.string().max(300).optional(),
                 }),
-                execute: async ({ objetivo, contexto_extra }) => {
-                  return {
-                    objetivo,
-                    instrucao: `Redija agora a mensagem (use {nome} como placeholder do cliente). Objetivo: ${objetivo}. Contexto adicional: ${contexto_extra ?? "nenhum"}. Mantenha ≤ 320 caracteres, emoji moderado, tom brasileiro amigável, CTA claro. Empresa: ${empresa?.nome_fantasia ?? "Lava-Rápido"}.`,
-                  };
-                },
-              }),
-              clientes_com_recompensa_disponivel: tool({
-                description: "Lista clientes que já acumularam pontos suficientes para resgatar uma recompensa ativa do programa de fidelidade. Use quando o usuário perguntar sobre fidelidade, resgates pendentes, ou quem chamar de volta com benefício.",
-                inputSchema: z.object({}),
-                execute: async () => {
-                  const [{ data: recompensas }, { data: clientes }] = await Promise.all([
-                    supabase.from("recompensas").select("nome, custo_pontos").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos"),
-                    supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", ownerId),
-                  ]);
-                  const ativas = (recompensas ?? []).sort((a: any, b: any) => a.custo_pontos - b.custo_pontos);
-                  if (ativas.length === 0) return { total: 0, mensagem: "Nenhuma recompensa ativa cadastrada." };
-                  const minCusto = ativas[0].custo_pontos;
-                  const elegiveis = (clientes ?? [])
-                    .filter((c: any) => Number(c.pontos_saldo ?? 0) >= minCusto)
-                    .map((c: any) => {
-                      const saldo = Number(c.pontos_saldo);
-                      const disp = ativas.filter((r: any) => r.custo_pontos <= saldo);
-                      return { nome: c.nome, telefone: c.telefone, pontos: saldo, recompensa_maxima: disp[disp.length - 1]?.nome };
-                    })
-                    .sort((a: any, b: any) => b.pontos - a.pontos)
-                    .slice(0, 20);
-                  return { total: elegiveis.length, clientes: elegiveis };
-                },
-              }),
-              clientes_proximos_recompensa: tool({
-                description: "Clientes a até 50 pontos de conquistar a primeira recompensa do programa de fidelidade. Use para identificar quem incentivar a voltar logo.",
-                inputSchema: z.object({ margem: z.number().int().min(10).max(200).default(50) }),
-                execute: async ({ margem }) => {
-                  const [{ data: recompensas }, { data: clientes }] = await Promise.all([
-                    supabase.from("recompensas").select("nome, custo_pontos").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos").limit(1),
-                    supabase.from("clientes").select("nome, telefone, pontos_saldo").eq("owner_id", ownerId),
-                  ]);
-                  if (!recompensas || recompensas.length === 0) return { total: 0, mensagem: "Nenhuma recompensa ativa cadastrada." };
-                  const min = (recompensas[0] as any).custo_pontos;
-                  const proximos = (clientes ?? [])
-                    .map((c: any) => ({ ...c, faltam: min - Number(c.pontos_saldo ?? 0) }))
-                    .filter((c: any) => c.faltam > 0 && c.faltam <= margem)
-                    .sort((a: any, b: any) => a.faltam - b.faltam)
-                    .slice(0, 20);
-                  return { total: proximos.length, recompensa_alvo: (recompensas[0] as any).nome, custo: min, clientes: proximos };
-                },
+                execute: async ({ objetivo, contexto_extra }) => ({
+                  objetivo,
+                  mensagem_base: objetivo === "recompensa_disponivel"
+                    ? "Ola {nome}! Boa noticia: voce ja possui pontos suficientes para resgatar {recompensa}. Esperamos voce para aproveitar seu beneficio."
+                    : objetivo === "proximo_recompensa"
+                      ? "Ola {nome}! Voce esta muito perto de desbloquear uma recompensa no nosso programa de fidelidade. Que tal agendar sua proxima lavagem?"
+                      : "Ola {nome}! Sentimos sua falta por aqui. Faz um tempo desde sua ultima visita e queremos te convidar para cuidar do seu veiculo novamente. Esta semana temos uma condicao especial para voce.",
+                  contexto_extra: contexto_extra ?? null,
+                }),
               }),
             },
           });
@@ -237,10 +295,7 @@ REGRAS:
           return result.toUIMessageStreamResponse({ originalMessages: messages });
         } catch (err) {
           console.error("[assistente-chat]", err);
-          return new Response(JSON.stringify({ error: (err as Error).message }), {
-            status: 500,
-            headers: { "content-type": "application/json" },
-          });
+          return json({ error: "Erro ao processar o Consultor LavaFlow IA." }, { status: 500 });
         }
       },
     },
