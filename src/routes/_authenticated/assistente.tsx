@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { useQuery } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
@@ -8,6 +10,7 @@ import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
+import { getMissaoDoDia } from "@/lib/lavaflow.functions";
 import { AlertTriangle, Bot, CalendarDays, CheckCircle2, Loader2, MessageCircle, RefreshCw, Send, Sparkles, Target, User } from "lucide-react";
 import { toast } from "sonner";
 
@@ -65,6 +68,7 @@ function priorityVariant(priority: ConsultorOpportunity["priority"]) {
 }
 
 function Page() {
+  const fetchMissao = useServerFn(getMissaoDoDia);
   const [token, setToken] = useState<string | null>(null);
   const [input, setInput] = useState("");
   const [consultor, setConsultor] = useState<ConsultorData | null>(null);
@@ -143,6 +147,7 @@ function Page() {
   }
 
   const totalImpact = consultor?.topOpportunities.reduce((sum, item) => sum + item.estimatedImpact, 0) ?? 0;
+  const { data: missao } = useQuery({ queryKey: ["missao-do-dia"], queryFn: () => fetchMissao(), enabled: !!token });
 
   return (
     <div className="space-y-5">
@@ -169,6 +174,42 @@ function Page() {
           <AlertTriangle className="h-4 w-4" />
           {consultor.fallbackNotice}
         </div>
+      )}
+
+      {missao && (
+        <section className="rounded-md border border-primary/30 bg-primary/5 p-4">
+          <div className="flex items-center gap-2 text-sm font-medium text-primary">
+            <Target className="h-4 w-4" />
+            Missão do Dia
+          </div>
+          <div className="mt-3 grid gap-4 lg:grid-cols-[1fr_1.2fr]">
+            <div>
+              <h2 className="font-display text-xl font-semibold leading-tight">{missao.titulo}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{missao.subtitulo}</p>
+              <div className="mt-3 flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <span>Potencial: {fmtBrl(Number(missao.potencialHoje ?? 0))}</span>
+                <span>Tempo estimado: {missao.tempoTotalMin ?? 0} min</span>
+                <span>Ticket médio: {fmtBrl(Number(missao.ticketMedio ?? 0))}</span>
+              </div>
+            </div>
+            <div className="grid gap-2">
+              {(missao.acoes ?? []).slice(0, 3).map((acao: any) => (
+                <button
+                  key={acao.id}
+                  onClick={() => handleSend(acao.whatsapp ?? acao.detalhe ?? acao.titulo)}
+                  disabled={!token || isBusy}
+                  className="rounded-md border bg-card p-3 text-left transition-colors hover:border-primary hover:bg-primary/5 disabled:opacity-50"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <p className="font-medium">{acao.titulo}</p>
+                    <Badge variant={acao.prioridade === "alta" ? "destructive" : acao.prioridade === "media" ? "default" : "secondary"}>{acao.prioridade}</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{acao.detalhe}</p>
+                </button>
+              ))}
+            </div>
+          </div>
+        </section>
       )}
 
       <section className="rounded-md border border-border bg-card p-4">

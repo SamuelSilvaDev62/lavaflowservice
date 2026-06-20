@@ -5,7 +5,7 @@ import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { getDashboardOperacional } from "@/lib/lavaflow.functions";
+import { getDashboardOperacional, getMissaoDoDia } from "@/lib/lavaflow.functions";
 import { getOnboardingState as getOnboardingStateFn } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
@@ -13,8 +13,8 @@ import { brl } from "@/lib/format";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
 import {
-  AlertTriangle, ArrowRight, Bot, CalendarDays, Car, Clock, DollarSign,
-  MapPin, Play, Sparkles, UsersRound, Wrench,
+  AlertTriangle, ArrowRight, Bot, CalendarDays, Car, CheckCircle2, Clock, DollarSign,
+  MapPin, MessageCircle, Play, Sparkles, Target, UsersRound, Wrench,
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
@@ -32,8 +32,10 @@ const STATUS_LABEL: Record<string, string> = {
 
 function Dashboard() {
   const fetchOps = useServerFn(getDashboardOperacional);
+  const fetchMissao = useServerFn(getMissaoDoDia);
   const fetchState = useServerFn(getOnboardingStateFn);
   const { data, isLoading } = useQuery({ queryKey: ["dashboard-operacional"], queryFn: () => fetchOps(), refetchInterval: 60_000 });
+  const { data: missao } = useQuery({ queryKey: ["missao-do-dia"], queryFn: () => fetchMissao(), refetchInterval: 60_000 });
   const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
 
   if (isLoading || !data) {
@@ -63,6 +65,8 @@ function Dashboard() {
       />
 
       <SetupChecklist />
+
+      {missao && <MissaoDoDia missao={missao} />}
 
       {urgentes.length > 0 && (
         <Card className="mb-4 border-warning/40 bg-warning/10">
@@ -178,6 +182,64 @@ function Dashboard() {
         </aside>
       </div>
     </>
+  );
+}
+
+function MissaoDoDia({ missao }: { missao: any }) {
+  return (
+    <Card className="mb-4 overflow-hidden border-primary/30 bg-primary/5">
+      <CardContent className="p-4 sm:p-5">
+        <div className="grid gap-4 lg:grid-cols-[1.1fr_.9fr]">
+          <div className="min-w-0">
+            <div className="mb-3 flex items-center gap-2 text-sm font-medium text-primary">
+              <Target className="h-4 w-4 shrink-0" />
+              Missão do Dia
+            </div>
+            <h2 className="font-display text-xl font-bold leading-tight sm:text-2xl">{missao.titulo}</h2>
+            <p className="mt-2 text-sm text-muted-foreground">{missao.subtitulo}</p>
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <MiniMetric label="Potencial" value={brl(Number(missao.potencialHoje ?? 0))} />
+              <MiniMetric label="Tempo" value={`${missao.tempoTotalMin ?? 0} min`} />
+              <MiniMetric label="Ticket" value={brl(Number(missao.ticketMedio ?? 0))} />
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            {(missao.acoes ?? []).length === 0 ? (
+              <div className="rounded-md border bg-card p-3 text-sm text-muted-foreground">
+                Registre mais ordens, clientes e agendamentos para o LavaFlow gerar uma missão mais precisa.
+              </div>
+            ) : (missao.acoes ?? []).slice(0, 3).map((acao: any) => (
+              <div key={acao.id} className="rounded-md border bg-card p-3">
+                <div className="flex items-start justify-between gap-2">
+                  <div className="min-w-0">
+                    <div className="mb-1 flex flex-wrap items-center gap-2">
+                      <Badge variant={acao.prioridade === "alta" ? "destructive" : acao.prioridade === "media" ? "default" : "secondary"}>{acao.prioridade}</Badge>
+                      <span className="text-xs text-muted-foreground">{brl(Number(acao.impactoEstimado ?? 0))} potencial</span>
+                    </div>
+                    <p className="font-medium leading-tight">{acao.titulo}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">{acao.detalhe}</p>
+                  </div>
+                  {acao.whatsapp ? <MessageCircle className="h-4 w-4 shrink-0 text-primary" /> : <CheckCircle2 className="h-4 w-4 shrink-0 text-success" />}
+                </div>
+                <Button asChild variant="ghost" size="sm" className="mt-2 h-8 px-2">
+                  <Link to={acao.rota as any}>{acao.cta}<ArrowRight className="ml-1 h-3 w-3" /></Link>
+                </Button>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0 rounded-md border bg-card px-3 py-2">
+      <p className="truncate text-[11px] text-muted-foreground">{label}</p>
+      <p className="truncate font-display text-sm font-bold sm:text-base">{value}</p>
+    </div>
   );
 }
 

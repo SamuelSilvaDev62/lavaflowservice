@@ -34,6 +34,14 @@ function isActiveStatus(status: string) {
   return !["concluido", "cancelado", "nao_compareceu"].includes(status);
 }
 
+function roundMoney(value: number) {
+  return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
+}
+
+function minutesToTime(mins: number) {
+  return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
+}
+
 export const getDashboardMetrics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -248,6 +256,278 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
       agendaHoje: proximos,
       veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao", "pronto"].includes(o.status)).slice(0, 6),
       recomendacoes,
+    };
+  });
+
+export const getMissaoDoDia = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const hoje = localDateIso();
+    const amanha = localDateIso(1);
+    const now = new Date();
+    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    const fortyFiveAgo = new Date(Date.now() - 45 * 86_400_000).toISOString();
+
+    const [
+      { data: clientes },
+      { data: ordens90 },
+      { data: ordensMes },
+      { data: agendamentosHoje },
+      { data: agendamentosAmanha },
+      { data: configRows },
+      { data: servicos },
+      { data: assinaturas },
+      { data: planos },
+      { data: recompensas },
+    ] = await Promise.all([
+      supabase.from("clientes").select("id, nome, telefone, pontos_saldo, created_at").eq("owner_id", ownerId),
+      supabase.from("ordens_servico")
+        .select("id, cliente_id, servico_id, valor, created_at, servicos:servico_id(nome)")
+        .eq("owner_id", ownerId)
+        .gte("created_at", ninetyAgo),
+      supabase.from("ordens_servico")
+        .select("id, cliente_id, valor, created_at")
+        .eq("owner_id", ownerId)
+        .gte("created_at", startMonth),
+      supabase.from("agendamentos")
+        .select("id, data_agendada, hora_agendada, status")
+        .eq("owner_id", ownerId)
+        .eq("data_agendada", hoje),
+      supabase.from("agendamentos")
+        .select("id, data_agendada, hora_agendada, status")
+        .eq("owner_id", ownerId)
+        .eq("data_agendada", amanha),
+      supabase.from("agenda_config")
+        .select("hora_inicio, hora_fim, intervalo_min, capacidade_simultanea, dias_semana")
+        .eq("owner_id", ownerId)
+        .maybeSingle(),
+      supabase.from("servicos").select("id, nome, preco_padrao, disponivel_online").eq("owner_id", ownerId),
+      supabase.from("assinaturas_clientes").select("cliente_id, status").eq("owner_id", ownerId),
+      supabase.from("planos_assinatura").select("id, nome, valor_mensal, ativo").eq("owner_id", ownerId).eq("ativo", true).order("valor_mensal"),
+      supabase.from("recompensas").select("nome, custo_pontos, ativo").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos"),
+    ]);
+
+    const clientesRows = clientes ?? [];
+    const ordensRows = ordens90 ?? [];
+    const ordensMesRows = ordensMes ?? [];
+    const receita90 = ordensRows.reduce((sum: number, row: any) => sum + Number(row.valor ?? 0), 0);
+    const ticketMedio = ordensRows.length ? receita90 / ordensRows.length : 50;
+    const faturamentoMes = ordensMesRows.reduce((sum: number, row: any) => sum + Number(row.valor ?? 0), 0);
+
+    const byCliente = new Map<string, { visitas: number; total: number; ultima: string | null; nome: string; telefone: string | null }>();
+    clientesRows.forEach((cliente: any) => {
+      byCliente.set(cliente.id, {
+        visitas: 0,
+        total: 0,
+        ultima: null,
+        nome: cliente.nome ?? "Cliente",
+        telefone: cliente.telefone ?? null,
+      });
+    });
+    ordensRows.forEach((ordem: any) => {
+      if (!ordem.cliente_id) return;
+      const cur = byCliente.get(ordem.cliente_id) ?? { visitas: 0, total: 0, ultima: null, nome: "Cliente", telefone: null };
+      cur.visitas += 1;
+      cur.total += Number(ordem.valor ?? 0);
+      if (!cur.ultima || ordem.created_at > cur.ultima) cur.ultima = ordem.created_at;
+      byCliente.set(ordem.cliente_id, cur);
+    });
+
+    const clientesEmRisco = Array.from(byCliente.entries())
+      .map(([id, row]) => ({
+        id,
+        nome: row.nome,
+        telefone: row.telefone,
+        visitas: row.visitas,
+        total: roundMoney(row.total),
+        diasSemRetornar: row.ultima ? Math.floor((Date.now() - new Date(row.ultima).getTime()) / 86_400_000) : 999,
+      }))
+      .filter((row) => row.diasSemRetornar >= 45)
+      .sort((a, b) => b.total - a.total || b.diasSemRetornar - a.diasSemRetornar)
+      .slice(0, 5);
+
+    const assinaturaClientes = new Set((assinaturas ?? []).filter((row: any) => row.status === "ativa").map((row: any) => row.cliente_id));
+    const candidatosAssinatura = Array.from(byCliente.entries())
+      .map(([id, row]) => ({ id, nome: row.nome, visitas: row.visitas, total: roundMoney(row.total) }))
+      .filter((row) => row.visitas >= 4 && !assinaturaClientes.has(row.id))
+      .sort((a, b) => b.visitas - a.visitas || b.total - a.total)
+      .slice(0, 5);
+
+    const servicosById = new Map((servicos ?? []).map((row: any) => [row.id, row]));
+    const servicoStats = new Map<string, { id: string; nome: string; qtd: number; receita: number }>();
+    ordensRows.forEach((ordem: any) => {
+      const id = ordem.servico_id ?? "sem-servico";
+      const nome = ordem.servicos?.nome ?? servicosById.get(id)?.nome ?? "Serviço";
+      const cur = servicoStats.get(id) ?? { id, nome, qtd: 0, receita: 0 };
+      cur.qtd += 1;
+      cur.receita += Number(ordem.valor ?? 0);
+      servicoStats.set(id, cur);
+    });
+    const servicoParaDivulgar = Array.from(servicoStats.values())
+      .sort((a, b) => (b.receita / Math.max(1, b.qtd)) - (a.receita / Math.max(1, a.qtd)))
+      [0] ?? (servicos ?? [])[0] ?? null;
+
+    const cfg = configRows ?? { hora_inicio: "08:00", hora_fim: "18:00", intervalo_min: 30, capacidade_simultanea: 1, dias_semana: [1,2,3,4,5,6] };
+    const [hI, mI] = String(cfg.hora_inicio ?? "08:00").slice(0, 5).split(":").map(Number);
+    const [hF, mF] = String(cfg.hora_fim ?? "18:00").slice(0, 5).split(":").map(Number);
+    const intervalo = Number(cfg.intervalo_min ?? 30);
+    const capacidade = Math.max(1, Number(cfg.capacidade_simultanea ?? 1));
+    const ocupHoje = new Map<string, number>();
+    (agendamentosHoje ?? [])
+      .filter((row: any) => isActiveStatus(row.status))
+      .forEach((row: any) => {
+        const hora = String(row.hora_agendada ?? "").slice(0, 5);
+        ocupHoje.set(hora, (ocupHoje.get(hora) ?? 0) + 1);
+      });
+
+    const slotsLivres: Array<{ data: string; hora: string; vagas: number }> = [];
+    const inicio = hI * 60 + mI;
+    const fim = hF * 60 + mF;
+    const agoraMins = now.getHours() * 60 + now.getMinutes();
+    for (let mins = inicio; mins < fim; mins += intervalo) {
+      if (mins < agoraMins) continue;
+      const hora = minutesToTime(mins);
+      const vagas = capacidade - (ocupHoje.get(hora) ?? 0);
+      if (vagas > 0) slotsLivres.push({ data: hoje, hora, vagas });
+    }
+    if (slotsLivres.length < 3) {
+      const ocupAmanha = new Map<string, number>();
+      (agendamentosAmanha ?? [])
+        .filter((row: any) => isActiveStatus(row.status))
+        .forEach((row: any) => {
+          const hora = String(row.hora_agendada ?? "").slice(0, 5);
+          ocupAmanha.set(hora, (ocupAmanha.get(hora) ?? 0) + 1);
+        });
+      for (let mins = inicio; mins < fim && slotsLivres.length < 5; mins += intervalo) {
+        const hora = minutesToTime(mins);
+        const vagas = capacidade - (ocupAmanha.get(hora) ?? 0);
+        if (vagas > 0) slotsLivres.push({ data: amanha, hora, vagas });
+      }
+    }
+
+    const menorRecompensa = Number((recompensas ?? [])[0]?.custo_pontos ?? 0);
+    const clientesComRecompensa = menorRecompensa
+      ? clientesRows.filter((cliente: any) => Number(cliente.pontos_saldo ?? 0) >= menorRecompensa).length
+      : 0;
+    const planoBase = (planos ?? [])[0];
+    const receitaRecuperavel = roundMoney(clientesEmRisco.length * ticketMedio);
+    const potencialAssinaturas = roundMoney(candidatosAssinatura.length * Number(planoBase?.valor_mensal ?? 0));
+    const potencialHoje = roundMoney(receitaRecuperavel + potencialAssinaturas);
+
+    const acoes: Array<{
+      id: string;
+      prioridade: "alta" | "media" | "baixa";
+      titulo: string;
+      detalhe: string;
+      impactoEstimado: number;
+      tempoMin: number;
+      rota: string;
+      cta: string;
+      whatsapp?: string;
+    }> = [];
+
+    if (clientesEmRisco.length > 0) {
+      const alvo = clientesEmRisco[0];
+      acoes.push({
+        id: "recuperar-clientes",
+        prioridade: clientesEmRisco.length >= 3 ? "alta" : "media",
+        titulo: `Chamar ${clientesEmRisco.length} cliente(s) em risco`,
+        detalhe: `${alvo.nome} está há ${alvo.diasSemRetornar} dias sem voltar. Potencial estimado por retorno: ${roundMoney(ticketMedio).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`,
+        impactoEstimado: receitaRecuperavel,
+        tempoMin: Math.min(12, Math.max(4, clientesEmRisco.length * 3)),
+        rota: "/clientes/inativos",
+        cta: "Ver clientes",
+        whatsapp: `Olá ${alvo.nome}! Sentimos sua falta por aqui. Temos horários disponíveis e seria um prazer cuidar do seu veículo novamente. Quer agendar uma lavagem esta semana?`,
+      });
+    }
+
+    if (candidatosAssinatura.length > 0 && planoBase) {
+      const alvo = candidatosAssinatura[0];
+      acoes.push({
+        id: "oferecer-assinatura",
+        prioridade: "media",
+        titulo: `Oferecer assinatura para ${candidatosAssinatura.length} cliente(s) frequente(s)`,
+        detalhe: `${alvo.nome} teve ${alvo.visitas} visita(s) recentes e ainda não possui assinatura ativa.`,
+        impactoEstimado: potencialAssinaturas,
+        tempoMin: 5,
+        rota: "/assinaturas",
+        cta: "Ver planos",
+        whatsapp: `Olá ${alvo.nome}! Vi que você cuida do veículo com frequência. Temos o plano ${planoBase.nome} que pode deixar suas lavagens mais previsíveis. Posso te explicar como funciona?`,
+      });
+    }
+
+    if (slotsLivres.length > 0) {
+      const slot = slotsLivres[0];
+      acoes.push({
+        id: "preencher-horarios",
+        prioridade: "media",
+        titulo: "Preencher horário livre",
+        detalhe: `${slot.data === hoje ? "Hoje" : "Amanhã"} às ${slot.hora} ainda tem ${slot.vagas} vaga(s).`,
+        impactoEstimado: roundMoney(slot.vagas * ticketMedio),
+        tempoMin: 3,
+        rota: "/agendamentos",
+        cta: "Abrir agenda",
+      });
+    }
+
+    if (servicoParaDivulgar) {
+      const nomeServico = servicoParaDivulgar.nome ?? "serviço principal";
+      acoes.push({
+        id: "divulgar-servico",
+        prioridade: "baixa",
+        titulo: `Divulgar ${nomeServico}`,
+        detalhe: "Serviço com bom potencial de ticket nos dados recentes. Use como oferta principal do dia.",
+        impactoEstimado: roundMoney(Number(servicoParaDivulgar.receita ?? servicoParaDivulgar.preco_padrao ?? ticketMedio)),
+        tempoMin: 4,
+        rota: "/oportunidades",
+        cta: "Ver oportunidades",
+        whatsapp: `Hoje é um bom dia para cuidar do seu veículo com ${nomeServico}. Temos horários disponíveis. Quer reservar um horário?`,
+      });
+    }
+
+    if (clientesComRecompensa > 0) {
+      acoes.push({
+        id: "ativar-fidelidade",
+        prioridade: "baixa",
+        titulo: `${clientesComRecompensa} cliente(s) com recompensa disponível`,
+        detalhe: "Recompensa disponível é um bom motivo para trazer o cliente de volta sem desconto agressivo.",
+        impactoEstimado: roundMoney(clientesComRecompensa * ticketMedio),
+        tempoMin: 4,
+        rota: "/fidelidade",
+        cta: "Ver fidelidade",
+      });
+    }
+
+    const acoesOrdenadas = acoes
+      .sort((a, b) => {
+        const peso = { alta: 3, media: 2, baixa: 1 };
+        return peso[b.prioridade] - peso[a.prioridade] || b.impactoEstimado - a.impactoEstimado;
+      })
+      .slice(0, 4);
+
+    return {
+      titulo: potencialHoje > 0
+        ? `Hoje você pode recuperar aproximadamente ${potencialHoje.toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}.`
+        : "Hoje o foco é manter a operação fluindo e registrar mais dados.",
+      subtitulo: acoesOrdenadas.length > 0
+        ? "Execute as ações abaixo primeiro. Elas usam dados reais do seu LavaFlow."
+        : "Ainda não há sinais suficientes para uma missão financeira confiável.",
+      potencialHoje,
+      faturamentoMes: roundMoney(faturamentoMes),
+      ticketMedio: roundMoney(ticketMedio),
+      tempoTotalMin: acoesOrdenadas.reduce((sum, item) => sum + item.tempoMin, 0),
+      clientesEmRisco,
+      candidatosAssinatura,
+      slotsLivres: slotsLivres.slice(0, 5),
+      servicoParaDivulgar: servicoParaDivulgar ? {
+        nome: servicoParaDivulgar.nome,
+        receita: roundMoney(Number(servicoParaDivulgar.receita ?? 0)),
+        quantidade: Number(servicoParaDivulgar.qtd ?? 0),
+      } : null,
+      acoes: acoesOrdenadas,
     };
   });
 
