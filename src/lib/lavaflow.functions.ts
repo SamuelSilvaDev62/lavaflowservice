@@ -3,6 +3,37 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 // ============ DASHBOARD METRICS ============
+type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
+
+function startOfTodayIso() {
+  const d = new Date();
+  d.setHours(0, 0, 0, 0);
+  return d.toISOString();
+}
+
+function endOfTodayIso() {
+  const d = new Date();
+  d.setHours(23, 59, 59, 999);
+  return d.toISOString();
+}
+
+function localDateIso(offsetDays = 0) {
+  const d = new Date();
+  d.setDate(d.getDate() + offsetDays);
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function agendamentoDateTime(a: any) {
+  return new Date(`${a.data_agendada}T${String(a.hora_agendada ?? "00:00").slice(0, 5)}:00`);
+}
+
+function isActiveStatus(status: string) {
+  return !["concluido", "cancelado", "nao_compareceu"].includes(status);
+}
+
 export const getDashboardMetrics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -95,6 +126,246 @@ export const getDashboardMetrics = createServerFn({ method: "GET" })
       novosClientesMes, receitaRecuperavel, scoreSaude, resumoAssistente,
       porDia, serie,
     };
+  });
+
+export const getDashboardOperacional = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const hoje = localDateIso();
+    const now = new Date();
+    const sixtyAgo = new Date(Date.now() - 60 * 86_400_000).toISOString();
+
+    const [{ data: agendamentos }, { data: ordens }, { data: clientes }, { data: funcionarios }] = await Promise.all([
+      supabase.from("agendamentos")
+        .select(`id, data_agendada, hora_agendada, status, leva_traz, endereco_retirada, endereco_devolucao,
+                 horario_retirada, horario_devolucao, taxa_leva_traz, cliente_id, servico_id, funcionario_id,
+                 clientes:cliente_id(nome, telefone), servicos:servico_id(nome, preco_padrao), funcionarios:funcionario_id(nome)`)
+        .eq("owner_id", ownerId)
+        .eq("data_agendada", hoje)
+        .order("hora_agendada", { ascending: true }),
+      supabase.from("ordens_servico")
+        .select(`id, status, valor, iniciado_em, finalizado_em, entregue_em, created_at, cliente_id, servico_id, funcionario_id,
+                 clientes:cliente_id(nome), veiculos:veiculo_id(placa, modelo), servicos:servico_id(nome), funcionarios:funcionario_id(nome)`)
+        .eq("owner_id", ownerId)
+        .in("status", ["aguardando", "em_lavagem", "finalizacao", "pronto"]),
+      supabase.from("ordens_servico")
+        .select("cliente_id, valor, created_at")
+        .eq("owner_id", ownerId)
+        .gte("created_at", sixtyAgo),
+      supabase.from("funcionarios")
+        .select("id, nome, capacidade_por_horario, ativo")
+        .eq("owner_id", ownerId)
+        .eq("ativo", true),
+    ]);
+
+    const agHoje = agendamentos ?? [];
+    const osAbertas = ordens ?? [];
+    const previstosAgenda = agHoje
+      .filter((a: any) => isActiveStatus(a.status))
+      .reduce((s: number, a: any) => s + Number(a.servicos?.preco_padrao ?? 0) + Number(a.taxa_leva_traz ?? 0), 0);
+    const faturamentoAberto = osAbertas.reduce((s: number, o: any) => s + Number(o.valor ?? 0), 0);
+
+    const lastByCliente = new Map<string, { last: string; total: number; visitas: number }>();
+    (clientes ?? []).forEach((o: any) => {
+      const cur = lastByCliente.get(o.cliente_id) ?? { last: o.created_at, total: 0, visitas: 0 };
+      if (o.created_at > cur.last) cur.last = o.created_at;
+      cur.total += Number(o.valor ?? 0);
+      cur.visitas += 1;
+      lastByCliente.set(o.cliente_id, cur);
+    });
+    const ticketMedio = clientes?.length
+      ? (clientes ?? []).reduce((s: number, o: any) => s + Number(o.valor ?? 0), 0) / (clientes ?? []).length
+      : 50;
+    const clientesInativos = Array.from(lastByCliente.values()).filter((c) => {
+      const dias = Math.floor((Date.now() - new Date(c.last).getTime()) / 86_400_000);
+      return dias >= 60;
+    }).length;
+
+    const proximos = agHoje
+      .filter((a: any) => isActiveStatus(a.status) && agendamentoDateTime(a) >= now)
+      .slice(0, 6);
+    const levaTrazProximos = agHoje.filter((a: any) => {
+      if (!a.leva_traz || !a.horario_retirada || !isActiveStatus(a.status)) return false;
+      const t = new Date(`${a.data_agendada}T${String(a.horario_retirada).slice(0, 5)}:00`).getTime();
+      const diffMin = (t - now.getTime()) / 60000;
+      return diffMin >= 0 && diffMin <= 90;
+    });
+
+    const ocupacaoPorFunc = new Map<string, number>();
+    agHoje.filter((a: any) => isActiveStatus(a.status) && a.funcionario_id).forEach((a: any) => {
+      ocupacaoPorFunc.set(a.funcionario_id, (ocupacaoPorFunc.get(a.funcionario_id) ?? 0) + 1);
+    });
+    const funcProxCapacidade = (funcionarios ?? [])
+      .map((f: any) => ({
+        id: f.id,
+        nome: f.nome,
+        ocupacao: ocupacaoPorFunc.get(f.id) ?? 0,
+        capacidade: Math.max(1, Number(f.capacidade_por_horario ?? 1)),
+      }))
+      .filter((f: any) => f.ocupacao >= f.capacidade)
+      .slice(0, 3);
+
+    const recomendacoes = [
+      clientesInativos > 0 ? {
+        tipo: "receita",
+        prioridade: "media",
+        titulo: `${clientesInativos} clientes sem retorno há 60+ dias`,
+        mensagem: `Potencial estimado de recuperação: ${Math.round(clientesInativos * ticketMedio)}`,
+        rota: "/clientes/inativos",
+      } : null,
+      levaTrazProximos.length > 0 ? {
+        tipo: "leva_traz",
+        prioridade: "alta",
+        titulo: "Retiradas próximas",
+        mensagem: `${levaTrazProximos.length} solicitação de Leva e Traz exige atenção nos próximos 90 minutos.`,
+        rota: "/agendamentos",
+      } : null,
+      osAbertas.filter((o: any) => o.status === "pronto").length > 0 ? {
+        tipo: "pronto",
+        prioridade: "alta",
+        titulo: "Veículos prontos para entrega",
+        mensagem: `${osAbertas.filter((o: any) => o.status === "pronto").length} veículo(s) aguardando entrega ao cliente.`,
+        rota: "/fila",
+      } : null,
+      funcProxCapacidade.length > 0 ? {
+        tipo: "capacidade",
+        prioridade: "media",
+        titulo: "Equipe próxima da capacidade",
+        mensagem: `${funcProxCapacidade.map((f: any) => f.nome).join(", ")} já está com agenda cheia.`,
+        rota: "/equipe",
+      } : null,
+    ].filter(Boolean);
+
+    return {
+      cards: {
+        agendamentosHoje: agHoje.length,
+        veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao"].includes(o.status)).length,
+        servicosPendentes: osAbertas.filter((o: any) => ["aguardando", "pronto"].includes(o.status)).length,
+        previsaoFaturamentoDia: previstosAgenda + faturamentoAberto,
+      },
+      agendaHoje: proximos,
+      veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao", "pronto"].includes(o.status)).slice(0, 6),
+      recomendacoes,
+    };
+  });
+
+export const getAlertasOperacionais = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const hoje = localDateIso();
+    const now = new Date();
+
+    const [{ data: agendamentos }, { data: ordens }, { data: notificacoes }] = await Promise.all([
+      supabase.from("agendamentos")
+        .select(`id, data_agendada, hora_agendada, status, leva_traz, endereco_retirada, endereco_devolucao,
+                 horario_retirada, horario_devolucao, clientes:cliente_id(nome), veiculos:veiculo_id(placa, modelo)`)
+        .eq("owner_id", ownerId)
+        .eq("data_agendada", hoje)
+        .order("hora_agendada", { ascending: true }),
+      supabase.from("ordens_servico")
+        .select(`id, status, iniciado_em, finalizado_em, created_at, clientes:cliente_id(nome), veiculos:veiculo_id(placa, modelo)`)
+        .eq("owner_id", ownerId)
+        .in("status", ["em_lavagem", "finalizacao", "pronto"]),
+      supabase.from("notificacoes")
+        .select("*")
+        .eq("owner_id", ownerId)
+        .eq("ignorada", false)
+        .order("created_at", { ascending: false })
+        .limit(20),
+    ]);
+
+    const derivados = [
+      ...(agendamentos ?? []).flatMap((a: any) => {
+        const out: any[] = [];
+        if (a.leva_traz && a.horario_retirada && isActiveStatus(a.status)) {
+          const t = new Date(`${a.data_agendada}T${String(a.horario_retirada).slice(0, 5)}:00`).getTime();
+          const diff = (t - now.getTime()) / 60000;
+          if (diff >= 0 && diff <= 30) {
+            out.push({
+              id: `retirada-${a.id}`,
+              tipo: "leva_traz_retirada",
+              prioridade: "alta",
+              titulo: "Retirada programada",
+              mensagem: `Buscar o veículo de ${a.clientes?.nome ?? "cliente"} em ${Math.round(diff)} minutos.`,
+              rota: "/agendamentos",
+              referencia_id: a.id,
+              created_at: new Date().toISOString(),
+            });
+          }
+        }
+        if (a.leva_traz && a.horario_devolucao && isActiveStatus(a.status)) {
+          const t = new Date(`${a.data_agendada}T${String(a.horario_devolucao).slice(0, 5)}:00`).getTime();
+          const diff = (t - now.getTime()) / 60000;
+          if (diff >= 0 && diff <= 30) {
+            out.push({
+              id: `devolucao-${a.id}`,
+              tipo: "leva_traz_devolucao",
+              prioridade: "alta",
+              titulo: "Devolução programada",
+              mensagem: `Devolver o veículo de ${a.clientes?.nome ?? "cliente"} em ${Math.round(diff)} minutos.`,
+              rota: "/agendamentos",
+              referencia_id: a.id,
+              created_at: new Date().toISOString(),
+            });
+          }
+        }
+        return out;
+      }),
+      ...(ordens ?? []).flatMap((o: any) => {
+        if (o.status === "pronto") {
+          return [{
+            id: `pronto-${o.id}`,
+            tipo: "veiculo_pronto",
+            prioridade: "alta",
+            titulo: "Veículo pronto para entrega",
+            mensagem: `${o.clientes?.nome ?? "Cliente"} já pode ser avisado para retirar o veículo.`,
+            rota: "/fila",
+            referencia_id: o.id,
+            created_at: new Date().toISOString(),
+          }];
+        }
+        if (o.iniciado_em) {
+          const mins = (now.getTime() - new Date(o.iniciado_em).getTime()) / 60000;
+          if (mins >= 180 && o.status !== "pronto") {
+            return [{
+              id: `atraso-${o.id}`,
+              tipo: "servico_atrasado",
+              prioridade: "alta",
+              titulo: "Serviço possivelmente atrasado",
+              mensagem: `${o.clientes?.nome ?? "Cliente"} está em atendimento há ${Math.round(mins)} minutos.`,
+              rota: "/fila",
+              referencia_id: o.id,
+              created_at: new Date().toISOString(),
+            }];
+          }
+        }
+        return [];
+      }),
+    ];
+
+    return { alertas: [...derivados, ...(notificacoes ?? [])].slice(0, 10) };
+  });
+
+export const marcarNotificacao = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    id: z.string().uuid(),
+    lida: z.boolean().optional(),
+    ignorada: z.boolean().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const { error } = await supabase.from("notificacoes")
+      .update({ lida: data.lida ?? true, ignorada: data.ignorada ?? false })
+      .eq("id", data.id)
+      .eq("owner_id", ownerId);
+    if (error) throw error;
+    return { ok: true };
   });
 
 // ============ OPORTUNIDADES ============
@@ -428,10 +699,11 @@ export const upsertServico = createServerFn({ method: "POST" })
 export const listFuncionarios = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
     const ninetyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const [{ data: func }, { data: ordens }] = await Promise.all([
-      context.supabase.from("funcionarios").select("*").eq("owner_id", context.userId).order("nome"),
-      context.supabase.from("ordens_servico").select("funcionario_id, valor").eq("owner_id", context.userId).gte("created_at", ninetyAgo).eq("status", "entregue"),
+      context.supabase.from("funcionarios").select("*").eq("owner_id", ownerId).order("nome"),
+      context.supabase.from("ordens_servico").select("funcionario_id, valor").eq("owner_id", ownerId).gte("created_at", ninetyAgo).eq("status", "entregue"),
     ]);
     const stats = new Map<string, { count: number; total: number }>();
     (ordens ?? []).forEach((o) => {
@@ -712,12 +984,125 @@ export const getRelatorios = createServerFn({ method: "GET" })
     };
   });
 
+export const getRelatoriosExecutivos = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const now = new Date();
+    const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
+    const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
+    const thirtyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
+
+    const [{ data: ordens }, { data: clientes }, { data: assinaturas }, { data: planos }, { data: agendamentos }] = await Promise.all([
+      supabase.from("ordens_servico")
+        .select("id, valor, status, created_at, cliente_id, servicos:servico_id(nome)")
+        .eq("owner_id", ownerId)
+        .gte("created_at", ninetyAgo),
+      supabase.from("clientes").select("id, nome, created_at, pontos_saldo").eq("owner_id", ownerId),
+      supabase.from("assinaturas_clientes")
+        .select("id, cliente_id, status, planos_assinatura:plano_id(valor_mensal)")
+        .eq("owner_id", ownerId),
+      supabase.from("planos_assinatura").select("valor_mensal").eq("owner_id", ownerId).eq("ativo", true).order("valor_mensal", { ascending: true }).limit(1),
+      supabase.from("agendamentos")
+        .select("id, cliente_id, leva_traz, taxa_leva_traz, clientes:cliente_id(nome)")
+        .eq("owner_id", ownerId)
+        .gte("data_agendada", ninetyAgo.slice(0, 10)),
+    ]);
+
+    const ordensMes = (ordens ?? []).filter((o: any) => o.created_at >= startMonth);
+    const faturamentoMensal = ordensMes.reduce((s: number, o: any) => s + Number(o.valor ?? 0), 0);
+    const faturamento90 = (ordens ?? []).reduce((s: number, o: any) => s + Number(o.valor ?? 0), 0);
+    const ticketMedio = ordens?.length ? faturamento90 / ordens.length : 0;
+    const receitaRecorrente = (assinaturas ?? [])
+      .filter((a: any) => a.status === "ativa")
+      .reduce((s: number, a: any) => s + Number(a.planos_assinatura?.valor_mensal ?? 0), 0);
+    const novosClientes = (clientes ?? []).filter((c: any) => c.created_at >= startMonth).length;
+
+    const clientesAtivos90 = new Set((ordens ?? []).map((o: any) => o.cliente_id));
+    const clientesRecentes30 = new Set((ordens ?? []).filter((o: any) => o.created_at >= thirtyAgo).map((o: any) => o.cliente_id));
+    const retencao = clientesAtivos90.size ? clientesRecentes30.size / clientesAtivos90.size : 0;
+
+    const inativos = (clientes ?? []).filter((c: any) => !clientesRecentes30.has(c.id)).length;
+    const receitaRecuperavel = inativos * (ticketMedio || 50);
+    const assinaturasAtivas = new Set((assinaturas ?? []).filter((a: any) => a.status === "ativa").map((a: any) => a.cliente_id));
+    const byCliente = new Map<string, number>();
+    (ordens ?? []).forEach((o: any) => byCliente.set(o.cliente_id, (byCliente.get(o.cliente_id) ?? 0) + 1));
+    const candidatosAssinatura = Array.from(byCliente.entries()).filter(([clienteId, visitas]) => visitas >= 4 && !assinaturasAtivas.has(clienteId)).length;
+    const potencialAssinaturas = candidatosAssinatura * Number(planos?.[0]?.valor_mensal ?? 0);
+
+    const porDia = new Map<string, number>();
+    const porServico = new Map<string, { nome: string; valor: number; qtd: number }>();
+    (ordens ?? []).forEach((o: any) => {
+      const dia = o.created_at.slice(0, 10);
+      porDia.set(dia, (porDia.get(dia) ?? 0) + Number(o.valor ?? 0));
+      const nome = o.servicos?.nome ?? "Sem serviço";
+      const cur = porServico.get(nome) ?? { nome, valor: 0, qtd: 0 };
+      cur.valor += Number(o.valor ?? 0);
+      cur.qtd += 1;
+      porServico.set(nome, cur);
+    });
+
+    const levaTraz = (agendamentos ?? []).filter((a: any) => a.leva_traz);
+    const levaTrazClientes = new Map<string, { nome: string; qtd: number; valor: number }>();
+    levaTraz.forEach((a: any) => {
+      const key = a.cliente_id ?? a.clientes?.nome ?? "sem-cliente";
+      const cur = levaTrazClientes.get(key) ?? { nome: a.clientes?.nome ?? "Cliente", qtd: 0, valor: 0 };
+      cur.qtd += 1;
+      cur.valor += Number(a.taxa_leva_traz ?? 0);
+      levaTrazClientes.set(key, cur);
+    });
+
+    const scoreSaude = Math.round(Math.max(0, Math.min(100,
+      (retencao * 40)
+      + (receitaRecorrente > 0 ? 15 : 0)
+      + (ticketMedio >= 40 ? 15 : (ticketMedio / 40) * 15)
+      + (faturamentoMensal > 0 ? 20 : 0)
+      + (novosClientes > 0 ? 10 : 0),
+    )));
+
+    return {
+      cards: {
+        faturamentoMensal,
+        ticketMedio,
+        receitaRecorrente,
+        novosClientes,
+        retencao,
+        scoreSaude,
+        receitaRecuperavel,
+        potencialAssinaturas,
+      },
+      serieFaturamento: Array.from(porDia, ([dia, valor]) => ({ dia, valor })).sort((a, b) => a.dia.localeCompare(b.dia)),
+      servicosMaisVendidos: Array.from(porServico.values()).sort((a, b) => b.valor - a.valor),
+      evolucaoClientes: (clientes ?? []).map((c: any) => ({ dia: c.created_at.slice(0, 10), valor: 1 })),
+      retencaoClientes: { ativos90: clientesAtivos90.size, recentes30: clientesRecentes30.size, retencao },
+      levaTraz: {
+        quantidade: levaTraz.length,
+        receita: levaTraz.reduce((s: number, a: any) => s + Number(a.taxa_leva_traz ?? 0), 0),
+        clientes: Array.from(levaTrazClientes.values()).sort((a, b) => b.qtd - a.qtd).slice(0, 10),
+      },
+    };
+  });
+
 // ============ COLABORADORES / MEU TRABALHO ============
 async function getOwnerScope(supabase: any, userId: string) {
   const { data } = await supabase.from("user_roles").select("owner_id, role").eq("user_id", userId);
-  const colab = (data ?? []).find((r: any) => r.role === "colaborador");
-  const isOwner = (data ?? []).some((r: any) => r.role === "owner");
-  return { ownerId: colab?.owner_id ?? userId, role: colab && !isOwner ? "colaborador" : "owner" as "owner" | "colaborador" };
+  const priority: Record<TenantRole, number> = {
+    owner: 1,
+    admin: 2,
+    gerente: 3,
+    atendente: 4,
+    lavador: 5,
+    colaborador: 5,
+  };
+  const sorted = ((data ?? []) as Array<{ owner_id: string; role: TenantRole }>)
+    .slice()
+    .sort((a, b) => (priority[a.role] ?? 99) - (priority[b.role] ?? 99));
+  const current = sorted[0];
+  return {
+    ownerId: current?.owner_id ?? userId,
+    role: current?.role ?? "owner",
+  };
 }
 
 export const getMyRole = createServerFn({ method: "GET" })
@@ -788,13 +1173,20 @@ export const upsertFuncionarioFull = createServerFn({ method: "POST" })
     comissao_tipo: z.enum(["fixo", "percentual"]).default("fixo"),
     comissao_valor: z.number().min(0).max(10000).default(0),
     comissao_modo: z.enum(["global", "por_servico"]).default("global"),
+    especialidades: z.array(z.string().max(80)).default([]),
+    horario_inicio: z.string().regex(/^\d{2}:\d{2}/).default("08:00"),
+    horario_fim: z.string().regex(/^\d{2}:\d{2}/).default("18:00"),
+    dias_disponiveis: z.array(z.number().int().min(0).max(6)).default([1,2,3,4,5,6]),
+    capacidade_por_horario: z.number().int().min(1).max(20).default(1),
+    tempo_medio_servicos: z.record(z.string(), z.number().int().min(1).max(1440)).default({}),
     ativo: z.boolean().default(true),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const row: any = { ...data, owner_id: context.userId };
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const row: any = { ...data, owner_id: ownerId };
     if (row.email === "") row.email = null;
     const { error } = data.id
-      ? await context.supabase.from("funcionarios").update(row).eq("id", data.id).eq("owner_id", context.userId)
+      ? await context.supabase.from("funcionarios").update(row).eq("id", data.id).eq("owner_id", ownerId)
       : await context.supabase.from("funcionarios").insert(row);
     if (error) throw error;
     return { ok: true };
@@ -959,7 +1351,7 @@ export const getEquipePainel = createServerFn({ method: "GET" })
 
     const [{ data: func }, { data: ordens }, { data: comissoes }, { data: pagamentos }] = await Promise.all([
       supabase.from("funcionarios")
-        .select("id, nome, ativo, comissao_tipo, comissao_valor, comissao_modo, auth_user_id, cargo, telefone, email")
+        .select("id, nome, ativo, comissao_tipo, comissao_valor, comissao_modo, auth_user_id, cargo, telefone, email, especialidades, horario_inicio, horario_fim, dias_disponiveis, capacidade_por_horario")
         .eq("owner_id", userId).order("nome"),
       supabase.from("ordens_servico")
         .select("id, valor, status, funcionario_id, iniciado_em, entregue_em, created_at")
@@ -1315,24 +1707,105 @@ export const getEquipeMetrics = createServerFn({ method: "GET" })
 // ============ AGENDAMENTOS ============
 export type AgendamentoStatus = "agendado" | "confirmado" | "em_andamento" | "concluido" | "cancelado" | "nao_compareceu";
 
+async function getFuncionariosDisponiveisInterno(
+  supabase: any,
+  ownerId: string,
+  dataAgendada: string,
+  horaAgendada: string,
+  servicoId?: string | null,
+) {
+  const hora = horaAgendada.length === 5 ? `${horaAgendada}:00` : horaAgendada;
+  const diaSemana = new Date(`${dataAgendada}T12:00:00`).getDay();
+  const [{ data: funcionarios }, { data: ocupados }, { data: servico }] = await Promise.all([
+    supabase.from("funcionarios")
+      .select("id, nome, ativo, cargo, especialidades, horario_inicio, horario_fim, dias_disponiveis, capacidade_por_horario, tempo_medio_servicos")
+      .eq("owner_id", ownerId)
+      .eq("ativo", true)
+      .order("nome"),
+    supabase.from("agendamentos")
+      .select("id, funcionario_id, status")
+      .eq("owner_id", ownerId)
+      .eq("data_agendada", dataAgendada)
+      .eq("hora_agendada", hora)
+      .not("status", "in", "(cancelado,nao_compareceu)"),
+    servicoId
+      ? supabase.from("servicos").select("id, nome").eq("id", servicoId).eq("owner_id", ownerId).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+
+  const ocupacao = new Map<string, number>();
+  (ocupados ?? []).forEach((a: any) => {
+    if (a.funcionario_id) ocupacao.set(a.funcionario_id, (ocupacao.get(a.funcionario_id) ?? 0) + 1);
+  });
+  const servicoNome = (servico as any)?.nome?.toLowerCase();
+
+  return (funcionarios ?? []).map((f: any) => {
+    const inicio = String(f.horario_inicio ?? "08:00").slice(0, 5);
+    const fim = String(f.horario_fim ?? "18:00").slice(0, 5);
+    const dias = f.dias_disponiveis ?? [1,2,3,4,5,6];
+    const especialidades = (f.especialidades ?? []) as string[];
+    const capacidade = Math.max(1, Number(f.capacidade_por_horario ?? 1));
+    const qtd = ocupacao.get(f.id) ?? 0;
+    const dentroHorario = hora.slice(0, 5) >= inicio && hora.slice(0, 5) < fim;
+    const diaDisponivel = dias.includes(diaSemana);
+    const especialidadeOk = !servicoNome || especialidades.length === 0
+      || especialidades.some((e) => servicoNome.includes(String(e).toLowerCase()) || String(e).toLowerCase().includes(servicoNome));
+    const disponivel = dentroHorario && diaDisponivel && especialidadeOk && qtd < capacidade;
+    return {
+      ...f,
+      ocupacao: qtd,
+      capacidade,
+      disponivel,
+      motivo_indisponivel: !diaDisponivel ? "Fora do dia de trabalho"
+        : !dentroHorario ? "Fora do horário"
+        : !especialidadeOk ? "Especialidade incompatível"
+        : qtd >= capacidade ? "Lotado"
+        : null,
+    };
+  });
+}
+
+export const getColaboradoresDisponiveis = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    data_agendada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    hora_agendada: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
+    servico_id: z.string().uuid().nullable().optional(),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const colaboradores = await getFuncionariosDisponiveisInterno(
+      context.supabase,
+      ownerId,
+      data.data_agendada,
+      data.hora_agendada,
+      data.servico_id,
+    );
+    return { colaboradores };
+  });
+
 export const listAgendamentos = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d: { date?: string; from?: string; to?: string }) => d ?? {})
+  .inputValidator((d: { date?: string; from?: string; to?: string; leva_traz?: boolean }) => d ?? {})
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     let q = supabase.from("agendamentos")
       .select(`id, data_agendada, hora_agendada, status, observacoes, ordem_id, created_at,
+               leva_traz, endereco_retirada, endereco_devolucao, horario_retirada, horario_devolucao,
+               observacoes_leva_traz, taxa_leva_traz, leva_traz_status,
                cliente_id, veiculo_id, servico_id, funcionario_id,
                clientes:cliente_id(nome, telefone),
                veiculos:veiculo_id(placa, modelo),
                servicos:servico_id(nome, preco_padrao),
                funcionarios:funcionario_id(nome)`)
-      .eq("owner_id", userId)
+      .eq("owner_id", ownerId)
       .order("data_agendada", { ascending: true })
       .order("hora_agendada", { ascending: true });
     if (data.date) q = q.eq("data_agendada", data.date);
     if (data.from) q = q.gte("data_agendada", data.from);
     if (data.to) q = q.lte("data_agendada", data.to);
+    if (data.leva_traz) q = q.eq("leva_traz", true);
     const { data: rows, error } = await q.limit(500);
     if (error) throw error;
     return { agendamentos: rows ?? [] };
@@ -1342,11 +1815,13 @@ export const agendamentoStats = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const today = new Date().toISOString().slice(0, 10);
     const monthAgo = new Date(Date.now() - 30 * 86_400_000).toISOString().slice(0, 10);
+    const weekAhead = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
     const [{ data: hoje }, { data: mes }] = await Promise.all([
-      supabase.from("agendamentos").select("id, status").eq("owner_id", userId).eq("data_agendada", today),
-      supabase.from("agendamentos").select("id, status").eq("owner_id", userId).gte("data_agendada", monthAgo),
+      supabase.from("agendamentos").select("id, status, leva_traz").eq("owner_id", ownerId).eq("data_agendada", today),
+      supabase.from("agendamentos").select("id, status, leva_traz, data_agendada").eq("owner_id", ownerId).gte("data_agendada", monthAgo),
     ]);
     const h = hoje ?? [];
     const m = mes ?? [];
@@ -1360,6 +1835,8 @@ export const agendamentoStats = createServerFn({ method: "GET" })
       naoCompareceuHoje: h.filter(a => a.status === "nao_compareceu").length,
       naoCompareceuMes: naoCompareceu,
       taxaComparecimento: totalMes ? compareceu / totalMes : 0,
+      levaTrazHoje: h.filter(a => a.leva_traz).length,
+      levaTrazSemana: m.filter(a => a.leva_traz && a.data_agendada >= today && a.data_agendada <= weekAhead).length,
       totalMes,
     };
   });
@@ -1374,23 +1851,47 @@ export const createAgendamento = createServerFn({ method: "POST" })
     data_agendada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     hora_agendada: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/),
     observacoes: z.string().max(500).nullable().optional(),
+    leva_traz: z.boolean().default(false),
+    endereco_retirada: z.string().max(300).nullable().optional(),
+    endereco_devolucao: z.string().max(300).nullable().optional(),
+    horario_retirada: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).nullable().optional(),
+    horario_devolucao: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).nullable().optional(),
+    observacoes_leva_traz: z.string().max(500).nullable().optional(),
+    taxa_leva_traz: z.number().min(0).default(0),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const hora = data.hora_agendada.length === 5 ? data.hora_agendada + ":00" : data.hora_agendada;
-    const { data: cfg } = await supabase.from("agenda_config").select("capacidade_simultanea").eq("owner_id", userId).maybeSingle();
+    const { data: cfg } = await supabase.from("agenda_config").select("capacidade_simultanea").eq("owner_id", ownerId).maybeSingle();
     const cap = cfg?.capacidade_simultanea ?? 1;
     const { count } = await supabase.from("agendamentos")
       .select("id", { count: "exact", head: true })
-      .eq("owner_id", userId)
+      .eq("owner_id", ownerId)
       .eq("data_agendada", data.data_agendada)
       .eq("hora_agendada", hora)
       .not("status", "in", "(cancelado,nao_compareceu)");
     if ((count ?? 0) >= cap) {
       throw new Error(`Horário lotado (capacidade ${cap}).`);
     }
+    let funcionario_id = data.funcionario_id ?? null;
+    const colaboradores = await getFuncionariosDisponiveisInterno(supabase, ownerId, data.data_agendada, hora, data.servico_id);
+    if (funcionario_id) {
+      const escolhido = colaboradores.find((c: any) => c.id === funcionario_id);
+      if (!escolhido?.disponivel) throw new Error(escolhido?.motivo_indisponivel ?? "Colaborador indisponivel neste horario.");
+    } else {
+      funcionario_id = colaboradores
+        .filter((c: any) => c.disponivel)
+        .sort((a: any, b: any) => (a.ocupacao / a.capacidade) - (b.ocupacao / b.capacidade) || a.ocupacao - b.ocupacao)[0]?.id ?? null;
+    }
+    const horario_retirada = data.horario_retirada
+      ? (data.horario_retirada.length === 5 ? `${data.horario_retirada}:00` : data.horario_retirada)
+      : null;
+    const horario_devolucao = data.horario_devolucao
+      ? (data.horario_devolucao.length === 5 ? `${data.horario_devolucao}:00` : data.horario_devolucao)
+      : null;
     const { error, data: row } = await supabase.from("agendamentos").insert({
-      ...data, hora_agendada: hora, owner_id: userId,
+      ...data, funcionario_id, hora_agendada: hora, horario_retirada, horario_devolucao, owner_id: ownerId,
     }).select().single();
     if (error) throw error;
     return { agendamento: row };
@@ -1402,12 +1903,27 @@ export const updateAgendamento = createServerFn({ method: "POST" })
     id: z.string().uuid(),
     funcionario_id: z.string().uuid().nullable().optional(),
     servico_id: z.string().uuid().nullable().optional(),
+    data_agendada: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).optional(),
+    hora_agendada: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).optional(),
     observacoes: z.string().max(500).nullable().optional(),
+    leva_traz: z.boolean().optional(),
+    endereco_retirada: z.string().max(300).nullable().optional(),
+    endereco_devolucao: z.string().max(300).nullable().optional(),
+    horario_retirada: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).nullable().optional(),
+    horario_devolucao: z.string().regex(/^\d{2}:\d{2}(:\d{2})?$/).nullable().optional(),
+    observacoes_leva_traz: z.string().max(500).nullable().optional(),
+    taxa_leva_traz: z.number().min(0).optional(),
+    leva_traz_status: z.enum(["pendente","retirada_agendada","retirado","em_servico","pronto_para_devolucao","devolvido","cancelado"]).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { id, ...rest } = data;
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const patch: any = { ...rest };
+    if (patch.hora_agendada?.length === 5) patch.hora_agendada = `${patch.hora_agendada}:00`;
+    if (patch.horario_retirada?.length === 5) patch.horario_retirada = `${patch.horario_retirada}:00`;
+    if (patch.horario_devolucao?.length === 5) patch.horario_devolucao = `${patch.horario_devolucao}:00`;
     const { error } = await context.supabase.from("agendamentos")
-      .update(rest).eq("id", id).eq("owner_id", context.userId);
+      .update(patch).eq("id", id).eq("owner_id", ownerId);
     if (error) throw error;
     return { ok: true };
   });
@@ -1420,11 +1936,12 @@ export const updateAgendamentoStatus = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const patch: any = { status: data.status };
     if (data.status === "confirmado") patch.confirmado_em = new Date().toISOString();
     if (data.status === "cancelado") patch.cancelado_em = new Date().toISOString();
     if (data.status === "concluido") patch.concluido_em = new Date().toISOString();
-    const { error } = await supabase.from("agendamentos").update(patch).eq("id", data.id).eq("owner_id", userId);
+    const { error } = await supabase.from("agendamentos").update(patch).eq("id", data.id).eq("owner_id", ownerId);
     if (error) throw error;
     return { ok: true };
   });
@@ -1434,9 +1951,10 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const { data: ag, error: e1 } = await supabase.from("agendamentos")
-      .select("id, cliente_id, veiculo_id, servico_id, funcionario_id, ordem_id, observacoes")
-      .eq("id", data.id).eq("owner_id", userId).single();
+      .select("id, cliente_id, veiculo_id, servico_id, funcionario_id, ordem_id, observacoes, leva_traz, taxa_leva_traz")
+      .eq("id", data.id).eq("owner_id", ownerId).single();
     if (e1) throw e1;
     if (ag.ordem_id) {
       return { ok: true, ordem_id: ag.ordem_id };
@@ -1446,14 +1964,15 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
       const { data: s } = await supabase.from("servicos").select("preco_padrao").eq("id", ag.servico_id).maybeSingle();
       valor = Number(s?.preco_padrao ?? 0);
     }
+    valor += Number(ag.taxa_leva_traz ?? 0);
     // Se já tem funcionario no agendamento, usa; senão tenta o usuário logado (colaborador)
     let funcionario_id: string | null = ag.funcionario_id ?? null;
     if (!funcionario_id) {
-      const { data: meFunc } = await supabase.from("funcionarios").select("id").eq("auth_user_id", userId).maybeSingle();
+      const { data: meFunc } = await supabase.from("funcionarios").select("id").eq("owner_id", ownerId).eq("auth_user_id", userId).maybeSingle();
       if (meFunc?.id) funcionario_id = meFunc.id;
     }
     const { data: os, error: e2 } = await supabase.from("ordens_servico").insert({
-      owner_id: userId,
+      owner_id: ownerId,
       cliente_id: ag.cliente_id,
       veiculo_id: ag.veiculo_id,
       servico_id: ag.servico_id,
@@ -1466,7 +1985,8 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
     const { error: e3 } = await supabase.from("agendamentos").update({
       status: "em_andamento",
       ordem_id: os.id,
-    }).eq("id", data.id).eq("owner_id", userId);
+      ...(ag.leva_traz ? { leva_traz_status: "em_servico" } : {}),
+    }).eq("id", data.id).eq("owner_id", ownerId);
     if (e3) throw e3;
     return { ok: true, ordem_id: os.id };
   });
@@ -1475,8 +1995,9 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
 export const getAgendaConfig = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data } = await context.supabase.from("agenda_config").select("*").eq("owner_id", context.userId).maybeSingle();
-    return { config: data ?? { hora_inicio: "08:00", hora_fim: "18:00", dias_semana: [1,2,3,4,5,6], intervalo_min: 30, capacidade_simultanea: 1 } };
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { data } = await context.supabase.from("agenda_config").select("*").eq("owner_id", ownerId).maybeSingle();
+    return { config: data ?? { hora_inicio: "08:00", hora_fim: "18:00", dias_semana: [1,2,3,4,5,6], intervalo_min: 30, capacidade_simultanea: 1, permitir_escolha_profissional: false } };
   });
 
 export const updateAgendaConfig = createServerFn({ method: "POST" })
@@ -1487,10 +2008,12 @@ export const updateAgendaConfig = createServerFn({ method: "POST" })
     dias_semana: z.array(z.number().int().min(0).max(6)).min(1).max(7),
     intervalo_min: z.number().int().refine(v => [15,30,60].includes(v)),
     capacidade_simultanea: z.number().int().min(1).max(10),
+    permitir_escolha_profissional: z.boolean().default(false),
   }).parse(d))
   .handler(async ({ data, context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
     const { error } = await context.supabase.from("agenda_config")
-      .upsert({ ...data, owner_id: context.userId, updated_at: new Date().toISOString() }, { onConflict: "owner_id" });
+      .upsert({ ...data, owner_id: ownerId, updated_at: new Date().toISOString() }, { onConflict: "owner_id" });
     if (error) throw error;
     return { ok: true };
   });

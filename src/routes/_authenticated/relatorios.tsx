@@ -1,167 +1,184 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { lazy, Suspense, useState } from "react";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
-import { getRelatorios } from "@/lib/lavaflow.functions";
-import { brl } from "@/lib/format";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
-import { BarChart3, TrendingUp, Package, CheckCircle2, Users, Wrench } from "lucide-react";
-
-const RelatoriosCharts = lazy(() => import("@/components/charts/relatorios-charts"));
-const HorizontalRankingChart = lazy(() =>
-  import("@/components/charts/relatorios-charts").then((m) => ({ default: m.HorizontalRankingChart })),
-);
-const ChartFallback = () => <div className="h-64 w-full rounded-md bg-muted/40 animate-pulse" />;
-
+import { getRelatoriosExecutivos } from "@/lib/lavaflow.functions";
+import { brl, pct } from "@/lib/format";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
+import {
+  BarChart3, CalendarDays, Car, CreditCard, DollarSign, Repeat,
+  Sparkles, TrendingUp, UserPlus, Users,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
   component: () => <RequireRole roles={GESTAO}><Page /></RequireRole>,
 });
 
 function Page() {
-  const fn = useServerFn(getRelatorios);
-  const { data, isLoading } = useQuery({ queryKey: ["relatorios"], queryFn: () => fn() });
-  const [mobileTab, setMobileTab] = useState<"servico" | "func">("servico");
+  const fn = useServerFn(getRelatoriosExecutivos);
+  const { data, isLoading } = useQuery({ queryKey: ["relatorios-executivos"], queryFn: () => fn() });
 
   return (
     <>
-      <div className="sm:hidden mb-3">
-        <h1 className="font-display text-2xl font-bold">Relatórios</h1>
-        <p className="text-xs text-muted-foreground">Últimos 90 dias</p>
-      </div>
-      <div className="hidden sm:block">
-        <PageHeader title="Relatórios" subtitle="Últimos 90 dias." />
-      </div>
+      <PageHeader
+        title="Relatorios Executivos"
+        subtitle="Crescimento, recorrencia, retencao e oportunidades do lava-rapido."
+        actions={<Button asChild variant="outline"><Link to="/dashboard">Ver operacao do dia</Link></Button>}
+      />
 
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
-      {data && data.qtd === 0 && (
+
+      {data && data.cards.faturamentoMensal === 0 && data.servicosMaisVendidos.length === 0 && (
         <EmptyState
           icon={BarChart3}
-          title="Seus relatórios aparecem quando você operar"
-          description="Registre ordens de serviço para visualizar receita por serviço, por funcionário e tendências de crescimento."
-          highlight="Lava-rápidos que analisam relatórios mensais crescem 2× mais rápido"
-          ctas={[{ label: "Registrar primeira OS", to: "/ordens" }]}
+          title="Seus relatorios aparecem quando voce operar"
+          description="Registre ordens de servico e agendamentos para visualizar receita, retencao e oportunidades."
+          ctas={[{ label: "Abrir ordens", to: "/ordens" }]}
         />
       )}
-      {data && data.qtd > 0 && (
-        <>
-          {/* DESKTOP — cards lado a lado */}
-          <div className="hidden sm:grid grid-cols-3 gap-3 mb-6">
-            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Faturamento</p><p className="font-display text-2xl font-bold">{brl(data.total)}</p></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Ordens</p><p className="font-display text-2xl font-bold">{data.qtd}</p></CardContent></Card>
-            <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Entregues</p><p className="font-display text-2xl font-bold text-success">{data.entregues}</p></CardContent></Card>
+
+      {data && (
+        <div className="space-y-5">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Kpi icon={DollarSign} label="Faturamento mensal" value={brl(data.cards.faturamentoMensal)} tone="success" />
+            <Kpi icon={TrendingUp} label="Ticket medio" value={brl(data.cards.ticketMedio)} />
+            <Kpi icon={Repeat} label="Receita recorrente" value={brl(data.cards.receitaRecorrente)} />
+            <Kpi icon={Users} label="Retencao 90d" value={pct(data.cards.retencao, 0)} tone={data.cards.retencao >= 0.45 ? "success" : "warning"} />
           </div>
 
-          {/* MOBILE — hero KPI + chips */}
-          <div className="sm:hidden mb-4">
-            <div className="rounded-2xl border bg-gradient-to-br from-primary/15 via-primary/5 to-transparent p-5 shadow-sm">
-              <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                <TrendingUp className="h-3.5 w-3.5" />
-                <span>Faturamento · 90 dias</span>
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="p-4">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                <div>
+                  <h2 className="font-display font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" />Resumo do consultor</h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    Score de saude {data.cards.scoreSaude}/100. Existe {brl(data.cards.receitaRecuperavel)} em receita recuperavel e {brl(data.cards.potencialAssinaturas)} de potencial em assinaturas.
+                  </p>
+                </div>
+                <Button asChild><Link to="/assistente">Pedir plano de acao</Link></Button>
               </div>
-              <p className="font-display font-black text-4xl mt-1 tracking-tight tabular-nums break-all leading-none">
-                {brl(data.total)}
-              </p>
-              <div className="flex items-center gap-2 mt-3">
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-success/15 text-success px-2 py-0.5 rounded-full">
-                  <CheckCircle2 className="h-3 w-3" />
-                  {data.entregues} entregues
-                </span>
-                <span className="inline-flex items-center gap-1 text-[11px] font-medium bg-card border px-2 py-0.5 rounded-full">
-                  <Package className="h-3 w-3" />
-                  {data.qtd} ordens
-                </span>
-              </div>
-            </div>
+            </CardContent>
+          </Card>
 
-            <div className="-mx-4 px-4 mt-3 flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 [&::-webkit-scrollbar]:hidden">
-              <KpiChip emoji="🎯" label="Ticket médio" value={brl(data.qtd ? data.total / data.qtd : 0)} />
-              <KpiChip emoji="✅" label="Taxa entrega" value={`${data.qtd ? Math.round((data.entregues / data.qtd) * 100) : 0}%`} />
-              <KpiChip emoji="🧼" label="Serviços" value={String(data.porServico.length)} />
-              <KpiChip emoji="👥" label="Equipe ativa" value={String(data.porFuncionario.length)} />
-            </div>
-          </div>
-
-          {/* MOBILE — tabs + gráfico horizontal */}
-          <div className="sm:hidden space-y-3">
-            <div className="grid grid-cols-2 gap-1.5 p-1 bg-muted rounded-xl">
-              <button
-                onClick={() => setMobileTab("servico")}
-                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition ${mobileTab === "servico" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}>
-                <Wrench className="h-3.5 w-3.5" />Serviços
-              </button>
-              <button
-                onClick={() => setMobileTab("func")}
-                className={`flex items-center justify-center gap-1.5 py-2 rounded-lg text-sm font-medium transition ${mobileTab === "func" ? "bg-card shadow-sm text-foreground" : "text-muted-foreground"}`}>
-                <Users className="h-3.5 w-3.5" />Equipe
-              </button>
-            </div>
+          <div className="grid lg:grid-cols-[1.2fr_1fr] gap-4">
+            <Card>
+              <CardContent className="p-4">
+                <h2 className="font-display font-semibold mb-3">Faturamento dos ultimos dias</h2>
+                <div className="space-y-2">
+                  {data.serieFaturamento.slice(-14).map((d: any) => (
+                    <Bar key={d.dia} label={d.dia.slice(5).split("-").reverse().join("/")} value={d.valor} max={Math.max(...data.serieFaturamento.map((x: any) => x.valor), 1)} />
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
 
             <Card>
               <CardContent className="p-4">
-                <h3 className="font-display font-semibold mb-3">
-                  Receita por {mobileTab === "servico" ? "serviço" : "funcionário"}
-                </h3>
-                <HorizontalChart data={(mobileTab === "servico" ? data.porServico : data.porFuncionario).slice(0, 5)} />
-                <RankingList items={(mobileTab === "servico" ? data.porServico : data.porFuncionario).slice(0, 5)} />
+                <h2 className="font-display font-semibold mb-3">Leva e Traz</h2>
+                <div className="grid grid-cols-2 gap-2 mb-3">
+                  <Mini icon={Car} label="Servicos" value={String(data.levaTraz.quantidade)} />
+                  <Mini icon={DollarSign} label="Receita" value={brl(data.levaTraz.receita)} />
+                </div>
+                {data.levaTraz.topClientes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Ainda nao ha volume relevante de Leva e Traz nos ultimos 90 dias.</p>
+                ) : (
+                  <div className="space-y-2">
+                    {data.levaTraz.topClientes.slice(0, 5).map((c: any) => (
+                      <div key={c.nome} className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
+                        <span className="truncate">{c.nome}</span>
+                        <span className="font-medium">{c.qtd} · {brl(c.valor)}</span>
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
 
-          {/* DESKTOP — gráficos lado a lado */}
-          <div className="hidden sm:grid lg:grid-cols-2 gap-4">
-            <Suspense fallback={<><ChartFallback /><ChartFallback /></>}>
-              <RelatoriosCharts porServico={data.porServico} porFuncionario={data.porFuncionario} />
-            </Suspense>
+          <div className="grid lg:grid-cols-3 gap-4">
+            <Ranking title="Servicos mais vendidos" items={data.servicosMaisVendidos} />
+            <Ranking title="Evolucao de clientes" items={data.evolucaoClientes.map((i: any) => ({ nome: i.mes, qtd: i.novos, valor: i.novos }))} qtdLabel="novos" />
+            <Card>
+              <CardContent className="p-4">
+                <h2 className="font-display font-semibold mb-3">Oportunidades</h2>
+                <div className="space-y-2">
+                  <Opportunity icon={UserPlus} label="Novos clientes no mes" value={String(data.cards.novosClientes)} />
+                  <Opportunity icon={CreditCard} label="Potencial em assinaturas" value={brl(data.cards.potencialAssinaturas)} />
+                  <Opportunity icon={CalendarDays} label="Receita recuperavel" value={brl(data.cards.receitaRecuperavel)} />
+                </div>
+              </CardContent>
+            </Card>
           </div>
-        </>
+        </div>
       )}
     </>
   );
 }
 
-function KpiChip({ emoji, label, value }: { emoji: string; label: string; value: string }) {
+function Kpi({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone?: "success" | "warning" }) {
+  const cls = tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : "";
   return (
-    <div className="snap-start shrink-0 min-w-[130px] rounded-xl border bg-card px-3 py-2">
-      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><span>{emoji}</span>{label}</p>
-      <p className="font-display font-bold text-base leading-tight mt-0.5 tabular-nums">{value}</p>
+    <Card>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4" />{label}</div>
+        <p className={`font-display font-bold text-2xl mt-1 tabular-nums ${cls}`}>{value}</p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function Mini({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+  return (
+    <div className="rounded-md border p-3">
+      <p className="text-xs text-muted-foreground flex items-center gap-1"><Icon className="h-3.5 w-3.5" />{label}</p>
+      <p className="font-display font-bold mt-1">{value}</p>
     </div>
   );
 }
 
-function HorizontalChart({ data }: { data: Array<{ nome: string; valor: number }> }) {
+function Bar({ label, value, max }: { label: string; value: number; max: number }) {
+  const width = Math.max(4, Math.round((value / max) * 100));
   return (
-    <Suspense fallback={<ChartFallback />}>
-      <HorizontalRankingChart data={data} />
-    </Suspense>
+    <div className="grid grid-cols-[44px_1fr_90px] items-center gap-2 text-sm">
+      <span className="text-muted-foreground">{label}</span>
+      <div className="h-2 rounded-full bg-muted overflow-hidden"><div className="h-full bg-primary" style={{ width: `${width}%` }} /></div>
+      <span className="text-right font-medium tabular-nums">{brl(value)}</span>
+    </div>
   );
 }
 
-function RankingList({ items }: { items: Array<{ nome: string; valor: number }> }) {
-  if (items.length === 0) return null;
-  const medals = ["🥇", "🥈", "🥉"];
-  const total = items.reduce((s, i) => s + i.valor, 0);
+function Ranking({ title, items, qtdLabel = "serv." }: { title: string; items: any[]; qtdLabel?: string }) {
   return (
-    <div className="mt-4 pt-3 border-t space-y-1.5">
-      {items.map((it, i) => {
-        const pct = total ? Math.round((it.valor / total) * 100) : 0;
-        return (
-          <div key={it.nome} className="flex items-center justify-between gap-2 text-sm">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-base shrink-0 w-5 text-center">{medals[i] ?? `${i + 1}.`}</span>
-              <span className="truncate font-medium">{it.nome}</span>
-            </div>
-            <div className="text-right shrink-0">
-              <p className="font-semibold tabular-nums leading-none">{brl(it.valor)}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">{pct}%</p>
-            </div>
+    <Card>
+      <CardContent className="p-4">
+        <h2 className="font-display font-semibold mb-3">{title}</h2>
+        {items.length === 0 ? (
+          <p className="text-sm text-muted-foreground">Sem dados suficientes.</p>
+        ) : (
+          <div className="space-y-2">
+            {items.slice(0, 7).map((it: any, i: number) => (
+              <div key={it.nome} className="flex items-center justify-between gap-2 rounded-md bg-muted px-3 py-2 text-sm">
+                <span className="truncate"><Badge variant="secondary" className="mr-2">{i + 1}</Badge>{it.nome}</span>
+                <span className="font-medium shrink-0">{it.qtd} {qtdLabel}</span>
+              </div>
+            ))}
           </div>
-        );
-      })}
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function Opportunity({ icon: Icon, label, value }: { icon: any; label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-3 rounded-md border p-3">
+      <span className="text-sm text-muted-foreground flex items-center gap-2"><Icon className="h-4 w-4" />{label}</span>
+      <span className="font-display font-bold tabular-nums">{value}</span>
     </div>
   );
 }

@@ -1,324 +1,222 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { lazy, Suspense } from "react";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { getDashboardMetrics, getOportunidades, getClientesComRecompensa, getAssinaturas, getCrescimentoKPIs } from "@/lib/lavaflow.functions";
-import { getOnboardingState } from "@/lib/onboarding.functions";
+import { Badge } from "@/components/ui/badge";
+import { getDashboardOperacional } from "@/lib/lavaflow.functions";
+import { getOnboardingState as getOnboardingStateFn } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
-import { ImpactBanner } from "@/components/dashboard/impact-banner";
-import { GrowthKPIs } from "@/components/dashboard/growth-kpis";
-import { brl, pct, num } from "@/lib/format";
-import {
-  TrendingUp, TrendingDown, DollarSign, Repeat, Users, ListChecks,
-  Sparkles, ArrowRight, Bot, AlertTriangle, Activity, Target, UserPlus, Gift,
-} from "lucide-react";
-
-const DashboardRevenueChart = lazy(() => import("@/components/charts/dashboard-revenue-chart"));
-
+import { brl } from "@/lib/format";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
+import {
+  AlertTriangle, ArrowRight, Bot, CalendarDays, Car, Clock, DollarSign,
+  MapPin, Play, Sparkles, UsersRound, Wrench,
+} from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: () => <RequireRole roles={GESTAO}><Dashboard /></RequireRole>,
 });
 
-function Kpi({
-  label, value, delta, icon: Icon, accent, hint, to,
-}: {
-  label: string; value: string; delta?: { value: number; positive?: boolean };
-  icon: any; accent?: string; hint?: string; to?: string;
-}) {
-  const inner = (
-    <Card className={`h-full ${to ? "hover:border-primary/50 hover:shadow-md transition cursor-pointer" : ""}`}>
-      <CardContent className="p-4 sm:p-5">
-        <div className="flex items-start justify-between gap-2">
-          <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground leading-tight">{label}</p>
-          <div className={`h-8 w-8 sm:h-9 sm:w-9 rounded-lg grid place-content-center shrink-0 ${accent ?? "bg-accent text-accent-foreground"}`}>
-            <Icon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
-          </div>
-        </div>
-        <p className="font-display text-xl sm:text-2xl font-bold mt-2 tabular-nums">{value}</p>
-        {delta && (
-          <p className={`text-[11px] mt-1 flex items-center gap-1 ${delta.positive ? "text-success" : "text-destructive"}`}>
-            {delta.positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-            {pct(Math.abs(delta.value))} vs mês passado
-          </p>
-        )}
-        {hint && !delta && <p className="text-[11px] mt-1 text-muted-foreground">{hint}</p>}
-      </CardContent>
-    </Card>
-  );
-  return to ? <Link to={to}>{inner}</Link> : inner;
-}
-
-function ScoreRing({ score }: { score: number }) {
-  const r = 28;
-  const c = 2 * Math.PI * r;
-  const off = c - (score / 100) * c;
-  const color = score >= 70 ? "text-success" : score >= 40 ? "text-warning" : "text-destructive";
-  return (
-    <div className="relative h-16 w-16 shrink-0">
-      <svg className="h-16 w-16 -rotate-90" viewBox="0 0 64 64">
-        <circle cx="32" cy="32" r={r} className="text-muted" strokeWidth="6" fill="none" stroke="currentColor" />
-        <circle cx="32" cy="32" r={r} className={color} strokeWidth="6" fill="none" stroke="currentColor"
-          strokeDasharray={c} strokeDashoffset={off} strokeLinecap="round" />
-      </svg>
-      <span className={`absolute inset-0 grid place-content-center font-display font-bold text-sm ${color}`}>{score}</span>
-    </div>
-  );
-}
+const STATUS_LABEL: Record<string, string> = {
+  agendado: "Agendado",
+  confirmado: "Confirmado",
+  em_andamento: "Em atendimento",
+  concluido: "Concluido",
+  cancelado: "Cancelado",
+  nao_compareceu: "Nao compareceu",
+};
 
 function Dashboard() {
-  const fetchMetrics = useServerFn(getDashboardMetrics);
-  const fetchOps = useServerFn(getOportunidades);
-  const fetchState = useServerFn(getOnboardingState);
-  const fetchRec = useServerFn(getClientesComRecompensa);
-  const fetchAss = useServerFn(getAssinaturas);
-  const fetchGrowth = useServerFn(getCrescimentoKPIs);
-  const { data: m, isLoading } = useQuery({ queryKey: ["dashboard"], queryFn: () => fetchMetrics() });
-  const { data: ops } = useQuery({ queryKey: ["oportunidades"], queryFn: () => fetchOps() });
+  const fetchOps = useServerFn(getDashboardOperacional);
+  const fetchState = useServerFn(getOnboardingStateFn);
+  const { data, isLoading } = useQuery({ queryKey: ["dashboard-operacional"], queryFn: () => fetchOps(), refetchInterval: 60_000 });
   const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
-  const { data: rec } = useQuery({ queryKey: ["clientes-recompensa"], queryFn: () => fetchRec() });
-  const { data: ass } = useQuery({ queryKey: ["assinaturas"], queryFn: () => fetchAss() });
-  const { data: growth } = useQuery({ queryKey: ["crescimento-kpis"], queryFn: () => fetchGrowth(), staleTime: 5 * 60_000 });
 
-  if (isLoading || !m) {
+  if (isLoading || !data) {
     return <div className="space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}</div>;
   }
 
   const isEmpty = state && state.counts.clientes === 0 && state.counts.ordens === 0;
-
   if (isEmpty) {
     return (
       <>
-        <PageHeader title="Painel Executivo" subtitle="Acompanhe o crescimento do seu lava-rápido em tempo real." />
+        <PageHeader title="Operacao do Dia" subtitle="Configure o LavaFlow para o painel comecar a orientar sua rotina." />
         <SetupChecklist />
         <EmptyDashboard />
       </>
     );
   }
 
-  const scoreColor = m.scoreSaude >= 70 ? "success" : m.scoreSaude >= 40 ? "warning" : "destructive";
-  const topOps = ops?.oportunidades.slice(0, 3) ?? [];
-  const totalPotencial = ops?.oportunidades.reduce((s, o) => s + o.receitaPotencial, 0) ?? 0;
+  const cards = data.cards;
+  const urgentes = data.recomendacoes.filter((r: any) => r.prioridade === "alta");
 
   return (
     <>
-      <PageHeader title="Painel Executivo" subtitle="Seu consultor de crescimento em tempo real." />
+      <PageHeader
+        title="Operacao do Dia"
+        subtitle="Agenda, fila, Leva e Traz e alertas para decidir o proximo passo."
+        actions={<Button asChild><Link to="/agendamentos">Abrir agenda <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>}
+      />
 
-      <div data-tour="dash-checklist" className="scroll-mt-20">
-        <SetupChecklist />
-      </div>
+      <SetupChecklist />
 
-      {growth && (
-        <ImpactBanner
-          clientes={growth.impactoMes.clientesRecuperados}
-          faturamento={growth.impactoMes.faturamentoRecuperado}
-        />
-      )}
-
-      {growth && (
-        <GrowthKPIs
-          receitaRecuperavel={growth.receitaRecuperavel}
-          clientesEmRisco={growth.clientesEmRisco}
-          proximasRecompensas={growth.proximasRecompensas}
-          potencialAssinatura={growth.potencialAssinatura}
-          candidatosAssinatura={growth.candidatosAssinatura}
-        />
-      )}
-
-      {/* Card do Assistente — destaque no topo */}
-      <Card data-tour="dash-assistente" className="mb-4 overflow-hidden border-primary/30 bg-gradient-to-br from-primary/10 via-primary/5 to-transparent scroll-mt-20">
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex items-start gap-3 sm:gap-4">
-            <div className="h-10 w-10 sm:h-11 sm:w-11 rounded-xl bg-primary text-primary-foreground grid place-content-center shrink-0">
-              <Bot className="h-5 w-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1">
-                <p className="font-display font-semibold text-sm">Assistente LavaFlow</p>
-                <span className="text-[10px] uppercase tracking-wider text-primary font-bold">ao vivo</span>
-              </div>
-              <p className="text-sm sm:text-base font-medium leading-snug">{m.resumoAssistente}</p>
-              <div className="flex flex-wrap gap-2 mt-3">
-                <Button asChild size="sm" className="h-8 text-xs">
-                  <Link to="/oportunidades">Ver oportunidades <ArrowRight className="h-3 w-3 ml-1" /></Link>
-                </Button>
-                <Button asChild size="sm" variant="outline" className="h-8 text-xs">
-                  <Link to="/assistente">Análises completas</Link>
-                </Button>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Score + KPIs de receita — destaque máximo */}
-      <div data-tour="dash-kpis" className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 mb-3 scroll-mt-20">
-        <Card data-tour="dash-score" className={`border-${scoreColor}/30`}>
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-center gap-3">
-              <ScoreRing score={m.scoreSaude} />
-              <div className="min-w-0">
-                <p className="text-[10px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">Score de Saúde</p>
-                <p className="text-[11px] text-muted-foreground mt-1">
-                  {m.scoreSaude >= 70 ? "Excelente 🚀" : m.scoreSaude >= 40 ? "Pode melhorar" : "Atenção urgente"}
-                </p>
-              </div>
+      {urgentes.length > 0 && (
+        <Card className="mb-4 border-warning/40 bg-warning/10">
+          <CardContent className="p-4 flex items-start gap-3">
+            <AlertTriangle className="h-5 w-5 text-warning mt-0.5 shrink-0" />
+            <div className="min-w-0">
+              <p className="font-display font-semibold">Atencao operacional</p>
+              <p className="text-sm text-muted-foreground">{urgentes[0].mensagem}</p>
             </div>
           </CardContent>
         </Card>
+      )}
 
-        <Kpi
-          label="Receita Recuperável"
-          value={brl(m.receitaRecuperavel)}
-          icon={AlertTriangle}
-          accent="bg-destructive/10 text-destructive"
-          hint={`${m.inativos} clientes parados`}
-          to="/clientes/inativos"
-        />
-
-        <Kpi
-          label="Faturamento do mês"
-          value={brl(m.faturamentoMes)}
-          delta={{ value: m.crescimento, positive: m.crescimento >= 0 }}
-          icon={DollarSign}
-          accent="bg-primary/10 text-primary"
-        />
-
-        <Kpi
-          label="Receita Recorrente"
-          value={brl(m.mrr)}
-          icon={Repeat}
-          accent="bg-success/10 text-success"
-          hint={`${m.assinantes} assinantes`}
-          to="/assinaturas"
-        />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-5">
+        <Kpi icon={CalendarDays} label="Agendados hoje" value={String(cards.agendamentosHoje)} to="/agendamentos" />
+        <Kpi icon={Car} label="Em atendimento" value={String(cards.veiculosEmAtendimento)} to="/fila" tone="warning" />
+        <Kpi icon={Wrench} label="Servicos pendentes" value={String(cards.servicosPendentes)} to="/ordens" />
+        <Kpi icon={DollarSign} label="Previsao do dia" value={brl(cards.previsaoFaturamentoDia)} tone="success" />
       </div>
 
-      {/* Oportunidades de Hoje */}
-      <Card data-tour="dash-oportunidades" className="mb-4 overflow-hidden scroll-mt-20">
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2">
-              <Target className="h-4 w-4 text-primary" />
-              <h3 className="font-display font-semibold">Oportunidades de hoje</h3>
-            </div>
-            <Link to="/oportunidades" className="text-xs text-primary hover:underline flex items-center gap-1">
-              ver todas <ArrowRight className="h-3 w-3" />
-            </Link>
-          </div>
-          {topOps.length > 0 ? (
-            <>
-              <ul className="space-y-2.5">
-                {topOps.map((o) => (
-                  <li key={o.id} className="flex items-start justify-between gap-3 p-2.5 -mx-2.5 rounded-lg hover:bg-accent/40">
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium leading-snug">{o.titulo}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-1 mt-0.5">{o.descricao}</p>
+      <div className="grid xl:grid-cols-[1.4fr_1fr] gap-4">
+        <section className="space-y-4">
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="font-display font-semibold flex items-center gap-2"><Clock className="h-4 w-4 text-primary" />Agenda de hoje</h2>
+                <Button asChild variant="ghost" size="sm"><Link to="/agendamentos">Ver tudo</Link></Button>
+              </div>
+              {data.agendaHoje.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">Nenhum agendamento para hoje.</p>
+              ) : (
+                <div className="space-y-2">
+                  {data.agendaHoje.slice(0, 8).map((a: any) => (
+                    <div key={a.id} className="flex items-center gap-3 rounded-md border p-3">
+                      <div className="w-14 shrink-0 text-center">
+                        <p className="font-display font-bold tabular-nums">{a.hora_agendada?.slice(0, 5)}</p>
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium truncate">{a.clientes?.nome ?? "Cliente"}</p>
+                        <p className="text-xs text-muted-foreground truncate">
+                          {a.servicos?.nome ?? "Servico"}{a.funcionarios?.nome ? ` · ${a.funcionarios.nome}` : ""}
+                        </p>
+                      </div>
+                      <div className="flex flex-col items-end gap-1">
+                        <Badge variant="secondary">{STATUS_LABEL[a.status] ?? a.status}</Badge>
+                        {a.leva_traz && <Badge className="bg-primary/10 text-primary"><MapPin className="h-3 w-3 mr-1" />Leva e Traz</Badge>}
+                      </div>
                     </div>
-                    <span className="text-xs font-semibold text-success shrink-0 tabular-nums">+{brl(o.receitaPotencial)}</span>
-                  </li>
-                ))}
-              </ul>
-              <div className="mt-4 pt-3 border-t flex items-center justify-between">
-                <span className="text-xs text-muted-foreground">Potencial total hoje</span>
-                <span className="font-display font-bold text-primary tabular-nums">{brl(totalPotencial)}</span>
-              </div>
-            </>
-          ) : (
-            <p className="text-sm text-muted-foreground py-4 text-center">Nenhuma oportunidade pendente. Continue acompanhando 🎉</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Recompensas disponíveis */}
-      {rec && rec.qtd > 0 && (
-        <Card className="mb-4 border-success/30 bg-gradient-to-br from-success/10 via-success/5 to-transparent">
-          <CardContent className="p-4 sm:p-5">
-            <div className="flex items-start gap-3">
-              <div className="h-10 w-10 rounded-xl bg-success text-success-foreground grid place-content-center shrink-0">
-                <Gift className="h-5 w-5" />
-              </div>
-              <div className="flex-1 min-w-0">
-                <p className="font-display font-semibold text-sm">Clientes com recompensa disponível</p>
-                <p className="text-sm mt-1">🎁 <strong>{rec.qtd}</strong> {rec.qtd === 1 ? "cliente pode resgatar" : "clientes podem resgatar"} benefícios agora.</p>
-                <Button asChild size="sm" variant="outline" className="h-8 text-xs mt-3">
-                  <Link to="/clientes" search={{ filtro: "recompensa_disponivel" }}>Ver clientes <ArrowRight className="h-3 w-3 ml-1" /></Link>
-                </Button>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Assinaturas pendentes + próximas cobranças */}
-      {ass && (ass.pendentesCount > 0 || ass.proximasCobrancas.length > 0) && (
-        <div className="grid sm:grid-cols-2 gap-3 mb-4">
-          {ass.pendentesCount > 0 && (
-            <Card className="border-warning/40 bg-gradient-to-br from-warning/10 to-transparent">
-              <CardContent className="p-4 sm:p-5">
-                <div className="flex items-start gap-3">
-                  <div className="h-10 w-10 rounded-xl bg-warning text-warning-foreground grid place-content-center shrink-0"><Repeat className="h-5 w-5" /></div>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-display font-semibold text-sm">Assinaturas pendentes</p>
-                    <p className="text-sm mt-1">⏳ <strong>{ass.pendentesCount}</strong> {ass.pendentesCount === 1 ? "cliente aguarda" : "clientes aguardam"} confirmação de pagamento.</p>
-                    <Button asChild size="sm" variant="outline" className="h-8 text-xs mt-3">
-                      <Link to="/assinaturas">Confirmar pagamentos <ArrowRight className="h-3 w-3 ml-1" /></Link>
-                    </Button>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-          {ass.proximasCobrancas.length > 0 && (
-            <Card>
-              <CardContent className="p-4 sm:p-5">
-                <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold mb-2">Próximas cobranças (7 dias)</p>
-                <ul className="space-y-1.5 text-sm">
-                  {ass.proximasCobrancas.slice(0, 4).map((c: any) => (
-                    <li key={c.id} className="flex items-center justify-between gap-2">
-                      <span className="truncate">{c.clientes?.nome} <span className="text-muted-foreground text-xs">· {c.planos_assinatura?.nome}</span></span>
-                      <span className="text-xs text-muted-foreground shrink-0 tabular-nums">{c.proxima_cobranca?.split("-").reverse().slice(0, 2).join("/")}</span>
-                    </li>
                   ))}
-                </ul>
-              </CardContent>
-            </Card>
-          )}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <h2 className="font-display font-semibold flex items-center gap-2 mb-3"><Play className="h-4 w-4 text-warning" />Veiculos em atendimento</h2>
+              {data.veiculosEmAtendimento.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">Nenhum veiculo em atendimento agora.</p>
+              ) : (
+                <div className="divide-y">
+                  {data.veiculosEmAtendimento.slice(0, 8).map((o: any) => (
+                    <div key={o.id} className="py-3 flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium truncate">{o.clientes?.nome ?? "Cliente"} · {o.veiculos?.placa ?? "Sem placa"}</p>
+                        <p className="text-xs text-muted-foreground truncate">{o.servicos?.nome ?? "Servico"}{o.funcionarios?.nome ? ` · ${o.funcionarios.nome}` : ""}</p>
+                      </div>
+                      <span className="font-display font-bold tabular-nums">{brl(Number(o.valor ?? 0))}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </section>
+
+        <aside className="space-y-4">
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-2 mb-3">
+                <Bot className="h-4 w-4 text-primary" />
+                <h2 className="font-display font-semibold">Consultor LavaFlow</h2>
+              </div>
+              <div className="space-y-2">
+                {data.recomendacoes.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">Sem alertas relevantes agora. Continue acompanhando a agenda e a fila.</p>
+                ) : data.recomendacoes.slice(0, 5).map((r: any, i: number) => (
+                  <div key={`${r.tipo}-${i}`} className="rounded-md bg-card border p-3">
+                    <div className="flex items-center justify-between gap-2 mb-1">
+                      <Badge variant={r.prioridade === "alta" ? "destructive" : "secondary"}>{r.prioridade}</Badge>
+                      {r.cta_to && <a href={r.cta_to} className="text-xs text-primary hover:underline">{r.cta_label ?? "Abrir"}</a>}
+                    </div>
+                    <p className="text-sm">{r.mensagem}</p>
+                  </div>
+                ))}
+              </div>
+              <Button asChild variant="outline" className="w-full mt-3">
+                <Link to="/assistente"><Sparkles className="h-4 w-4 mr-2" />Conversar com o assistente</Link>
+              </Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <h2 className="font-display font-semibold flex items-center gap-2 mb-3"><UsersRound className="h-4 w-4 text-primary" />Distribuicao da equipe</h2>
+              {data.agendaHoje.length === 0 ? (
+                <p className="text-sm text-muted-foreground">Sem carga de trabalho prevista para hoje.</p>
+              ) : (
+                <EquipeResumo agendamentos={data.agendaHoje} />
+              )}
+            </CardContent>
+          </Card>
+        </aside>
+      </div>
+    </>
+  );
+}
+
+function Kpi({ icon: Icon, label, value, tone, to }: { icon: any; label: string; value: string; tone?: "success" | "warning"; to?: string }) {
+  const cls = tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : "";
+  const content = (
+    <Card className={to ? "hover:border-primary/50 transition-colors" : ""}>
+      <CardContent className="p-4">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground"><Icon className="h-4 w-4" />{label}</div>
+        <p className={`font-display font-bold text-2xl mt-1 tabular-nums ${cls}`}>{value}</p>
+      </CardContent>
+    </Card>
+  );
+  return to ? <Link to={to as any}>{content}</Link> : content;
+}
+
+function EquipeResumo({ agendamentos }: { agendamentos: any[] }) {
+  const counts = new Map<string, number>();
+  let semResponsavel = 0;
+  agendamentos.forEach((a) => {
+    if (a.status === "cancelado" || a.status === "nao_compareceu") return;
+    const nome = a.funcionarios?.nome;
+    if (!nome) semResponsavel += 1;
+    else counts.set(nome, (counts.get(nome) ?? 0) + 1);
+  });
+  return (
+    <div className="space-y-2">
+      {Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([nome, qtd]) => (
+        <div key={nome} className="flex items-center justify-between rounded-md bg-muted px-3 py-2 text-sm">
+          <span className="truncate">{nome}</span>
+          <Badge variant="secondary">{qtd} serv.</Badge>
+        </div>
+      ))}
+      {semResponsavel > 0 && (
+        <div className="flex items-center justify-between rounded-md border border-warning/40 px-3 py-2 text-sm">
+          <span>Sem responsavel</span>
+          <Badge variant="outline">{semResponsavel}</Badge>
         </div>
       )}
-
-      {/* Impacto Financeiro do Mês */}
-      <h3 className="font-display font-semibold text-sm uppercase tracking-wider text-muted-foreground mt-6 mb-3">
-        Impacto financeiro do mês
-      </h3>
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-        <Kpi label="Lavagens" value={num(m.lavagensMes)} icon={ListChecks} />
-        <Kpi label="Ticket médio" value={brl(m.ticketMedio)} icon={Activity} accent="bg-primary/10 text-primary" />
-        <Kpi label="Novos clientes" value={num(m.novosClientesMes)} icon={UserPlus} accent="bg-success/10 text-success" />
-        <Kpi label="Retenção 90d" value={pct(m.retencao, 0)} icon={Users} accent="bg-success/10 text-success" />
-      </div>
-
-      {/* Gráfico */}
-      <Card>
-        <CardContent className="p-4 sm:p-5">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="font-display font-semibold flex items-center gap-2">
-              <Sparkles className="h-4 w-4 text-primary" /> Faturamento — últimos 14 dias
-            </h3>
-          </div>
-          <div className="h-56 sm:h-64">
-            <Suspense fallback={<div className="h-full w-full rounded-md bg-muted/40 animate-pulse" />}>
-              <DashboardRevenueChart data={m.serie} />
-            </Suspense>
-          </div>
-        </CardContent>
-      </Card>
-    </>
+    </div>
   );
 }

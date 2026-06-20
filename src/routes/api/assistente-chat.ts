@@ -28,6 +28,11 @@ export const Route = createFileRoute("/api/assistente-chat")({
           const { data: userData, error: userErr } = await supabase.auth.getUser(token);
           if (userErr || !userData.user) return new Response("Unauthorized", { status: 401 });
           const userId = userData.user.id;
+          const { data: roles } = await supabase.from("user_roles").select("owner_id, role").eq("user_id", userId);
+          const rolePriority: Record<string, number> = { owner: 1, admin: 2, gerente: 3, atendente: 4, lavador: 5, colaborador: 5 };
+          const ownerId = (roles ?? [])
+            .slice()
+            .sort((a: any, b: any) => (rolePriority[a.role] ?? 9) - (rolePriority[b.role] ?? 9))[0]?.owner_id ?? userId;
 
           const body = (await request.json()) as { messages?: UIMessage[] };
           const messages = body.messages;
@@ -38,10 +43,10 @@ export const Route = createFileRoute("/api/assistente-chat")({
           const startMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString();
 
           const [{ data: empresa }, { data: ordensMes }, { data: clientesCount }, { data: assinaturas }] = await Promise.all([
-            supabase.from("empresa").select("nome_fantasia, whatsapp").eq("owner_id", userId).maybeSingle(),
-            supabase.from("ordens_servico").select("valor, status, created_at").eq("owner_id", userId).gte("created_at", startMonth),
-            supabase.from("clientes").select("id", { count: "exact", head: true }).eq("owner_id", userId),
-            supabase.from("assinaturas_clientes").select("id, planos_assinatura:plano_id(valor_mensal)").eq("owner_id", userId).eq("status", "ativa"),
+            supabase.from("empresa").select("nome_fantasia, whatsapp").eq("owner_id", ownerId).maybeSingle(),
+            supabase.from("ordens_servico").select("valor, status, created_at").eq("owner_id", ownerId).gte("created_at", startMonth),
+            supabase.from("clientes").select("id", { count: "exact", head: true }).eq("owner_id", ownerId),
+            supabase.from("assinaturas_clientes").select("id, planos_assinatura:plano_id(valor_mensal)").eq("owner_id", ownerId).eq("status", "ativa"),
           ]);
 
           const faturamentoMes = (ordensMes ?? []).reduce((s, o: any) => s + Number(o.valor ?? 0), 0);
@@ -91,8 +96,8 @@ REGRAS:
                 inputSchema: z.object({ dias: z.number().int().min(7).max(365).default(60) }),
                 execute: async ({ dias }) => {
                   const [{ data: clientes }, { data: ordens }] = await Promise.all([
-                    supabase.from("clientes").select("id, nome, telefone").eq("owner_id", userId),
-                    supabase.from("ordens_servico").select("cliente_id, created_at").eq("owner_id", userId),
+                    supabase.from("clientes").select("id, nome, telefone").eq("owner_id", ownerId),
+                    supabase.from("ordens_servico").select("cliente_id, created_at").eq("owner_id", ownerId),
                   ]);
                   const last = new Map<string, string>();
                   (ordens ?? []).forEach((o: any) => {
@@ -118,7 +123,7 @@ REGRAS:
                   const { data } = await supabase
                     .from("ordens_servico")
                     .select("cliente_id, valor, clientes:cliente_id(nome)")
-                    .eq("owner_id", userId)
+                    .eq("owner_id", ownerId)
                     .gte("created_at", ninetyAgo);
                   const totals = new Map<string, { nome: string; total: number; visitas: number }>();
                   (data ?? []).forEach((o: any) => {
@@ -140,7 +145,7 @@ REGRAS:
                   const { data } = await supabase
                     .from("ordens_servico")
                     .select("valor, created_at")
-                    .eq("owner_id", userId)
+                    .eq("owner_id", ownerId)
                     .gte("created_at", ninetyAgo);
                   const labels = ["Domingo", "Segunda", "Terça", "Quarta", "Quinta", "Sexta", "Sábado"];
                   const por = Array(7).fill(0);
@@ -157,7 +162,7 @@ REGRAS:
                   const { data } = await supabase
                     .from("ordens_servico")
                     .select("valor, servicos:servico_id(nome)")
-                    .eq("owner_id", userId)
+                    .eq("owner_id", ownerId)
                     .gte("created_at", ninetyAgo);
                   const por = new Map<string, { receita: number; qtd: number }>();
                   (data ?? []).forEach((o: any) => {
@@ -190,8 +195,8 @@ REGRAS:
                 inputSchema: z.object({}),
                 execute: async () => {
                   const [{ data: recompensas }, { data: clientes }] = await Promise.all([
-                    supabase.from("recompensas").select("nome, custo_pontos").eq("owner_id", userId).eq("ativo", true).order("custo_pontos"),
-                    supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", userId),
+                    supabase.from("recompensas").select("nome, custo_pontos").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos"),
+                    supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", ownerId),
                   ]);
                   const ativas = (recompensas ?? []).sort((a: any, b: any) => a.custo_pontos - b.custo_pontos);
                   if (ativas.length === 0) return { total: 0, mensagem: "Nenhuma recompensa ativa cadastrada." };
@@ -213,8 +218,8 @@ REGRAS:
                 inputSchema: z.object({ margem: z.number().int().min(10).max(200).default(50) }),
                 execute: async ({ margem }) => {
                   const [{ data: recompensas }, { data: clientes }] = await Promise.all([
-                    supabase.from("recompensas").select("nome, custo_pontos").eq("owner_id", userId).eq("ativo", true).order("custo_pontos").limit(1),
-                    supabase.from("clientes").select("nome, telefone, pontos_saldo").eq("owner_id", userId),
+                    supabase.from("recompensas").select("nome, custo_pontos").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos").limit(1),
+                    supabase.from("clientes").select("nome, telefone, pontos_saldo").eq("owner_id", ownerId),
                   ]);
                   if (!recompensas || recompensas.length === 0) return { total: 0, mensagem: "Nenhuma recompensa ativa cadastrada." };
                   const min = (recompensas[0] as any).custo_pontos;

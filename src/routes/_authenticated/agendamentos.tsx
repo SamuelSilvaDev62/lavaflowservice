@@ -21,14 +21,14 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import {
   listAgendamentos, createAgendamento, agendamentoStats, updateAgendamentoStatus,
   iniciarAtendimento, listClientes, listServicos, getEmpresa, listFuncionarios, updateAgendamento,
-  type AgendamentoStatus,
+  getColaboradoresDisponiveis, type AgendamentoStatus,
 } from "@/lib/lavaflow.functions";
 import { dateBr } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import { toast } from "sonner";
 import {
   Plus, MessageCircle, Play, Check, X as XIcon, AlertTriangle, CalendarDays,
-  Link2, ChevronDown, Phone, Calendar as CalendarIcon, ChevronRight,
+  Link2, ChevronDown, Phone, Calendar as CalendarIcon, ChevronRight, MapPin,
 } from "lucide-react";
 import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
@@ -76,12 +76,13 @@ function Page() {
   const [date, setDate] = useState(todayIso());
   const [open, setOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
+  const [levaOnly, setLevaOnly] = useState(false);
   const isMobile = useIsMobile();
 
   const list = useServerFn(listAgendamentos);
   const stats = useServerFn(agendamentoStats);
   const emp = useServerFn(getEmpresa);
-  const { data: ag, isLoading } = useQuery({ queryKey: ["agendamentos", date], queryFn: () => list({ data: { date } }) });
+  const { data: ag, isLoading } = useQuery({ queryKey: ["agendamentos", date, levaOnly], queryFn: () => list({ data: { date, leva_traz: levaOnly } }) });
   const { data: st } = useQuery({ queryKey: ["agendamento-stats"], queryFn: () => stats() });
   const { data: empresa } = useQuery({ queryKey: ["empresa"], queryFn: () => emp() });
 
@@ -185,6 +186,15 @@ function Page() {
             />
           </PopoverContent>
         </Popover>
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <Button type="button" size="sm" variant={levaOnly ? "default" : "outline"} onClick={() => setLevaOnly((v) => !v)}>
+          <MapPin className="h-4 w-4 mr-1" /> Leva e Traz
+        </Button>
+        {st?.taxaComparecimento != null && (
+          <span className="text-xs text-muted-foreground">Comparecimento 30 dias: {Math.round(st.taxaComparecimento * 100)}%</span>
+        )}
       </div>
 
       <Tabs defaultValue="agenda">
@@ -409,14 +419,18 @@ function NovoAgendamentoDialog({ onClose, defaultDate }: { onClose: () => void; 
 function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; defaultDate: string }) {
   const cli = useServerFn(listClientes);
   const sv = useServerFn(listServicos);
-  const fnFunc = useServerFn(listFuncionarios);
+  const dispFn = useServerFn(getColaboradoresDisponiveis);
   const create = useServerFn(createAgendamento);
   const qc = useQueryClient();
   const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: () => cli() });
   const { data: servicos } = useQuery({ queryKey: ["servicos"], queryFn: () => sv() });
-  const { data: funcs } = useQuery({ queryKey: ["funcionarios"], queryFn: () => fnFunc() });
   const [f, setF] = useState({
     cliente_id: "", servico_id: "", funcionario_id: "", data_agendada: defaultDate, hora_agendada: "09:00", observacoes: "",
+    leva_traz: false, endereco_retirada: "", endereco_devolucao: "", horario_retirada: "", horario_devolucao: "", observacoes_leva_traz: "", taxa_leva_traz: 0,
+  });
+  const { data: disponiveis } = useQuery({
+    queryKey: ["colaboradores-disponiveis", f.data_agendada, f.hora_agendada, f.servico_id],
+    queryFn: () => dispFn({ data: { data_agendada: f.data_agendada, hora_agendada: f.hora_agendada, servico_id: f.servico_id || null } }),
   });
   const mut = useMutation({
     mutationFn: () => create({ data: {
@@ -426,6 +440,13 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
       data_agendada: f.data_agendada,
       hora_agendada: f.hora_agendada,
       observacoes: f.observacoes || null,
+      leva_traz: f.leva_traz,
+      endereco_retirada: f.leva_traz ? f.endereco_retirada || null : null,
+      endereco_devolucao: f.leva_traz ? f.endereco_devolucao || null : null,
+      horario_retirada: f.leva_traz ? f.horario_retirada || null : null,
+      horario_devolucao: f.leva_traz ? f.horario_devolucao || null : null,
+      observacoes_leva_traz: f.leva_traz ? f.observacoes_leva_traz || null : null,
+      taxa_leva_traz: f.leva_traz ? Number(f.taxa_leva_traz) || 0 : 0,
     } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["agendamentos"] });
@@ -455,7 +476,11 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
           <SelectTrigger><SelectValue placeholder="Sem definir" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__none__">Sem definir</SelectItem>
-            {funcs?.funcionarios.filter((x: any) => x.ativo).map((x: any) => <SelectItem key={x.id} value={x.id}>{x.nome}</SelectItem>)}
+            {disponiveis?.colaboradores.map((x: any) => (
+              <SelectItem key={x.id} value={x.id} disabled={!x.disponivel}>
+                {x.nome} {x.disponivel ? `(${x.ocupacao}/${x.capacidade})` : `- ${x.motivo_indisponivel}`}
+              </SelectItem>
+            ))}
           </SelectContent>
         </Select>
       </div>
@@ -464,6 +489,22 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
         <div><Label>Horário</Label><Input type="time" required value={f.hora_agendada} onChange={(e) => setF({ ...f, hora_agendada: e.target.value })} /></div>
       </div>
       <div><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
+      <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
+        <input type="checkbox" checked={f.leva_traz} onChange={(e) => setF({ ...f, leva_traz: e.target.checked })} />
+        <span>Adicionar Leva e Traz</span>
+      </label>
+      {f.leva_traz && (
+        <div className="rounded-md border p-3 space-y-3">
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label>Retirada</Label><Input type="time" value={f.horario_retirada} onChange={(e) => setF({ ...f, horario_retirada: e.target.value })} /></div>
+            <div><Label>Devolucao</Label><Input type="time" value={f.horario_devolucao} onChange={(e) => setF({ ...f, horario_devolucao: e.target.value })} /></div>
+          </div>
+          <div><Label>Endereco de retirada</Label><Input value={f.endereco_retirada} onChange={(e) => setF({ ...f, endereco_retirada: e.target.value })} /></div>
+          <div><Label>Endereco de devolucao</Label><Input value={f.endereco_devolucao} onChange={(e) => setF({ ...f, endereco_devolucao: e.target.value })} /></div>
+          <div><Label>Taxa de Leva e Traz</Label><Input type="number" min="0" step="0.01" value={f.taxa_leva_traz} onChange={(e) => setF({ ...f, taxa_leva_traz: Number(e.target.value) || 0 })} /></div>
+          <div><Label>Observacoes do transporte</Label><Textarea rows={2} value={f.observacoes_leva_traz} onChange={(e) => setF({ ...f, observacoes_leva_traz: e.target.value })} /></div>
+        </div>
+      )}
       <Button type="submit" className="w-full h-12" disabled={mut.isPending}>Salvar agendamento</Button>
     </form>
   );

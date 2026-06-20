@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { WelcomeModal } from "@/components/welcome-modal";
 import { GuidedTour } from "@/components/guided-tour";
+import { OperationalAlerts } from "@/components/operational-alerts";
 import { useRole } from "@/hooks/use-role";
 import { ADMINS, GESTAO, OPERACIONAL, isColaborador, type AppRole, ROLE_LABELS } from "@/lib/rbac";
 
@@ -18,7 +19,7 @@ type NavGroup = { label: string; items: NavItem[] };
 
 const groupsAll: NavGroup[] = [
   { label: "Visão", items: [
-    { to: "/dashboard", label: "Painel Executivo", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
+    { to: "/dashboard", label: "Operacao do Dia", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
     { to: "/oportunidades", label: "Oportunidades", icon: Sparkles, tour: "oportunidades", roles: OPERACIONAL },
     { to: "/assistente", label: "Assistente LavaFlow", icon: Bot, tour: "assistente", roles: GESTAO },
   ]},
@@ -138,6 +139,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {!colab && <WelcomeModal />}
       {!colab && <GuidedTour />}
+      {!colab && <OperationalAlerts />}
     </div>
   );
 }
