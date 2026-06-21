@@ -519,7 +519,7 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
         <span>Adicionar Leva e Traz</span>
       </label>
       {f.leva_traz && (
-        <div className="order-8 space-y-3 rounded-md border p-3">
+        <div className="space-y-3 rounded-md border p-3">
           <p className="font-display text-sm font-semibold">Leva e Traz</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2"><Label>Horário de retirada</Label><Input type="time" placeholder="Selecione o horário de retirada" value={f.horario_retirada} onChange={(e) => setF({ ...f, horario_retirada: e.target.value })} /></div>
