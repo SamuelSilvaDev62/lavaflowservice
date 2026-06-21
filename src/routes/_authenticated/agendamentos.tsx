@@ -414,7 +414,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function NovoAgendamentoDialog({ onClose, defaultDate }: { onClose: () => void; defaultDate: string }) {
   return (
-    <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl overflow-hidden p-0">
+    <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden p-0">
       <DialogHeader className="px-5 pt-5"><DialogTitle>Nova reserva</DialogTitle></DialogHeader>
       <NovoAgendamentoForm onClose={onClose} defaultDate={defaultDate} />
     </DialogContent>
