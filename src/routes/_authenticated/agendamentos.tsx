@@ -491,7 +491,11 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
           <SelectContent>{servicos?.servicos.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div className="order-5 space-y-2"><Label>Colaborador responsável</Label>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-2"><Label>Data</Label><Input type="date" required value={f.data_agendada} onChange={(e) => setF({ ...f, data_agendada: e.target.value, funcionario_id: "" })} /></div>
+        <div className="space-y-2"><Label>Horário</Label><Input type="time" required value={f.hora_agendada} onChange={(e) => setF({ ...f, hora_agendada: e.target.value, funcionario_id: "" })} /></div>
+      </div>
+      <div className="space-y-2"><Label>Colaborador responsável</Label>
         <Select value={f.funcionario_id || "__none__"} onValueChange={(v) => setF({ ...f, funcionario_id: v === "__none__" ? "" : v })}>
           <SelectTrigger><SelectValue placeholder="Sem definir" /></SelectTrigger>
           <SelectContent>
@@ -509,12 +513,8 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
           </p>
         )}
       </div>
-      <div className="order-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-2"><Label>Data</Label><Input type="date" required value={f.data_agendada} onChange={(e) => setF({ ...f, data_agendada: e.target.value, funcionario_id: "" })} /></div>
-        <div className="space-y-2"><Label>Horário</Label><Input type="time" required value={f.hora_agendada} onChange={(e) => setF({ ...f, hora_agendada: e.target.value, funcionario_id: "" })} /></div>
-      </div>
-      <div className="order-6 space-y-2"><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
-      <label className="order-7 flex items-center gap-2 rounded-md border p-3 text-sm">
+      <div className="space-y-2"><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
+      <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
         <input type="checkbox" checked={f.leva_traz} onChange={(e) => setF({ ...f, leva_traz: e.target.checked })} />
         <span>Adicionar Leva e Traz</span>
       </label>
