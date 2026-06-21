@@ -480,7 +480,7 @@ export const getMissaoDoDia = createServerFn({ method: "GET" })
         prioridade: "baixa",
         titulo: `Divulgar ${nomeServico}`,
         detalhe: "Serviço com bom potencial de ticket nos dados recentes. Use como oferta principal do dia.",
-        impactoEstimado: roundMoney(Number(servicoParaDivulgar.receita ?? servicoParaDivulgar.preco_padrao ?? ticketMedio)),
+        impactoEstimado: roundMoney(Number(servicoParaDivulgar.receita ?? (servicoParaDivulgar as any).preco_padrao ?? ticketMedio)),
         tempoMin: 4,
         rota: "/oportunidades",
         cta: "Ver oportunidades",
