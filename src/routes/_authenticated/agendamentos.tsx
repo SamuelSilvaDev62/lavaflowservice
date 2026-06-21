@@ -554,7 +554,7 @@ function DistribuicaoEquipe({ agendamentos }: { agendamentos: any[] }) {
     <div className="mb-3 flex flex-wrap gap-1.5">
       <span className="text-xs text-muted-foreground self-center mr-1">Distribuição:</span>
       {Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([nome, qtd]) => (
-        <Badge key={nome} variant="secondary" className="font-normal">?? {nome} - {qtd}</Badge>
+        <Badge key={nome} variant="secondary" className="font-normal">{nome} - {qtd}</Badge>
       ))}
       {semDef > 0 && <Badge variant="outline">Sem definir - {semDef}</Badge>}
     </div>
