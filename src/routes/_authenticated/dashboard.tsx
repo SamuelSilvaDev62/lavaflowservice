@@ -92,10 +92,10 @@ function Dashboard() {
 
       <div className="grid xl:grid-cols-[1.4fr_1fr] gap-4">
         <section className="space-y-4">
-          <Card>
+          <Card className="overflow-hidden">
             <CardContent className="p-4">
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <h2 className="min-w-0 font-display font-semibold flex items-center gap-2"><Clock className="h-4 w-4 text-primary shrink-0" />Agenda de hoje</h2>
+              <div className="mb-3 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                <h2 className="flex min-w-0 items-center gap-2 font-display font-semibold"><Clock className="h-4 w-4 text-primary shrink-0" /><span className="truncate">Agenda de hoje</span></h2>
                 <Button asChild variant="ghost" size="sm" className="shrink-0 px-2 sm:px-3"><Link to="/agendamentos">Ver tudo</Link></Button>
               </div>
               {data.agendaHoje.length === 0 ? (
@@ -103,7 +103,7 @@ function Dashboard() {
               ) : (
                 <div className="space-y-2">
                   {data.agendaHoje.slice(0, 8).map((a: any) => (
-                    <div key={a.id} className="grid gap-2 rounded-md border p-3 sm:flex sm:items-center sm:gap-3">
+                    <div key={a.id} className="grid gap-2 overflow-hidden rounded-md border p-3 sm:flex sm:items-center sm:gap-3">
                       <div className="flex items-start justify-between gap-2 sm:block sm:w-14 sm:shrink-0 sm:text-center">
                         <p className="font-display text-lg font-bold tabular-nums leading-none sm:text-base">{a.hora_agendada?.slice(0, 5)}</p>
                         <Badge variant="secondary" className="shrink-0 sm:hidden">{STATUS_LABEL[a.status] ?? a.status}</Badge>
@@ -112,9 +112,14 @@ function Dashboard() {
                         <p className="font-medium break-words">{a.clientes?.nome ?? "Cliente"}</p>
                         <p className="text-xs text-muted-foreground break-words">{a.servicos?.nome ?? "Serviço"}</p>
                         <p className="text-xs text-muted-foreground break-words">{a.funcionarios?.nome ?? "Sem colaborador definido"}</p>
+                        {a.leva_traz && (
+                          <div className="flex flex-wrap gap-1.5 sm:hidden">
+                            <Badge className="max-w-full bg-primary/10 text-primary"><MapPin className="h-3 w-3 mr-1 shrink-0" />Leva e Traz</Badge>
+                          </div>
+                        )}
                       </div>
-                      <div className="flex flex-wrap items-center gap-1 sm:flex-col sm:items-end">
-                        <Badge variant="secondary" className="hidden sm:inline-flex">{STATUS_LABEL[a.status] ?? a.status}</Badge>
+                      <div className="hidden sm:flex sm:flex-col sm:items-end sm:gap-1">
+                        <Badge variant="secondary">{STATUS_LABEL[a.status] ?? a.status}</Badge>
                         {a.leva_traz && <Badge className="max-w-full bg-primary/10 text-primary"><MapPin className="h-3 w-3 mr-1 shrink-0" />Leva e Traz</Badge>}
                       </div>
                     </div>
