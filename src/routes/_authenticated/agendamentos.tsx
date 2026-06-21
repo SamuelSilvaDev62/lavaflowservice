@@ -249,7 +249,7 @@ function Page() {
               <Plus className="h-6 w-6" />
             </Button>
           </DrawerTrigger>
-          <DrawerContent className="max-h-[92vh] overflow-hidden px-0 pb-0">
+          <DrawerContent className="flex max-h-[92vh] flex-col overflow-hidden px-0 pb-0">
             <DrawerHeader className="px-4 text-left"><DrawerTitle>Nova reserva</DrawerTitle></DrawerHeader>
             <NovoAgendamentoForm onClose={() => setOpen(false)} defaultDate={date} />
           </DrawerContent>
