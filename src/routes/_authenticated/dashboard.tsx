@@ -10,6 +10,7 @@ import { getOnboardingState as getOnboardingStateFn } from "@/lib/onboarding.fun
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
 import { brl } from "@/lib/format";
+import { cn } from "@/lib/utils";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
 import {
