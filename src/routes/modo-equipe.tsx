@@ -50,6 +50,11 @@ const checklistItems = [
   ["bancos_manchados", "Bancos manchados"],
   ["objetos_pessoais", "Objetos pessoais no veiculo"],
   ["chave_recebida", "Chave recebida"],
+  ["arranhoes_superficiais", "Arranhoes superficiais"],
+  ["pintura_opaca", "Pintura opaca"],
+  ["farol_amarelado", "Farol amarelado"],
+  ["mau_cheiro_interno", "Mau cheiro interno"],
+  ["rodas_muito_sujas", "Rodas muito sujas"],
 ] as const;
 
 const emptyChecklist = Object.fromEntries(checklistItems.map(([key]) => [key, false])) as Record<string, boolean>;
@@ -253,6 +258,11 @@ function Page() {
                               {new Date(o.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
                               {tempo ? ` · ${tempo} em atendimento` : ""}
                             </p>
+                            {(o.upsell_oportunidades?.length ?? 0) > 0 && (
+                              <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs text-primary">
+                                Possivel servico adicional identificado.
+                              </div>
+                            )}
                           </div>
                           <div className="grid grid-cols-2 gap-2 sm:w-64">
                             <Button
@@ -271,6 +281,16 @@ function Page() {
                             >
                               Finalizar
                             </Button>
+                            {(o.upsell_oportunidades?.length ?? 0) > 0 && (
+                              <Button
+                                type="button"
+                                variant="secondary"
+                                className="col-span-2 h-10"
+                                onClick={() => toast.success("Recepcao avisada sobre a oportunidade")}
+                              >
+                                Avisar recepcao
+                              </Button>
+                            )}
                           </div>
                         </div>
                       </CardContent>

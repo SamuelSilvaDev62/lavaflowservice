@@ -1062,7 +1062,18 @@ export const listOrdens = createServerFn({ method: "GET" })
                funcionarios:funcionario_id(nome), checklist_funcionario:checklist_inicial_funcionario_id(nome)`)
       .eq("owner_id", userId).order("created_at", { ascending: false }).limit(200);
     if (error) throw error;
-    return { ordens: data ?? [] };
+    const ids = (data ?? []).map((o: any) => o.id);
+    const { data: upsells } = ids.length
+      ? await supabase
+          .from("os_upsell_oportunidades")
+          .select("id, ordem_id, servico_sugerido, motivo, valor_estimado, status, origem_item_label")
+          .eq("owner_id", userId)
+          .in("ordem_id", ids)
+          .order("created_at", { ascending: false })
+      : { data: [] as any[] };
+    const byOrdem = new Map<string, any[]>();
+    (upsells ?? []).forEach((u: any) => byOrdem.set(u.ordem_id, [...(byOrdem.get(u.ordem_id) ?? []), u]));
+    return { ordens: (data ?? []).map((o: any) => ({ ...o, upsell_oportunidades: byOrdem.get(o.id) ?? [] })) };
   });
 
 // ============ CLIENTES ============
@@ -1868,13 +1879,24 @@ export const getModoEquipe = createServerFn({ method: "POST" })
           .in("ordem_id", ordemIds)
           .order("created_at", { ascending: false })
       : { data: [] as any[] };
+    const { data: upsells } = ordemIds.length
+      ? await supabaseAdmin
+          .from("os_upsell_oportunidades")
+          .select("id, ordem_id, servico_sugerido, motivo, valor_estimado, status")
+          .eq("owner_id", sessao.owner_id)
+          .in("ordem_id", ordemIds)
+          .order("created_at", { ascending: false })
+      : { data: [] as any[] };
     const checklistByOrdem = new Map<string, any>();
     (checklists ?? []).forEach((c: any) => {
       if (!checklistByOrdem.has(c.ordem_id)) checklistByOrdem.set(c.ordem_id, c);
     });
+    const upsellsByOrdem = new Map<string, any[]>();
+    (upsells ?? []).forEach((u: any) => upsellsByOrdem.set(u.ordem_id, [...(upsellsByOrdem.get(u.ordem_id) ?? []), u]));
     const ordensComChecklist = (ordens ?? []).map((o: any) => ({
       ...o,
       checklist_inicial: checklistByOrdem.get(o.id) ?? null,
+      upsell_oportunidades: upsellsByOrdem.get(o.id) ?? [],
     }));
 
     const minhas = ordensComChecklist.filter((o: any) => o.funcionario_id === funcionario.id);
@@ -1935,7 +1957,122 @@ const checklistInicialSchema = z.object({
   bancos_manchados: z.boolean().default(false),
   objetos_pessoais: z.boolean().default(false),
   chave_recebida: z.boolean().default(false),
+  arranhoes_superficiais: z.boolean().default(false),
+  pintura_opaca: z.boolean().default(false),
+  farol_amarelado: z.boolean().default(false),
+  mau_cheiro_interno: z.boolean().default(false),
+  rodas_muito_sujas: z.boolean().default(false),
 });
+
+const checklistLabels: Record<string, string> = {
+  riscos_visiveis: "Riscos visiveis",
+  amassados: "Amassados",
+  vidro_trincado: "Vidro trincado",
+  retrovisor_danificado: "Retrovisor danificado",
+  farol_lanterna_danificado: "Farol ou lanterna danificado",
+  rodas_avarias: "Rodas com avarias",
+  bancos_manchados: "Bancos manchados",
+  objetos_pessoais: "Objetos pessoais no veiculo",
+  chave_recebida: "Chave recebida",
+  arranhoes_superficiais: "Arranhoes superficiais",
+  pintura_opaca: "Pintura opaca",
+  farol_amarelado: "Farol amarelado",
+  mau_cheiro_interno: "Mau cheiro interno",
+  rodas_muito_sujas: "Rodas muito sujas",
+};
+
+const upsellRules: Record<string, { servico: string; termos: string[]; motivo: string }> = {
+  arranhoes_superficiais: {
+    servico: "Polimento tecnico",
+    termos: ["polimento tecnico", "polimento comercial", "polimento"],
+    motivo: "Identificamos riscos superficiais que podem ser reduzidos com um polimento.",
+  },
+  pintura_opaca: {
+    servico: "Polimento + cristalizacao",
+    termos: ["cristalizacao", "polimento"],
+    motivo: "A pintura apresenta perda de brilho. Uma cristalizacao pode melhorar a aparencia e proteger a lataria.",
+  },
+  farol_amarelado: {
+    servico: "Revitalizacao de farois",
+    termos: ["revitalizacao de farois", "farol", "farois"],
+    motivo: "Os farois apresentam sinais de amarelamento. A revitalizacao melhora estetica e visibilidade.",
+  },
+  bancos_manchados: {
+    servico: "Higienizacao interna",
+    termos: ["higienizacao interna", "higienizacao", "interna"],
+    motivo: "Foram identificadas manchas nos bancos. A higienizacao interna pode ser oferecida ao cliente.",
+  },
+  mau_cheiro_interno: {
+    servico: "Oxi-sanitizacao",
+    termos: ["oxi-sanitizacao", "ox sanitizacao", "higienizacao interna", "higienizacao"],
+    motivo: "Foi identificado mau cheiro no interior. Uma higienizacao profunda pode resolver o problema.",
+  },
+  rodas_muito_sujas: {
+    servico: "Limpeza tecnica de rodas",
+    termos: ["limpeza tecnica de rodas", "rodas", "limpeza de rodas"],
+    motivo: "As rodas apresentam sujeira pesada. Ofereca limpeza tecnica como servico adicional.",
+  },
+};
+
+function normalizeText(value: string) {
+  return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
+}
+
+function estruturouChecklistInicial(itens: Record<string, boolean>) {
+  return Object.entries(checklistLabels).map(([chave, label]) => ({
+    chave,
+    label,
+    marcado: !!itens[chave],
+    severidade: itens[chave] ? "media" : null,
+    observacao: null,
+    fotos: [],
+  }));
+}
+
+async function gerarUpsellsChecklistInicial(supabase: any, input: {
+  ownerId: string;
+  ordemId: string;
+  checklistId: string;
+  funcionarioId: string;
+  itens: Record<string, boolean>;
+}) {
+  const marcados = Object.entries(input.itens).filter(([chave, marcado]) => marcado && upsellRules[chave]);
+  if (marcados.length === 0) return [];
+
+  const { data: servicos } = await supabase
+    .from("servicos")
+    .select("id, nome, preco_padrao")
+    .eq("owner_id", input.ownerId)
+    .eq("ativo", true);
+
+  const rows = marcados.map(([chave]) => {
+    const rule = upsellRules[chave];
+    const match = (servicos ?? []).find((s: any) => {
+      const nome = normalizeText(s.nome ?? "");
+      return rule.termos.some((termo) => nome.includes(normalizeText(termo)));
+    });
+    return {
+      owner_id: input.ownerId,
+      ordem_id: input.ordemId,
+      checklist_id: input.checklistId,
+      funcionario_id: input.funcionarioId,
+      servico_id: match?.id ?? null,
+      origem_item_chave: chave,
+      origem_item_label: checklistLabels[chave],
+      servico_sugerido: match?.nome ?? rule.servico,
+      motivo: rule.motivo,
+      valor_estimado: match?.preco_padrao ?? null,
+      status: "sugerida",
+    };
+  });
+
+  const { data, error } = await supabase
+    .from("os_upsell_oportunidades")
+    .insert(rows as any)
+    .select("*");
+  if (error) throw error;
+  return data ?? [];
+}
 
 export const equipeConcluirChecklistInicial = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
@@ -1955,16 +2092,24 @@ export const equipeConcluirChecklistInicial = createServerFn({ method: "POST" })
     if (!funcionario?.perm_iniciar_atendimento) throw new Error("Sem permissao para iniciar atendimento");
 
     const now = new Date().toISOString();
-    const { error: insertError } = await supabaseAdmin.from("os_checklists").insert({
+    const itensEstruturados = estruturouChecklistInicial(data.itens);
+    const { data: checklistRow, error: insertError } = await supabaseAdmin.from("os_checklists").insert({
       owner_id: sessao.owner_id,
       ordem_id: data.ordem_id,
       funcionario_id: funcionario.id,
       tipo: "inicial",
       status: "concluido",
-      itens: data.itens,
+      itens: itensEstruturados,
       observacoes: data.observacoes ?? null,
-    } as any);
+    } as any).select("id").single();
     if (insertError) throw insertError;
+    const oportunidades = await gerarUpsellsChecklistInicial(supabaseAdmin, {
+      ownerId: sessao.owner_id,
+      ordemId: data.ordem_id,
+      checklistId: checklistRow.id,
+      funcionarioId: funcionario.id,
+      itens: data.itens,
+    });
     const { error } = await supabaseAdmin.from("ordens_servico").update({
       status: "em_lavagem",
       iniciado_em: now,
@@ -1979,9 +2124,9 @@ export const equipeConcluirChecklistInicial = createServerFn({ method: "POST" })
       funcionario_id: funcionario.id,
       ordem_id: data.ordem_id,
       acao: "concluiu_checklist_inicial",
-      metadata: { itens: data.itens, observacoes: data.observacoes ?? null },
+      metadata: { itens: itensEstruturados, observacoes: data.observacoes ?? null, oportunidades: oportunidades.length },
     } as any);
-    return { ok: true };
+    return { ok: true, oportunidades };
   });
 
 export const equipePularChecklistInicial = createServerFn({ method: "POST" })
@@ -2008,7 +2153,7 @@ export const equipePularChecklistInicial = createServerFn({ method: "POST" })
       funcionario_id: funcionario.id,
       tipo: "inicial",
       status: "pulado",
-      itens: {},
+      itens: estruturouChecklistInicial({}),
       observacoes: data.observacoes ?? null,
     } as any);
     if (insertError) throw insertError;
@@ -2028,6 +2173,23 @@ export const equipePularChecklistInicial = createServerFn({ method: "POST" })
       acao: "pulou_checklist_inicial",
       metadata: { observacoes: data.observacoes ?? null },
     } as any);
+    return { ok: true };
+  });
+
+export const atualizarUpsellOportunidade = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    id: z.string().uuid(),
+    status: z.enum(["sugerida", "oferecida", "aceita", "recusada", "ignorada"]),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { error } = await context.supabase
+      .from("os_upsell_oportunidades")
+      .update({ status: data.status, updated_at: new Date().toISOString() } as any)
+      .eq("id", data.id)
+      .eq("owner_id", ownerId);
+    if (error) throw error;
     return { ok: true };
   });
 

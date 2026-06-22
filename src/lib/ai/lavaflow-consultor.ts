@@ -90,6 +90,26 @@ export function buildRulesConsultorResponse(context: any, advancedUnavailable = 
     }));
   }
 
+  if (Number(opportunities.upsell_checklist_abertas ?? 0) > 0) {
+    const topServico = Array.isArray(opportunities.upsell_checklist_por_servico)
+      ? opportunities.upsell_checklist_por_servico[0]?.servico
+      : null;
+    topOpportunities.push(makeOpportunity({
+      id: "rules-upsell-checklist",
+      priority: "alta",
+      category: "upsell",
+      title: `${opportunities.upsell_checklist_abertas} oportunidades vindas do checklist`,
+      description: topServico
+        ? `O checklist identificou servicos adicionais, principalmente ${topServico}.`
+        : "O checklist inicial identificou servicos adicionais que ainda podem ser oferecidos.",
+      estimatedImpact: Math.round(Number(opportunities.upsell_checklist_potencial ?? 0)),
+      whyItMatters: "Essas oportunidades aparecem durante a vistoria do veiculo, quando a necessidade esta clara e contextualizada.",
+      recommendedAction: "Priorizar contato da recepcao com os clientes dessas OS e registrar aceite ou recusa.",
+      actionType: "upsell",
+      ctaLabel: "Ver ordens",
+    }));
+  }
+
   if (Number(context.team?.comissao_total_pendente ?? 0) > 0) {
     topOpportunities.push(makeOpportunity({
       id: "rules-equipe-comissoes",

@@ -813,6 +813,60 @@ export type Database = {
         }
         Relationships: []
       }
+      os_upsell_oportunidades: {
+        Row: {
+          checklist_id: string | null
+          created_at: string
+          funcionario_id: string | null
+          id: string
+          motivo: string
+          ordem_id: string
+          origem: string
+          origem_item_chave: string
+          origem_item_label: string
+          owner_id: string
+          servico_id: string | null
+          servico_sugerido: string
+          status: string
+          updated_at: string
+          valor_estimado: number | null
+        }
+        Insert: {
+          checklist_id?: string | null
+          created_at?: string
+          funcionario_id?: string | null
+          id?: string
+          motivo: string
+          ordem_id: string
+          origem?: string
+          origem_item_chave: string
+          origem_item_label: string
+          owner_id: string
+          servico_id?: string | null
+          servico_sugerido: string
+          status?: string
+          updated_at?: string
+          valor_estimado?: number | null
+        }
+        Update: {
+          checklist_id?: string | null
+          created_at?: string
+          funcionario_id?: string | null
+          id?: string
+          motivo?: string
+          ordem_id?: string
+          origem?: string
+          origem_item_chave?: string
+          origem_item_label?: string
+          owner_id?: string
+          servico_id?: string | null
+          servico_sugerido?: string
+          status?: string
+          updated_at?: string
+          valor_estimado?: number | null
+        }
+        Relationships: []
+      }
       ordens_servico: {
         Row: {
           checklist_inicial_em: string | null

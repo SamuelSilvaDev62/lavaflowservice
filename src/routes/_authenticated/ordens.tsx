@@ -10,7 +10,7 @@ import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { listOrdens, createOrdem, listClientes, listServicos, listFuncionarios, updateOrdemStatus, type OsStatus } from "@/lib/lavaflow.functions";
+import { listOrdens, createOrdem, listClientes, listServicos, listFuncionarios, updateOrdemStatus, atualizarUpsellOportunidade, type OsStatus } from "@/lib/lavaflow.functions";
 import { brl, dateTimeBr } from "@/lib/format";
 import { Plus, ClipboardList } from "lucide-react";
 import { toast } from "sonner";
@@ -103,11 +103,17 @@ const STATUS_OPTIONS: OsStatus[] = ["aguardando", "em_lavagem", "finalizacao", "
 
 function OrdemRow({ o }: { o: any }) {
   const upd = useServerFn(updateOrdemStatus);
+  const updUpsell = useServerFn(atualizarUpsellOportunidade);
   const qc = useQueryClient();
   const mut = useMutation({
     mutationFn: (status: OsStatus) => upd({ data: { id: o.id, status } }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["ordens"] }); qc.invalidateQueries({ queryKey: ["fila"] }); toast.success("Status atualizado"); },
     onError: (e: any) => toast.error(e?.message ?? "Falha ao atualizar"),
+  });
+  const upsellMut = useMutation({
+    mutationFn: ({ id, status }: { id: string; status: "oferecida" | "aceita" | "recusada" | "ignorada" }) => updUpsell({ data: { id, status } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ordens"] }); toast.success("Oportunidade atualizada"); },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao atualizar oportunidade"),
   });
   return (
     <div className="p-4 flex items-center justify-between gap-3 flex-wrap">
@@ -119,6 +125,30 @@ function OrdemRow({ o }: { o: any }) {
           {o.checklist_funcionario?.nome ? ` · ${o.checklist_funcionario.nome}` : ""}
           {o.checklist_inicial_em ? ` · ${dateTimeBr(o.checklist_inicial_em)}` : ""}
         </p>
+        {(o.upsell_oportunidades?.length ?? 0) > 0 && (
+          <div className="mt-3 space-y-2 rounded-lg border bg-primary/5 p-3">
+            <p className="text-xs font-semibold text-primary">Oportunidades identificadas pelo checklist</p>
+            {o.upsell_oportunidades.map((u: any) => (
+              <div key={u.id} className="rounded-md bg-card p-2">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div>
+                    <p className="text-sm font-medium">{u.servico_sugerido}</p>
+                    <p className="text-xs text-muted-foreground">{u.motivo}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {u.valor_estimado != null ? `Valor estimado: ${brl(Number(u.valor_estimado))}` : "Valor estimado: sem servico vinculado"}
+                    </p>
+                  </div>
+                  <Badge variant="secondary">{u.status}</Badge>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  <Button size="sm" variant="outline" onClick={() => upsellMut.mutate({ id: u.id, status: "oferecida" })}>Oferecido</Button>
+                  <Button size="sm" onClick={() => upsellMut.mutate({ id: u.id, status: "aceita" })}>Cliente aceitou</Button>
+                  <Button size="sm" variant="outline" onClick={() => upsellMut.mutate({ id: u.id, status: "recusada" })}>Cliente recusou</Button>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <p className="font-semibold">{brl(o.valor)}</p>

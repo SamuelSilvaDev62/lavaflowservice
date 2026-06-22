@@ -59,6 +59,7 @@ export async function buildBusinessContext(supabase: SupabaseLike, ownerId: stri
     { data: agendamentosHoje },
     { data: funcionarios },
     { data: comissoes },
+    { data: upsellsChecklist },
   ] = await Promise.all([
     supabase.from("empresa").select("nome_fantasia").eq("owner_id", ownerId).maybeSingle(),
     supabase.from("ordens_servico").select("id, cliente_id, funcionario_id, servico_id, valor, status, created_at, entregue_em, servicos:servico_id(nome)").eq("owner_id", ownerId).gte("created_at", range.startIso).lte("created_at", range.endIso),
@@ -72,6 +73,7 @@ export async function buildBusinessContext(supabase: SupabaseLike, ownerId: stri
     supabase.from("agendamentos").select("id, data_agendada, hora_agendada, status, clientes:cliente_id(nome), servicos:servico_id(nome, preco_padrao)").eq("owner_id", ownerId).eq("data_agendada", today).order("hora_agendada"),
     supabase.from("funcionarios").select("id, nome, ativo").eq("owner_id", ownerId),
     supabase.from("comissoes").select("id, funcionario_id, valor, pagamento_id, created_at").eq("owner_id", ownerId).is("pagamento_id", null),
+    supabase.from("os_upsell_oportunidades").select("id, servico_sugerido, valor_estimado, status, origem_item_label, created_at").eq("owner_id", ownerId).gte("created_at", range.startIso).lte("created_at", range.endIso),
   ]);
 
   const ordens = ordensPeriodo ?? [];
@@ -137,6 +139,19 @@ export async function buildBusinessContext(supabase: SupabaseLike, ownerId: stri
 
   const funcionariosRows = funcionarios ?? [];
   const comissoesPendentes = comissoes ?? [];
+  const upsellRows = upsellsChecklist ?? [];
+  const upsellsAbertos = upsellRows.filter((row: any) => ["sugerida", "oferecida"].includes(row.status));
+  const upsellsAceitos = upsellRows.filter((row: any) => row.status === "aceita");
+  const potencialUpsellChecklist = upsellsAbertos.reduce((sum: number, row: any) => sum + Number(row.valor_estimado ?? 0), 0);
+  const receitaUpsellAceita = upsellsAceitos.reduce((sum: number, row: any) => sum + Number(row.valor_estimado ?? 0), 0);
+  const upsellsPorServico = Array.from(groupBy(upsellRows, (row: any) => row.servico_sugerido).entries())
+    .map(([servico, rows]: [string, any[]]) => ({
+      servico,
+      quantidade: rows.length,
+      potencial: roundMoney(rows.reduce((sum: number, row: any) => sum + Number(row.valor_estimado ?? 0), 0)),
+    }))
+    .sort((a, b) => b.quantidade - a.quantidade)
+    .slice(0, 5);
   const byFuncionario = groupBy(ordens, (row: any) => row.funcionario_id);
   const rankingColaboradores = funcionariosRows
     .map((func: any) => {
@@ -199,6 +214,11 @@ export async function buildBusinessContext(supabase: SupabaseLike, ownerId: stri
       horarios_ociosos: [],
       dias_fracos: diasFracos,
       comissoes_pendentes: comissoesPendentes.length,
+      upsell_checklist_abertas: upsellsAbertos.length,
+      upsell_checklist_potencial: roundMoney(potencialUpsellChecklist),
+      upsell_checklist_aceitas: upsellsAceitos.length,
+      upsell_checklist_receita_aceita: roundMoney(receitaUpsellAceita),
+      upsell_checklist_por_servico: upsellsPorServico,
     },
     team: {
       ranking_colaboradores: rankingColaboradores.slice(0, 8),
