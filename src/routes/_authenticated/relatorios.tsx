@@ -76,19 +76,52 @@ function Page() {
                     {brl(data.receitaInfluenciada.totalInfluenciada)} atribuídos a funcionalidades do sistema neste mês.
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-2 min-w-[220px]">
+                <div className="grid grid-cols-2 gap-2 min-w-[260px]">
                   <Mini icon={DollarSign} label="Influenciada" value={brl(data.receitaInfluenciada.totalInfluenciada)} />
                   <Mini icon={TrendingUp} label="Participacao" value={pct(data.receitaInfluenciada.percentual, 1)} />
                 </div>
               </div>
               <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
-                {data.receitaInfluenciada.categorias.map((cat: any) => (
-                  <div key={cat.origem} className="rounded-md border bg-card/70 p-3">
+                {data.receitaInfluenciada.categorias.filter((cat: any) => Number(cat.valor ?? 0) > 0 || Number(cat.quantidade ?? 0) > 0).map((cat: any) => (
+                  <div key={cat.origem} className="rounded-xl border bg-card/70 p-3">
                     <p className="text-xs text-muted-foreground">{cat.label}</p>
                     <p className="font-display font-bold mt-1">{brl(cat.valor)}</p>
                     <p className="text-xs text-muted-foreground">{cat.quantidade} origem(ns)</p>
                   </div>
                 ))}
+                {data.receitaInfluenciada.categorias.every((cat: any) => Number(cat.valor ?? 0) === 0 && Number(cat.quantidade ?? 0) === 0) && (
+                  <div className="rounded-xl border bg-card/70 p-3 sm:col-span-2 lg:col-span-4">
+                    <p className="text-sm text-muted-foreground">Ainda nao ha receita atribuida. Quando campanhas, checklist, fidelidade ou Leva e Traz gerarem vendas, elas aparecem aqui.</p>
+                  </div>
+                )}
+              </div>
+              <div className="mt-4 grid gap-3 lg:grid-cols-[0.9fr_1.1fr]">
+                <div className="rounded-2xl border bg-background/60 p-3">
+                  <h3 className="font-display font-semibold text-sm">Conversoes e qualidade</h3>
+                  <div className="mt-3 grid grid-cols-2 gap-2">
+                    <Mini icon={Sparkles} label="Indice LavaFlow" value={`${data.receitaInfluenciada.indiceLavaFlow.score}/100`} />
+                    <Mini icon={TrendingUp} label="Upsell" value={pct(data.receitaInfluenciada.indiceLavaFlow.resumo.conversaoUpsell, 1)} />
+                    <Mini icon={Repeat} label="Retorno" value={pct(data.receitaInfluenciada.indiceLavaFlow.resumo.retorno, 1)} />
+                    <Mini icon={CalendarDays} label="Comparecimento" value={pct(data.receitaInfluenciada.indiceLavaFlow.resumo.comparecimento, 1)} />
+                  </div>
+                </div>
+                <div className="rounded-2xl border bg-background/60 p-3">
+                  <h3 className="font-display font-semibold text-sm">Ultimas receitas atribuidas</h3>
+                  <div className="mt-3 space-y-2">
+                    {(data.receitaInfluenciada.ultimosEventos ?? []).slice(0, 5).map((evento: any) => (
+                      <div key={evento.id} className="flex items-center justify-between gap-3 rounded-xl bg-card/70 px-3 py-2 text-sm">
+                        <div className="min-w-0">
+                          <p className="truncate font-medium">{evento.label}</p>
+                          <p className="text-xs text-muted-foreground truncate">{evento.descricao ?? "Receita atribuida"}</p>
+                        </div>
+                        <span className="font-semibold text-success shrink-0">{brl(Number(evento.valor ?? 0))}</span>
+                      </div>
+                    ))}
+                    {(data.receitaInfluenciada.ultimosEventos ?? []).length === 0 && (
+                      <p className="text-sm text-muted-foreground">Nenhuma receita atribuida registrada neste periodo.</p>
+                    )}
+                  </div>
+                </div>
               </div>
               {data.receitaInfluenciada.timeline.length > 0 && (
                 <div className="mt-4 space-y-2">
