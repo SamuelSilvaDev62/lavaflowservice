@@ -60,6 +60,7 @@ export async function buildBusinessContext(supabase: SupabaseLike, ownerId: stri
     { data: funcionarios },
     { data: comissoes },
     { data: upsellsChecklist },
+    { data: receitaInfluenciadaRows },
   ] = await Promise.all([
     supabase.from("empresa").select("nome_fantasia").eq("owner_id", ownerId).maybeSingle(),
     supabase.from("ordens_servico").select("id, cliente_id, funcionario_id, servico_id, valor, status, created_at, entregue_em, servicos:servico_id(nome)").eq("owner_id", ownerId).gte("created_at", range.startIso).lte("created_at", range.endIso),
@@ -69,11 +70,12 @@ export async function buildBusinessContext(supabase: SupabaseLike, ownerId: stri
     supabase.from("recompensas").select("nome, custo_pontos, ativo").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos"),
     supabase.from("assinaturas_clientes").select("id, cliente_id, status, planos_assinatura:plano_id(nome, valor_mensal)").eq("owner_id", ownerId),
     supabase.from("planos_assinatura").select("id, nome, valor_mensal, ativo").eq("owner_id", ownerId),
-    supabase.from("agendamentos").select("id, data_agendada, hora_agendada, status, cliente_id, servicos:servico_id(nome, preco_padrao)").eq("owner_id", ownerId).gte("data_agendada", range.startIso.slice(0, 10)).lte("data_agendada", range.endIso.slice(0, 10)),
+    supabase.from("agendamentos").select("id, data_agendada, hora_agendada, status, cliente_id, leva_traz, taxa_leva_traz, servicos:servico_id(nome, preco_padrao)").eq("owner_id", ownerId).gte("data_agendada", range.startIso.slice(0, 10)).lte("data_agendada", range.endIso.slice(0, 10)),
     supabase.from("agendamentos").select("id, data_agendada, hora_agendada, status, clientes:cliente_id(nome), servicos:servico_id(nome, preco_padrao)").eq("owner_id", ownerId).eq("data_agendada", today).order("hora_agendada"),
     supabase.from("funcionarios").select("id, nome, ativo").eq("owner_id", ownerId),
     supabase.from("comissoes").select("id, funcionario_id, valor, pagamento_id, created_at").eq("owner_id", ownerId).is("pagamento_id", null),
     supabase.from("os_upsell_oportunidades").select("id, servico_sugerido, valor_estimado, status, origem_item_label, created_at").eq("owner_id", ownerId).gte("created_at", range.startIso).lte("created_at", range.endIso),
+    supabase.from("receita_influenciada").select("id, origem, valor, created_at").eq("owner_id", ownerId).gte("created_at", range.startIso).lte("created_at", range.endIso),
   ]);
 
   const ordens = ordensPeriodo ?? [];
@@ -152,6 +154,19 @@ export async function buildBusinessContext(supabase: SupabaseLike, ownerId: stri
     }))
     .sort((a, b) => b.quantidade - a.quantidade)
     .slice(0, 5);
+  const receitaInfluenciadaBase = [...(receitaInfluenciadaRows ?? [])];
+  const levaTrazInfluenciado = (agendamentosPeriodo ?? [])
+    .filter((row: any) => row.leva_traz && Number(row.taxa_leva_traz ?? 0) > 0)
+    .map((row: any) => ({ origem: "LEVA_ETRAZ", valor: Number(row.taxa_leva_traz ?? 0), created_at: `${row.data_agendada}T12:00:00.000Z` }));
+  const receitaInfluenciada = [...receitaInfluenciadaBase, ...levaTrazInfluenciado];
+  const receitaInfluenciadaTotal = receitaInfluenciada.reduce((sum: number, row: any) => sum + Number(row.valor ?? 0), 0);
+  const receitaPorOrigem = Array.from(groupBy(receitaInfluenciada, (row: any) => row.origem).entries())
+    .map(([origem, rows]: [string, any[]]) => ({
+      origem,
+      quantidade: rows.length,
+      valor: roundMoney(rows.reduce((sum: number, row: any) => sum + Number(row.valor ?? 0), 0)),
+    }))
+    .sort((a: any, b: any) => b.valor - a.valor);
   const byFuncionario = groupBy(ordens, (row: any) => row.funcionario_id);
   const rankingColaboradores = funcionariosRows
     .map((func: any) => {
@@ -219,6 +234,9 @@ export async function buildBusinessContext(supabase: SupabaseLike, ownerId: stri
       upsell_checklist_aceitas: upsellsAceitos.length,
       upsell_checklist_receita_aceita: roundMoney(receitaUpsellAceita),
       upsell_checklist_por_servico: upsellsPorServico,
+      receita_influenciada_total: roundMoney(receitaInfluenciadaTotal),
+      receita_influenciada_percentual: receitaPeriodo ? roundMoney(receitaInfluenciadaTotal / receitaPeriodo) : 0,
+      receita_influenciada_por_origem: receitaPorOrigem,
     },
     team: {
       ranking_colaboradores: rankingColaboradores.slice(0, 8),

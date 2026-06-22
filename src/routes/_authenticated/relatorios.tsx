@@ -65,6 +65,41 @@ function Page() {
             </CardContent>
           </Card>
 
+          <Card className="border-success/30 bg-success/5">
+            <CardContent className="p-4">
+              <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
+                <div>
+                  <h2 className="font-display font-semibold flex items-center gap-2">
+                    <DollarSign className="h-4 w-4 text-success" />Receita Influenciada pelo LavaFlow
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">
+                    {brl(data.receitaInfluenciada.totalInfluenciada)} atribuídos a funcionalidades do sistema neste mês.
+                  </p>
+                </div>
+                <div className="grid grid-cols-2 gap-2 min-w-[220px]">
+                  <Mini icon={DollarSign} label="Influenciada" value={brl(data.receitaInfluenciada.totalInfluenciada)} />
+                  <Mini icon={TrendingUp} label="Participacao" value={pct(data.receitaInfluenciada.percentual, 1)} />
+                </div>
+              </div>
+              <div className="mt-4 grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                {data.receitaInfluenciada.categorias.map((cat: any) => (
+                  <div key={cat.origem} className="rounded-md border bg-card/70 p-3">
+                    <p className="text-xs text-muted-foreground">{cat.label}</p>
+                    <p className="font-display font-bold mt-1">{brl(cat.valor)}</p>
+                    <p className="text-xs text-muted-foreground">{cat.quantidade} origem(ns)</p>
+                  </div>
+                ))}
+              </div>
+              {data.receitaInfluenciada.timeline.length > 0 && (
+                <div className="mt-4 space-y-2">
+                  {data.receitaInfluenciada.timeline.slice(-7).map((d: any) => (
+                    <Bar key={d.dia} label={d.dia.slice(5).split("-").reverse().join("/")} value={d.valor} max={Math.max(...data.receitaInfluenciada.timeline.map((x: any) => x.valor), 1)} />
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
           <div className="grid lg:grid-cols-[1.2fr_1fr] gap-4">
             <Card>
               <CardContent className="p-4">

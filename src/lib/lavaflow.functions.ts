@@ -1071,9 +1071,19 @@ export const listOrdens = createServerFn({ method: "GET" })
           .in("ordem_id", ids)
           .order("created_at", { ascending: false })
       : { data: [] as any[] };
+    const { data: origens } = ids.length
+      ? await supabase
+          .from("receita_influenciada")
+          .select("id, ordem_id, origem, valor, descricao, created_at")
+          .eq("owner_id", userId)
+          .in("ordem_id", ids)
+          .order("created_at", { ascending: false })
+      : { data: [] as any[] };
     const byOrdem = new Map<string, any[]>();
+    const origensByOrdem = new Map<string, any[]>();
     (upsells ?? []).forEach((u: any) => byOrdem.set(u.ordem_id, [...(byOrdem.get(u.ordem_id) ?? []), u]));
-    return { ordens: (data ?? []).map((o: any) => ({ ...o, upsell_oportunidades: byOrdem.get(o.id) ?? [] })) };
+    (origens ?? []).forEach((r: any) => origensByOrdem.set(r.ordem_id, [...(origensByOrdem.get(r.ordem_id) ?? []), r]));
+    return { ordens: (data ?? []).map((o: any) => ({ ...o, upsell_oportunidades: byOrdem.get(o.id) ?? [], origens_receita: origensByOrdem.get(o.id) ?? [] })) };
   });
 
 // ============ CLIENTES ============
@@ -1495,6 +1505,102 @@ export const getRelatorios = createServerFn({ method: "GET" })
     };
   });
 
+const RECEITA_ORIGENS: Record<string, string> = {
+  CLIENTE_RECUPERADO: "Clientes recuperados",
+  FIDELIDADE: "Programa de Fidelidade",
+  UPSELL_CHECKLIST: "Checklist",
+  CONSULTOR_IA: "Consultor IA",
+  CAMPANHA: "Campanhas",
+  ANIVERSARIO: "Aniversarios",
+  LEVA_ETRAZ: "Leva e Traz",
+};
+
+function periodoReceitaInfluenciada(periodo = "mes") {
+  const now = new Date();
+  const fim = new Date(now);
+  if (periodo === "hoje") return { inicio: new Date(now.getFullYear(), now.getMonth(), now.getDate()), fim };
+  if (periodo === "semana") return { inicio: new Date(now.getFullYear(), now.getMonth(), now.getDate() - 6), fim };
+  if (periodo === "ano") return { inicio: new Date(now.getFullYear(), 0, 1), fim };
+  return { inicio: new Date(now.getFullYear(), now.getMonth(), 1), fim };
+}
+
+async function getReceitaInfluenciadaData(supabase: any, ownerId: string, opts: { periodo?: string; inicio?: string; fim?: string } = {}) {
+  const base = periodoReceitaInfluenciada(opts.periodo);
+  const inicio = opts.inicio ? new Date(opts.inicio) : base.inicio;
+  const fim = opts.fim ? new Date(opts.fim) : base.fim;
+  const inicioIso = inicio.toISOString();
+  const fimIso = fim.toISOString();
+  const inicioDia = inicioIso.slice(0, 10);
+  const fimDia = fimIso.slice(0, 10);
+
+  const [{ data: ordens }, { data: eventos }, { data: levaTraz }] = await Promise.all([
+    supabase.from("ordens_servico").select("id, valor, created_at").eq("owner_id", ownerId).gte("created_at", inicioIso).lte("created_at", fimIso),
+    supabase.from("receita_influenciada").select("*").eq("owner_id", ownerId).gte("created_at", inicioIso).lte("created_at", fimIso),
+    supabase.from("agendamentos")
+      .select("id, ordem_id, cliente_id, taxa_leva_traz, data_agendada, clientes:cliente_id(nome)")
+      .eq("owner_id", ownerId)
+      .eq("leva_traz", true)
+      .gt("taxa_leva_traz", 0)
+      .gte("data_agendada", inicioDia)
+      .lte("data_agendada", fimDia),
+  ]);
+
+  const rows = [...(eventos ?? [])];
+  const refs = new Set(rows.map((row: any) => `${row.origem}:${row.referencia_tipo}:${row.referencia_id}`));
+  (levaTraz ?? []).forEach((row: any) => {
+    const key = `LEVA_ETRAZ:agendamento:${row.id}`;
+    if (refs.has(key)) return;
+    rows.push({
+      id: key,
+      owner_id: ownerId,
+      ordem_id: row.ordem_id,
+      cliente_id: row.cliente_id,
+      funcionario_id: null,
+      origem: "LEVA_ETRAZ",
+      valor: Number(row.taxa_leva_traz ?? 0),
+      descricao: "Servico Leva e Traz contratado",
+      referencia_tipo: "agendamento",
+      referencia_id: row.id,
+      metadata: { cliente: row.clientes?.nome ?? null },
+      created_at: `${row.data_agendada}T12:00:00.000Z`,
+    });
+  });
+
+  const totalReceita = (ordens ?? []).reduce((sum: number, row: any) => sum + Number(row.valor ?? 0), 0);
+  const categorias = Object.entries(RECEITA_ORIGENS).map(([origem, label]) => {
+    const catRows = rows.filter((row: any) => row.origem === origem);
+    return {
+      origem,
+      label,
+      valor: catRows.reduce((sum: number, row: any) => sum + Number(row.valor ?? 0), 0),
+      quantidade: catRows.length,
+    };
+  });
+  const totalInfluenciada = categorias.reduce((sum, row) => sum + row.valor, 0);
+  const porDia = new Map<string, number>();
+  rows.forEach((row: any) => {
+    const dia = String(row.created_at ?? "").slice(0, 10);
+    if (!dia) return;
+    porDia.set(dia, (porDia.get(dia) ?? 0) + Number(row.valor ?? 0));
+  });
+
+  return {
+    periodo: opts.periodo ?? "mes",
+    inicio: inicioIso,
+    fim: fimIso,
+    totalReceita,
+    totalInfluenciada,
+    percentual: totalReceita ? totalInfluenciada / totalReceita : 0,
+    categorias,
+    timeline: Array.from(porDia, ([dia, valor]) => ({ dia, valor })).sort((a, b) => a.dia.localeCompare(b.dia)),
+    ultimosEventos: rows
+      .slice()
+      .sort((a: any, b: any) => String(b.created_at).localeCompare(String(a.created_at)))
+      .slice(0, 8)
+      .map((row: any) => ({ ...row, label: RECEITA_ORIGENS[row.origem] ?? row.origem })),
+  };
+}
+
 export const getRelatoriosExecutivos = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -1571,6 +1677,7 @@ export const getRelatoriosExecutivos = createServerFn({ method: "GET" })
       + (faturamentoMensal > 0 ? 20 : 0)
       + (novosClientes > 0 ? 10 : 0),
     )));
+    const receitaInfluenciada = await getReceitaInfluenciadaData(supabase, ownerId, { periodo: "mes" });
 
     return {
       cards: {
@@ -1592,7 +1699,16 @@ export const getRelatoriosExecutivos = createServerFn({ method: "GET" })
         receita: levaTraz.reduce((s: number, a: any) => s + Number(a.taxa_leva_traz ?? 0), 0),
         clientes: Array.from(levaTrazClientes.values()).sort((a, b) => b.qtd - a.qtd).slice(0, 10),
       },
+      receitaInfluenciada,
     };
+  });
+
+export const getReceitaInfluenciada = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d: { periodo?: string; inicio?: string; fim?: string } | undefined) => d ?? {})
+  .handler(async ({ data, context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    return getReceitaInfluenciadaData(context.supabase, ownerId, data);
   });
 
 // ============ COLABORADORES / MEU TRABALHO ============
@@ -2184,12 +2300,49 @@ export const atualizarUpsellOportunidade = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
-    const { error } = await context.supabase
+    const { error, data: oportunidade } = await context.supabase
       .from("os_upsell_oportunidades")
       .update({ status: data.status, updated_at: new Date().toISOString() } as any)
       .eq("id", data.id)
-      .eq("owner_id", ownerId);
+      .eq("owner_id", ownerId)
+      .select("id, ordem_id, servico_sugerido, servico_id, valor_estimado, funcionario_id, motivo, origem_item_label")
+      .maybeSingle();
     if (error) throw error;
+    if (data.status === "aceita" && oportunidade) {
+      const { data: ordem } = await context.supabase
+        .from("ordens_servico")
+        .select("cliente_id")
+        .eq("id", oportunidade.ordem_id)
+        .eq("owner_id", ownerId)
+        .maybeSingle();
+      const { data: existente } = await context.supabase
+        .from("receita_influenciada")
+        .select("id")
+        .eq("owner_id", ownerId)
+        .eq("origem", "UPSELL_CHECKLIST")
+        .eq("referencia_tipo", "os_upsell_oportunidade")
+        .eq("referencia_id", oportunidade.id)
+        .maybeSingle();
+      if (!existente) {
+        await context.supabase.from("receita_influenciada").insert({
+          owner_id: ownerId,
+          ordem_id: oportunidade.ordem_id,
+          cliente_id: ordem?.cliente_id ?? null,
+          funcionario_id: oportunidade.funcionario_id ?? null,
+          origem: "UPSELL_CHECKLIST",
+          valor: Number(oportunidade.valor_estimado ?? 0),
+          descricao: `Upsell aceito: ${oportunidade.servico_sugerido}`,
+          referencia_tipo: "os_upsell_oportunidade",
+          referencia_id: oportunidade.id,
+          metadata: {
+            servico_sugerido: oportunidade.servico_sugerido,
+            servico_id: oportunidade.servico_id,
+            motivo: oportunidade.motivo,
+            origem_item: oportunidade.origem_item_label,
+          },
+        } as any);
+      }
+    }
     return { ok: true };
   });
 

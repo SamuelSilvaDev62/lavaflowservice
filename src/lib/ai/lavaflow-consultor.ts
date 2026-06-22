@@ -110,6 +110,26 @@ export function buildRulesConsultorResponse(context: any, advancedUnavailable = 
     }));
   }
 
+  if (Number(opportunities.receita_influenciada_total ?? 0) > 0) {
+    const topOrigem = Array.isArray(opportunities.receita_influenciada_por_origem)
+      ? opportunities.receita_influenciada_por_origem[0]
+      : null;
+    topOpportunities.push(makeOpportunity({
+      id: "rules-receita-influenciada",
+      priority: "media",
+      category: "relatorio",
+      title: `LavaFlow influenciou R$ ${Number(opportunities.receita_influenciada_total).toFixed(2)} no periodo`,
+      description: topOrigem
+        ? `A principal origem registrada foi ${topOrigem.origem}, com R$ ${Number(topOrigem.valor ?? 0).toFixed(2)}.`
+        : "As funcionalidades do sistema ja possuem receita atribuida no periodo.",
+      estimatedImpact: Math.round(Number(opportunities.receita_influenciada_total ?? 0)),
+      whyItMatters: "Medir receita influenciada mostra quais rotinas realmente aumentam o faturamento.",
+      recommendedAction: "Revisar o relatorio de Receita Influenciada e reforcar as origens com maior retorno.",
+      actionType: "relatorio",
+      ctaLabel: "Ver relatorios",
+    }));
+  }
+
   if (Number(context.team?.comissao_total_pendente ?? 0) > 0) {
     topOpportunities.push(makeOpportunity({
       id: "rules-equipe-comissoes",

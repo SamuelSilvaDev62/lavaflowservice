@@ -867,6 +867,51 @@ export type Database = {
         }
         Relationships: []
       }
+      receita_influenciada: {
+        Row: {
+          cliente_id: string | null
+          created_at: string
+          descricao: string | null
+          funcionario_id: string | null
+          id: string
+          metadata: Json
+          ordem_id: string | null
+          origem: string
+          owner_id: string
+          referencia_id: string | null
+          referencia_tipo: string | null
+          valor: number
+        }
+        Insert: {
+          cliente_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          funcionario_id?: string | null
+          id?: string
+          metadata?: Json
+          ordem_id?: string | null
+          origem: string
+          owner_id: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          valor?: number
+        }
+        Update: {
+          cliente_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          funcionario_id?: string | null
+          id?: string
+          metadata?: Json
+          ordem_id?: string | null
+          origem?: string
+          owner_id?: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          valor?: number
+        }
+        Relationships: []
+      }
       ordens_servico: {
         Row: {
           checklist_inicial_em: string | null

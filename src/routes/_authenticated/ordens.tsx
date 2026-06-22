@@ -125,6 +125,16 @@ function OrdemRow({ o }: { o: any }) {
           {o.checklist_funcionario?.nome ? ` · ${o.checklist_funcionario.nome}` : ""}
           {o.checklist_inicial_em ? ` · ${dateTimeBr(o.checklist_inicial_em)}` : ""}
         </p>
+        {(o.origens_receita?.length ?? 0) > 0 && (
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="text-xs text-muted-foreground">Origem da venda:</span>
+            {o.origens_receita.map((r: any) => (
+              <Badge key={r.id} variant="outline" className="text-[11px]">
+                {origemReceitaLabel(r.origem)} {Number(r.valor ?? 0) > 0 ? `Â· ${brl(Number(r.valor))}` : ""}
+              </Badge>
+            ))}
+          </div>
+        )}
         {(o.upsell_oportunidades?.length ?? 0) > 0 && (
           <div className="mt-3 space-y-2 rounded-lg border bg-primary/5 p-3">
             <p className="text-xs font-semibold text-primary">Oportunidades identificadas pelo checklist</p>
@@ -159,4 +169,17 @@ function OrdemRow({ o }: { o: any }) {
       </div>
     </div>
   );
+}
+
+function origemReceitaLabel(origem: string) {
+  const labels: Record<string, string> = {
+    CLIENTE_RECUPERADO: "Cliente recuperado",
+    FIDELIDADE: "Fidelidade",
+    UPSELL_CHECKLIST: "Upsell Checklist",
+    CONSULTOR_IA: "Consultor IA",
+    CAMPANHA: "Campanha",
+    ANIVERSARIO: "Aniversario",
+    LEVA_ETRAZ: "Leva e Traz",
+  };
+  return labels[origem] ?? origem;
 }
