@@ -38,6 +38,34 @@ function roundMoney(value: number) {
   return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
 }
 
+async function hashSecret(value: string) {
+  const { randomBytes, scryptSync } = await import("node:crypto");
+  const salt = randomBytes(16).toString("hex");
+  const hash = scryptSync(value, salt, 32).toString("hex");
+  return `scrypt$${salt}$${hash}`;
+}
+
+async function verifySecret(value: string, stored?: string | null) {
+  if (!stored) return false;
+  const parts = stored.split("$");
+  if (parts.length !== 3 || parts[0] !== "scrypt") return false;
+  const { scryptSync, timingSafeEqual } = await import("node:crypto");
+  const [, salt, expected] = parts;
+  const actual = scryptSync(value, salt, 32);
+  const expectedBuffer = Buffer.from(expected, "hex");
+  return expectedBuffer.length === actual.length && timingSafeEqual(expectedBuffer, actual);
+}
+
+async function tokenHash(token: string) {
+  const { createHash } = await import("node:crypto");
+  return createHash("sha256").update(token).digest("hex");
+}
+
+async function newSessionToken() {
+  const { randomBytes } = await import("node:crypto");
+  return randomBytes(32).toString("hex");
+}
+
 function minutesToTime(mins: number) {
   return `${String(Math.floor(mins / 60)).padStart(2, "0")}:${String(mins % 60).padStart(2, "0")}`;
 }
@@ -1591,6 +1619,7 @@ export const upsertFuncionarioFull = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     id: z.string().uuid().optional(),
     nome: z.string().min(1).max(80),
+    avatar_url: z.string().url().max(500).optional().nullable().or(z.literal("")),
     cargo: z.string().max(40).optional().nullable(),
     telefone: z.string().max(20).optional().nullable(),
     email: z.string().email().max(160).optional().nullable().or(z.literal("")),
@@ -1604,11 +1633,26 @@ export const upsertFuncionarioFull = createServerFn({ method: "POST" })
     capacidade_por_horario: z.number().int().min(1).max(20).default(1),
     tempo_medio_servicos: z.record(z.string(), z.number().int().min(1).max(1440)).default({}),
     ativo: z.boolean().default(true),
+    pin: z.string().regex(/^\d{4}$|^\d{6}$/).optional().or(z.literal("")),
+    pin_digits: z.union([z.literal(4), z.literal(6)]).default(4),
+    perm_iniciar_atendimento: z.boolean().default(true),
+    perm_finalizar_atendimento: z.boolean().default(true),
+    perm_realizar_checklist: z.boolean().default(true),
+    perm_ver_apenas_atribuidos: z.boolean().default(true),
+    perm_ver_todos_veiculos: z.boolean().default(false),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
     const row: any = { ...data, owner_id: ownerId };
+    const pin = row.pin;
+    delete row.pin;
     if (row.email === "") row.email = null;
+    if (row.avatar_url === "") row.avatar_url = null;
+    if (pin) {
+      row.pin_hash = await hashSecret(pin);
+      row.pin_failed_attempts = 0;
+      row.pin_locked_until = null;
+    }
     const { error } = data.id
       ? await context.supabase.from("funcionarios").update(row).eq("id", data.id).eq("owner_id", ownerId)
       : await context.supabase.from("funcionarios").insert(row);
@@ -1617,6 +1661,242 @@ export const upsertFuncionarioFull = createServerFn({ method: "POST" })
   });
 
 // ============ COMISSÕES POR SERVIÇO ============
+// ============ MODO EQUIPE - ACESSO RAPIDO POR PIN ============
+export const getEquipeAcessoPublico = createServerFn({ method: "GET" })
+  .inputValidator((d) => z.object({ slug: z.string().min(2).max(80) }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: emp } = await supabaseAdmin.rpc("get_empresa_by_slug", { _slug: data.slug });
+    const empresa = Array.isArray(emp) ? emp[0] : emp;
+    if (!empresa?.owner_id) throw new Error("Empresa nao encontrada");
+
+    const { data: funcionarios, error } = await supabaseAdmin
+      .from("funcionarios")
+      .select("id, nome, cargo, ativo, avatar_url, pin_digits, pin_hash, pin_locked_until")
+      .eq("owner_id", empresa.owner_id)
+      .eq("ativo", true)
+      .order("nome");
+    if (error) throw error;
+
+    const { data: emAtendimento } = await supabaseAdmin
+      .from("ordens_servico")
+      .select("funcionario_id")
+      .eq("owner_id", empresa.owner_id)
+      .eq("status", "em_lavagem");
+    const ocupados = new Set((emAtendimento ?? []).map((o: any) => o.funcionario_id).filter(Boolean));
+
+    return {
+      empresa: { nome: empresa.nome_fantasia ?? "LavaFlow", slug: data.slug },
+      colaboradores: (funcionarios ?? []).map((f: any) => ({
+        id: f.id,
+        nome: f.nome,
+        cargo: f.cargo,
+        avatar_url: f.avatar_url,
+        pin_digits: f.pin_digits ?? 4,
+        pin_configurado: !!f.pin_hash,
+        bloqueado_ate: f.pin_locked_until,
+        status: ocupados.has(f.id) ? "Em atendimento" : "Disponivel",
+      })),
+    };
+  });
+
+export const autenticarEquipePin = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    slug: z.string().min(2).max(80),
+    funcionario_id: z.string().uuid(),
+    pin: z.string().regex(/^\d{4}$|^\d{6}$/),
+    device_id: z.string().max(120).optional(),
+    user_agent: z.string().max(300).optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: emp } = await supabaseAdmin.rpc("get_empresa_by_slug", { _slug: data.slug });
+    const empresa = Array.isArray(emp) ? emp[0] : emp;
+    if (!empresa?.owner_id) throw new Error("Empresa nao encontrada");
+
+    const { data: funcionario, error } = await supabaseAdmin
+      .from("funcionarios")
+      .select("id, owner_id, nome, ativo, pin_hash, pin_failed_attempts, pin_locked_until")
+      .eq("id", data.funcionario_id)
+      .eq("owner_id", empresa.owner_id)
+      .maybeSingle();
+    if (error) throw error;
+    if (!funcionario?.ativo) throw new Error("Colaborador inativo");
+    if (!funcionario.pin_hash) throw new Error("PIN ainda nao configurado");
+    if (funcionario.pin_locked_until && new Date(funcionario.pin_locked_until).getTime() > Date.now()) {
+      throw new Error("PIN bloqueado temporariamente");
+    }
+
+    const ok = await verifySecret(data.pin, funcionario.pin_hash);
+    await supabaseAdmin.from("equipe_pin_attempts").insert({
+      owner_id: empresa.owner_id,
+      funcionario_id: funcionario.id,
+      success: ok,
+      device_id: data.device_id ?? null,
+      user_agent: data.user_agent ?? null,
+    } as any);
+
+    if (!ok) {
+      const attempts = Number(funcionario.pin_failed_attempts ?? 0) + 1;
+      const locked = attempts >= 5 ? new Date(Date.now() + 5 * 60 * 1000).toISOString() : null;
+      await supabaseAdmin.from("funcionarios").update({
+        pin_failed_attempts: attempts,
+        pin_locked_until: locked,
+      } as any).eq("id", funcionario.id);
+      throw new Error(locked ? "PIN bloqueado por 5 minutos" : "PIN incorreto");
+    }
+
+    await supabaseAdmin.from("funcionarios").update({
+      pin_failed_attempts: 0,
+      pin_locked_until: null,
+    } as any).eq("id", funcionario.id);
+
+    const token = await newSessionToken();
+    await supabaseAdmin.from("equipe_sessoes").insert({
+      owner_id: empresa.owner_id,
+      funcionario_id: funcionario.id,
+      token_hash: await tokenHash(token),
+      device_id: data.device_id ?? null,
+      user_agent: data.user_agent ?? null,
+      expires_at: new Date(Date.now() + 12 * 60 * 60 * 1000).toISOString(),
+    } as any);
+    await supabaseAdmin.from("equipe_auditoria").insert({
+      owner_id: empresa.owner_id,
+      funcionario_id: funcionario.id,
+      acao: "login_pin",
+      metadata: { device_id: data.device_id ?? null },
+    } as any);
+    return { token, funcionario: { id: funcionario.id, nome: funcionario.nome }, slug: data.slug };
+  });
+
+async function getEquipeSession(token: string) {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  const { data: sessao, error } = await supabaseAdmin
+    .from("equipe_sessoes")
+    .select("id, owner_id, funcionario_id, expires_at")
+    .eq("token_hash", await tokenHash(token))
+    .maybeSingle();
+  if (error) throw error;
+  if (!sessao || new Date(sessao.expires_at).getTime() <= Date.now()) throw new Error("Sessao expirada");
+  await supabaseAdmin.from("equipe_sessoes").update({ last_seen_at: new Date().toISOString() } as any).eq("id", sessao.id);
+  return { supabaseAdmin, sessao };
+}
+
+export const getModoEquipe = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ token: z.string().min(20) }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin, sessao } = await getEquipeSession(data.token);
+    const { data: funcionario, error: funcError } = await supabaseAdmin
+      .from("funcionarios")
+      .select("id, nome, cargo, avatar_url, ativo, perm_iniciar_atendimento, perm_finalizar_atendimento, perm_realizar_checklist, perm_ver_apenas_atribuidos, perm_ver_todos_veiculos")
+      .eq("id", sessao.funcionario_id)
+      .eq("owner_id", sessao.owner_id)
+      .maybeSingle();
+    if (funcError) throw funcError;
+    if (!funcionario?.ativo) throw new Error("Colaborador inativo");
+
+    const startToday = startOfTodayIso();
+    let query = supabaseAdmin
+      .from("ordens_servico")
+      .select(`id, status, valor, created_at, iniciado_em, finalizado_em, entregue_em, funcionario_id, observacoes,
+               clientes:cliente_id(nome, telefone), veiculos:veiculo_id(placa, modelo), servicos:servico_id(nome)`)
+      .eq("owner_id", sessao.owner_id)
+      .in("status", ["aguardando", "em_lavagem", "pronto"])
+      .order("created_at", { ascending: true });
+    if (funcionario.perm_ver_apenas_atribuidos && !funcionario.perm_ver_todos_veiculos) {
+      query = query.or(`funcionario_id.eq.${funcionario.id},funcionario_id.is.null`);
+    }
+    const { data: ordens, error } = await query;
+    if (error) throw error;
+
+    const minhas = (ordens ?? []).filter((o: any) => o.funcionario_id === funcionario.id);
+    const concluidasHoje = minhas.filter((o: any) => o.finalizado_em && new Date(o.finalizado_em) >= new Date(startToday)).length;
+    const emAtendimento = (ordens ?? []).filter((o: any) => o.status === "em_lavagem" && o.funcionario_id === funcionario.id);
+    const proximas = (ordens ?? []).filter((o: any) => o.status === "aguardando" || o.status === "em_lavagem").slice(0, 12);
+    const proximo = proximas.find((o: any) => o.status === "aguardando") ?? null;
+
+    return {
+      funcionario,
+      cards: {
+        veiculosAtribuidos: minhas.filter((o: any) => o.status !== "pronto").length,
+        emAtendimento: emAtendimento.length,
+        proximoServico: proximo?.servicos?.nome ?? "Livre",
+        concluidosHoje: concluidasHoje,
+      },
+      fila: proximas,
+    };
+  });
+
+export const equipeIniciarAtendimento = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ token: z.string().min(20), ordem_id: z.string().uuid() }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin, sessao } = await getEquipeSession(data.token);
+    const { data: funcionario } = await supabaseAdmin
+      .from("funcionarios")
+      .select("id, perm_iniciar_atendimento")
+      .eq("id", sessao.funcionario_id)
+      .maybeSingle();
+    if (!funcionario?.perm_iniciar_atendimento) throw new Error("Sem permissao para iniciar atendimento");
+
+    const now = new Date().toISOString();
+    const { error } = await supabaseAdmin.from("ordens_servico").update({
+      status: "em_lavagem",
+      iniciado_em: now,
+      funcionario_id: funcionario.id,
+    } as any).eq("id", data.ordem_id).eq("owner_id", sessao.owner_id);
+    if (error) throw error;
+    await supabaseAdmin.from("equipe_auditoria").insert({
+      owner_id: sessao.owner_id,
+      funcionario_id: funcionario.id,
+      ordem_id: data.ordem_id,
+      acao: "iniciou_atendimento",
+      metadata: { iniciado_em: now },
+    } as any);
+    return { ok: true };
+  });
+
+export const equipeFinalizarAtendimento = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    token: z.string().min(20),
+    ordem_id: z.string().uuid(),
+    observacoes: z.string().max(1000).optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin, sessao } = await getEquipeSession(data.token);
+    const { data: funcionario } = await supabaseAdmin
+      .from("funcionarios")
+      .select("id, perm_finalizar_atendimento")
+      .eq("id", sessao.funcionario_id)
+      .maybeSingle();
+    if (!funcionario?.perm_finalizar_atendimento) throw new Error("Sem permissao para finalizar atendimento");
+
+    const { data: ordem } = await supabaseAdmin
+      .from("ordens_servico")
+      .select("observacoes")
+      .eq("id", data.ordem_id)
+      .eq("owner_id", sessao.owner_id)
+      .maybeSingle();
+    const now = new Date().toISOString();
+    const obs = data.observacoes
+      ? [ordem?.observacoes, `[Equipe] ${data.observacoes}`].filter(Boolean).join("\n")
+      : ordem?.observacoes;
+    const { error } = await supabaseAdmin.from("ordens_servico").update({
+      status: "pronto",
+      finalizado_em: now,
+      observacoes: obs ?? null,
+      funcionario_id: funcionario.id,
+    } as any).eq("id", data.ordem_id).eq("owner_id", sessao.owner_id);
+    if (error) throw error;
+    await supabaseAdmin.from("equipe_auditoria").insert({
+      owner_id: sessao.owner_id,
+      funcionario_id: funcionario.id,
+      ordem_id: data.ordem_id,
+      acao: "finalizou_atendimento",
+      metadata: { finalizado_em: now, observacoes: data.observacoes ?? null },
+    } as any);
+    return { ok: true };
+  });
+
 export const listComissoesServico = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { funcionario_id: string }) => z.object({ funcionario_id: z.string().uuid() }).parse(d))
@@ -1773,9 +2053,9 @@ export const getEquipePainel = createServerFn({ method: "GET" })
     const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
     await ensureComissoesEntregues(supabase, userId, start, end);
 
-    const [{ data: func }, { data: ordens }, { data: comissoes }, { data: pagamentos }] = await Promise.all([
+    const [{ data: func }, { data: ordens }, { data: comissoes }, { data: pagamentos }, { data: empresa }] = await Promise.all([
       supabase.from("funcionarios")
-        .select("id, nome, ativo, comissao_tipo, comissao_valor, comissao_modo, auth_user_id, cargo, telefone, email, especialidades, horario_inicio, horario_fim, dias_disponiveis, capacidade_por_horario")
+        .select("id, nome, ativo, comissao_tipo, comissao_valor, comissao_modo, auth_user_id, cargo, telefone, email, avatar_url, pin_digits, pin_hash, perm_iniciar_atendimento, perm_finalizar_atendimento, perm_realizar_checklist, perm_ver_apenas_atribuidos, perm_ver_todos_veiculos, especialidades, horario_inicio, horario_fim, dias_disponiveis, capacidade_por_horario")
         .eq("owner_id", userId).order("nome"),
       supabase.from("ordens_servico")
         .select("id, valor, status, funcionario_id, iniciado_em, entregue_em, created_at")
@@ -1790,6 +2070,10 @@ export const getEquipePainel = createServerFn({ method: "GET" })
         .select("funcionario_id, valor, pago_em")
         .eq("owner_id", userId)
         .order("pago_em", { ascending: false }),
+      supabase.from("empresas")
+        .select("slug, nome_fantasia")
+        .eq("owner_id", userId)
+        .maybeSingle(),
     ]);
 
     const ultimoPagto = new Map<string, { valor: number; pago_em: string }>();
@@ -1829,6 +2113,14 @@ export const getEquipePainel = createServerFn({ method: "GET" })
           : `R$ ${Number(f.comissao_valor).toFixed(2)} por OS`;
       return {
         id: f.id, nome: f.nome, cargo: f.cargo, telefone: f.telefone, email: f.email,
+        avatar_url: f.avatar_url,
+        pin_digits: f.pin_digits ?? 4,
+        pin_configurado: !!f.pin_hash,
+        perm_iniciar_atendimento: f.perm_iniciar_atendimento ?? true,
+        perm_finalizar_atendimento: f.perm_finalizar_atendimento ?? true,
+        perm_realizar_checklist: f.perm_realizar_checklist ?? true,
+        perm_ver_apenas_atribuidos: f.perm_ver_apenas_atribuidos ?? true,
+        perm_ver_todos_veiculos: f.perm_ver_todos_veiculos ?? false,
         ativo: f.ativo, vinculado: !!f.auth_user_id,
         comissao_tipo: f.comissao_tipo, comissao_valor: Number(f.comissao_valor),
         comissao_modo: f.comissao_modo,
@@ -1853,6 +2145,7 @@ export const getEquipePainel = createServerFn({ method: "GET" })
     return {
       colaboradores: colaboradores.sort((a, b) => b.receita - a.receita),
       periodo: { inicio: start.toISOString().slice(0, 10), fim: end.toISOString().slice(0, 10) },
+      empresa: empresa ?? null,
       cards: {
         totalAPagar, totalLavagens, ativosHoje,
         melhor: melhor && melhor.lavagens > 0

@@ -508,10 +508,107 @@ export type Database = {
         }
         Relationships: []
       }
+      equipe_auditoria: {
+        Row: {
+          acao: string
+          created_at: string
+          funcionario_id: string | null
+          id: string
+          metadata: Json
+          ordem_id: string | null
+          owner_id: string
+        }
+        Insert: {
+          acao: string
+          created_at?: string
+          funcionario_id?: string | null
+          id?: string
+          metadata?: Json
+          ordem_id?: string | null
+          owner_id: string
+        }
+        Update: {
+          acao?: string
+          created_at?: string
+          funcionario_id?: string | null
+          id?: string
+          metadata?: Json
+          ordem_id?: string | null
+          owner_id?: string
+        }
+        Relationships: []
+      }
+      equipe_pin_attempts: {
+        Row: {
+          created_at: string
+          device_id: string | null
+          funcionario_id: string | null
+          id: string
+          owner_id: string
+          success: boolean
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string | null
+          funcionario_id?: string | null
+          id?: string
+          owner_id: string
+          success?: boolean
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          device_id?: string | null
+          funcionario_id?: string | null
+          id?: string
+          owner_id?: string
+          success?: boolean
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
+      equipe_sessoes: {
+        Row: {
+          created_at: string
+          device_id: string | null
+          expires_at: string
+          funcionario_id: string
+          id: string
+          last_seen_at: string
+          owner_id: string
+          token_hash: string
+          user_agent: string | null
+        }
+        Insert: {
+          created_at?: string
+          device_id?: string | null
+          expires_at: string
+          funcionario_id: string
+          id?: string
+          last_seen_at?: string
+          owner_id: string
+          token_hash: string
+          user_agent?: string | null
+        }
+        Update: {
+          created_at?: string
+          device_id?: string | null
+          expires_at?: string
+          funcionario_id?: string
+          id?: string
+          last_seen_at?: string
+          owner_id?: string
+          token_hash?: string
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       funcionarios: {
         Row: {
           ativo: boolean
           auth_user_id: string | null
+          avatar_url: string | null
           capacidade_por_horario: number
           cargo: string | null
           comissao_modo: string
@@ -525,12 +622,22 @@ export type Database = {
           id: string
           nome: string
           owner_id: string
+          perm_finalizar_atendimento: boolean
+          perm_iniciar_atendimento: boolean
+          perm_realizar_checklist: boolean
+          perm_ver_apenas_atribuidos: boolean
+          perm_ver_todos_veiculos: boolean
+          pin_digits: number
+          pin_failed_attempts: number
+          pin_hash: string | null
+          pin_locked_until: string | null
           telefone: string | null
           tempo_medio_servicos: Json
         }
         Insert: {
           ativo?: boolean
           auth_user_id?: string | null
+          avatar_url?: string | null
           capacidade_por_horario?: number
           cargo?: string | null
           comissao_modo?: string
@@ -544,12 +651,22 @@ export type Database = {
           id?: string
           nome: string
           owner_id: string
+          perm_finalizar_atendimento?: boolean
+          perm_iniciar_atendimento?: boolean
+          perm_realizar_checklist?: boolean
+          perm_ver_apenas_atribuidos?: boolean
+          perm_ver_todos_veiculos?: boolean
+          pin_digits?: number
+          pin_failed_attempts?: number
+          pin_hash?: string | null
+          pin_locked_until?: string | null
           telefone?: string | null
           tempo_medio_servicos?: Json
         }
         Update: {
           ativo?: boolean
           auth_user_id?: string | null
+          avatar_url?: string | null
           capacidade_por_horario?: number
           cargo?: string | null
           comissao_modo?: string
@@ -563,6 +680,15 @@ export type Database = {
           id?: string
           nome?: string
           owner_id?: string
+          perm_finalizar_atendimento?: boolean
+          perm_iniciar_atendimento?: boolean
+          perm_realizar_checklist?: boolean
+          perm_ver_apenas_atribuidos?: boolean
+          perm_ver_todos_veiculos?: boolean
+          pin_digits?: number
+          pin_failed_attempts?: number
+          pin_hash?: string | null
+          pin_locked_until?: string | null
           telefone?: string | null
           tempo_medio_servicos?: Json
         }

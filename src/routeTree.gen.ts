@@ -10,11 +10,13 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrustRouteImport } from './routes/trust'
+import { Route as ModoEquipeRouteImport } from './routes/modo-equipe'
 import { Route as LpRouteImport } from './routes/lp'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlanoSlugRouteImport } from './routes/plano.$slug'
+import { Route as EquipeSlugRouteImport } from './routes/equipe.$slug'
 import { Route as ApiAssistenteChatRouteImport } from './routes/api/assistente-chat'
 import { Route as AgendarSlugRouteImport } from './routes/agendar.$slug'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
@@ -36,6 +38,11 @@ import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authentic
 const TrustRoute = TrustRouteImport.update({
   id: '/trust',
   path: '/trust',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ModoEquipeRoute = ModoEquipeRouteImport.update({
+  id: '/modo-equipe',
+  path: '/modo-equipe',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LpRoute = LpRouteImport.update({
@@ -60,6 +67,11 @@ const IndexRoute = IndexRouteImport.update({
 const PlanoSlugRoute = PlanoSlugRouteImport.update({
   id: '/plano/$slug',
   path: '/plano/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EquipeSlugRoute = EquipeSlugRouteImport.update({
+  id: '/equipe/$slug',
+  path: '/equipe/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ApiAssistenteChatRoute = ApiAssistenteChatRouteImport.update({
@@ -159,6 +171,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/lp': typeof LpRoute
+  '/modo-equipe': typeof ModoEquipeRoute
   '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
@@ -174,6 +187,7 @@ export interface FileRoutesByFullPath {
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/api/assistente-chat': typeof ApiAssistenteChatRoute
+  '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
@@ -183,6 +197,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/lp': typeof LpRoute
+  '/modo-equipe': typeof ModoEquipeRoute
   '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
@@ -198,6 +213,7 @@ export interface FileRoutesByTo {
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/api/assistente-chat': typeof ApiAssistenteChatRoute
+  '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
@@ -209,6 +225,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/lp': typeof LpRoute
+  '/modo-equipe': typeof ModoEquipeRoute
   '/trust': typeof TrustRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/_authenticated/assinaturas': typeof AuthenticatedAssinaturasRoute
@@ -224,6 +241,7 @@ export interface FileRoutesById {
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/api/assistente-chat': typeof ApiAssistenteChatRoute
+  '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/_authenticated/clientes/inativos': typeof AuthenticatedClientesInativosRoute
@@ -235,6 +253,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/lp'
+    | '/modo-equipe'
     | '/trust'
     | '/agendamentos'
     | '/assinaturas'
@@ -250,6 +269,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/agendar/$slug'
     | '/api/assistente-chat'
+    | '/equipe/$slug'
     | '/plano/$slug'
     | '/clientes/$id'
     | '/clientes/inativos'
@@ -259,6 +279,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/lp'
+    | '/modo-equipe'
     | '/trust'
     | '/agendamentos'
     | '/assinaturas'
@@ -274,6 +295,7 @@ export interface FileRouteTypes {
     | '/relatorios'
     | '/agendar/$slug'
     | '/api/assistente-chat'
+    | '/equipe/$slug'
     | '/plano/$slug'
     | '/clientes/$id'
     | '/clientes/inativos'
@@ -284,6 +306,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/lp'
+    | '/modo-equipe'
     | '/trust'
     | '/_authenticated/agendamentos'
     | '/_authenticated/assinaturas'
@@ -299,6 +322,7 @@ export interface FileRouteTypes {
     | '/_authenticated/relatorios'
     | '/agendar/$slug'
     | '/api/assistente-chat'
+    | '/equipe/$slug'
     | '/plano/$slug'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/inativos'
@@ -310,9 +334,11 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   LpRoute: typeof LpRoute
+  ModoEquipeRoute: typeof ModoEquipeRoute
   TrustRoute: typeof TrustRoute
   AgendarSlugRoute: typeof AgendarSlugRoute
   ApiAssistenteChatRoute: typeof ApiAssistenteChatRoute
+  EquipeSlugRoute: typeof EquipeSlugRoute
   PlanoSlugRoute: typeof PlanoSlugRoute
 }
 
@@ -323,6 +349,13 @@ declare module '@tanstack/react-router' {
       path: '/trust'
       fullPath: '/trust'
       preLoaderRoute: typeof TrustRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/modo-equipe': {
+      id: '/modo-equipe'
+      path: '/modo-equipe'
+      fullPath: '/modo-equipe'
+      preLoaderRoute: typeof ModoEquipeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/lp': {
@@ -358,6 +391,13 @@ declare module '@tanstack/react-router' {
       path: '/plano/$slug'
       fullPath: '/plano/$slug'
       preLoaderRoute: typeof PlanoSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/equipe/$slug': {
+      id: '/equipe/$slug'
+      path: '/equipe/$slug'
+      fullPath: '/equipe/$slug'
+      preLoaderRoute: typeof EquipeSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/assistente-chat': {
@@ -526,9 +566,11 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   LpRoute: LpRoute,
+  ModoEquipeRoute: ModoEquipeRoute,
   TrustRoute: TrustRoute,
   AgendarSlugRoute: AgendarSlugRoute,
   ApiAssistenteChatRoute: ApiAssistenteChatRoute,
+  EquipeSlugRoute: EquipeSlugRoute,
   PlanoSlugRoute: PlanoSlugRoute,
 }
 export const routeTree = rootRouteImport

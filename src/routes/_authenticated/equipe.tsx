@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -17,7 +18,7 @@ import {
 } from "@/lib/lavaflow.functions";
 import { brl, dateBr } from "@/lib/format";
 import {
-  Plus, Trophy, UsersRound, Car, DollarSign, Link2, Pencil, Wallet, Sliders, CheckCircle2,
+  Plus, Trophy, UsersRound, Car, DollarSign, Link2, Pencil, Wallet, Sliders, CheckCircle2, ExternalLink, ShieldCheck,
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
@@ -40,9 +41,17 @@ type Periodo = "semana" | "quinzena" | "mes" | "custom";
 const defaultForm = {
   id: undefined as string | undefined,
   nome: "",
+  avatar_url: "",
   cargo: "",
   telefone: "",
   email: "",
+  pin: "",
+  pin_digits: 4 as 4 | 6,
+  perm_iniciar_atendimento: true,
+  perm_finalizar_atendimento: true,
+  perm_realizar_checklist: true,
+  perm_ver_apenas_atribuidos: true,
+  perm_ver_todos_veiculos: false,
   comissao_tipo: "fixo" as "fixo" | "percentual",
   comissao_valor: 0,
   comissao_modo: "global" as "global" | "por_servico",
@@ -100,8 +109,15 @@ function Page() {
   function openNew() { setForm({ ...defaultForm }); setOpen(true); }
   function openEdit(c: any) {
     setForm({
-      id: c.id, nome: c.nome ?? "", cargo: c.cargo ?? "", telefone: c.telefone ?? "",
+      id: c.id, nome: c.nome ?? "", avatar_url: c.avatar_url ?? "", cargo: c.cargo ?? "", telefone: c.telefone ?? "",
       email: c.email ?? "",
+      pin: "",
+      pin_digits: (c.pin_digits ?? 4) as 4 | 6,
+      perm_iniciar_atendimento: c.perm_iniciar_atendimento ?? true,
+      perm_finalizar_atendimento: c.perm_finalizar_atendimento ?? true,
+      perm_realizar_checklist: c.perm_realizar_checklist ?? true,
+      perm_ver_apenas_atribuidos: c.perm_ver_apenas_atribuidos ?? true,
+      perm_ver_todos_veiculos: c.perm_ver_todos_veiculos ?? false,
       comissao_tipo: c.comissao_tipo ?? "fixo",
       comissao_valor: Number(c.comissao_valor ?? 0),
       comissao_modo: c.comissao_modo ?? "global",
@@ -116,6 +132,8 @@ function Page() {
   const colaboradores = data?.colaboradores ?? [];
   const periodoInicio = data?.periodo.inicio ?? firstOfMonthIso();
   const periodoFim = data?.periodo.fim ?? todayIso();
+  const equipeSlug = data?.empresa?.slug;
+  const equipeUrl = equipeSlug && typeof window !== "undefined" ? `${window.location.origin}/equipe/${equipeSlug}` : "";
 
   return (
     <>
@@ -151,15 +169,70 @@ function Page() {
         <Kpi icon={Trophy} label="Melhor do período" value={cards?.melhor?.nome ?? "—"} sub={cards?.melhor ? `${cards.melhor.lavagens} lav.` : undefined} />
       </div>
 
+      <Card className="mb-6">
+        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2 font-semibold">
+              <ShieldCheck className="h-4 w-4 text-primary" /> Acesso rapido da equipe
+            </div>
+            <p className="mt-1 break-all text-xs text-muted-foreground">
+              {equipeUrl || "Configure o link publico da empresa para liberar o acesso por PIN."}
+            </p>
+          </div>
+          <div className="flex gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              disabled={!equipeUrl}
+              onClick={() => equipeUrl && navigator.clipboard?.writeText(equipeUrl).then(() => toast.success("Link copiado"))}
+            >
+              Copiar link
+            </Button>
+            <Button type="button" variant="outline" disabled={!equipeUrl} onClick={() => equipeUrl && window.open(equipeUrl, "_blank")}>
+              <ExternalLink className="h-4 w-4" />
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
       {/* Dialog editar/novo */}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader><DialogTitle>{form.id ? "Editar colaborador" : "Novo colaborador"}</DialogTitle></DialogHeader>
           <form onSubmit={(e) => { e.preventDefault(); mut.mutate(); }} className="space-y-3">
             <div><Label>Nome</Label><Input required value={form.nome} onChange={(e) => setForm({ ...form, nome: e.target.value })} /></div>
+            <div><Label>Foto / avatar URL</Label><Input value={form.avatar_url} onChange={(e) => setForm({ ...form, avatar_url: e.target.value })} placeholder="https://..." /></div>
             <div className="grid grid-cols-2 gap-2">
               <div><Label>Cargo</Label><Input value={form.cargo} onChange={(e) => setForm({ ...form, cargo: e.target.value })} /></div>
               <div><Label>Telefone</Label><Input value={form.telefone} onChange={(e) => setForm({ ...form, telefone: e.target.value })} /></div>
+            </div>
+            <div className="rounded-lg border bg-muted/40 p-3 space-y-3">
+              <div className="flex items-center gap-2 font-medium text-sm">
+                <ShieldCheck className="h-4 w-4 text-primary" /> Acesso por PIN
+              </div>
+              <div className="grid grid-cols-[1fr_96px] gap-2">
+                <div>
+                  <Label>{form.id ? "Novo PIN" : "PIN"}</Label>
+                  <Input
+                    inputMode="numeric"
+                    type="password"
+                    maxLength={form.pin_digits}
+                    value={form.pin}
+                    onChange={(e) => setForm({ ...form, pin: e.target.value.replace(/\D/g, "").slice(0, form.pin_digits) })}
+                    placeholder={form.id ? "Manter atual" : "Obrigatorio"}
+                  />
+                </div>
+                <div>
+                  <Label>Tamanho</Label>
+                  <select className="h-9 w-full rounded-md border bg-background px-2 text-sm"
+                          value={form.pin_digits}
+                          onChange={(e) => setForm({ ...form, pin_digits: Number(e.target.value) as 4 | 6, pin: "" })}>
+                    <option value={4}>4</option>
+                    <option value={6}>6</option>
+                  </select>
+                </div>
+              </div>
+              <p className="text-[11px] text-muted-foreground">O PIN e salvo apenas com hash. Deixe em branco ao editar para manter o PIN atual.</p>
             </div>
             <div>
               <Label>E-mail de acesso</Label>
@@ -183,6 +256,15 @@ function Page() {
               <p className="text-[11px] text-muted-foreground mt-1">
                 O perfil só é aplicado quando o colaborador é vinculado por e-mail.
               </p>
+            </div>
+
+            <div className="rounded-lg border p-3 space-y-2">
+              <p className="text-sm font-medium">Permissoes do Modo Equipe</p>
+              <Perm label="Pode iniciar atendimento" checked={form.perm_iniciar_atendimento} onChange={(v) => setForm({ ...form, perm_iniciar_atendimento: v })} />
+              <Perm label="Pode finalizar atendimento" checked={form.perm_finalizar_atendimento} onChange={(v) => setForm({ ...form, perm_finalizar_atendimento: v })} />
+              <Perm label="Pode realizar checklist" checked={form.perm_realizar_checklist} onChange={(v) => setForm({ ...form, perm_realizar_checklist: v })} />
+              <Perm label="Visualiza apenas veiculos atribuidos" checked={form.perm_ver_apenas_atribuidos} onChange={(v) => setForm({ ...form, perm_ver_apenas_atribuidos: v, perm_ver_todos_veiculos: v ? form.perm_ver_todos_veiculos : true })} />
+              <Perm label="Pode visualizar todos os veiculos" checked={form.perm_ver_todos_veiculos} onChange={(v) => setForm({ ...form, perm_ver_todos_veiculos: v })} />
             </div>
 
             <div>
@@ -252,6 +334,7 @@ function Page() {
                     {c.nome}
                     {!c.ativo && <Badge variant="outline" className="shrink-0">Inativo</Badge>}
                     {c.vinculado && <Badge variant="secondary" className="gap-1 shrink-0"><Link2 className="h-3 w-3" /></Badge>}
+                    {c.pin_configurado && <Badge variant="outline" className="shrink-0">PIN</Badge>}
                   </p>
                   <p className="text-xs text-muted-foreground truncate">{c.cargo ?? "—"} · {c.tipo_label}</p>
                 </div>
@@ -333,5 +416,14 @@ function Stat({ label, value, highlight }: { label: string; value: string; highl
       <p className="text-[10px] text-muted-foreground">{label}</p>
       <p className={`font-display font-bold text-sm ${highlight ? "text-success" : ""}`}>{value}</p>
     </div>
+  );
+}
+
+function Perm({ label, checked, onChange }: { label: string; checked: boolean; onChange: (checked: boolean) => void }) {
+  return (
+    <label className="flex items-center gap-2 text-xs text-muted-foreground">
+      <Checkbox checked={checked} onCheckedChange={(v) => onChange(v === true)} />
+      <span>{label}</span>
+    </label>
   );
 }
