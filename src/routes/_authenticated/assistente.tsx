@@ -161,8 +161,8 @@ function Page() {
       </div>
 
       <PageHeader
-        title="Central de Inteligência"
-        subtitle="Diagnóstico em tempo real, oportunidades priorizadas e um consultor IA conectado aos seus dados."
+        title="Consultor IA"
+        subtitle="Oportunidades priorizadas, diagnostico do negocio e acoes para aumentar faturamento."
         actions={
           <div className="flex gap-2">
             <Button variant="outline" size="sm" onClick={loadConsultor} disabled={!token || loadingConsultor}>

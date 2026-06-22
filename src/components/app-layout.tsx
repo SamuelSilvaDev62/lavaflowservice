@@ -2,8 +2,22 @@ import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  LayoutDashboard, Sparkles, Bot, ListChecks, ClipboardList, Users, UserMinus,
-  CreditCard, Award, UsersRound, BarChart3, Settings, Menu, X, LogOut, Car, Briefcase, CalendarDays,
+  Award,
+  BarChart3,
+  Bot,
+  Briefcase,
+  CalendarDays,
+  Car,
+  ClipboardList,
+  CreditCard,
+  LayoutDashboard,
+  ListChecks,
+  LogOut,
+  Menu,
+  Settings,
+  Users,
+  UsersRound,
+  X,
 } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { cn } from "@/lib/utils";
@@ -18,31 +32,27 @@ type NavItem = { to: string; label: string; icon: any; tour?: string; roles: App
 type NavGroup = { label: string; items: NavItem[] };
 
 const groupsAll: NavGroup[] = [
-  { label: "Visão", items: [
-    { to: "/dashboard", label: "Operação do Dia", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
-    { to: "/oportunidades", label: "Oportunidades", icon: Sparkles, tour: "oportunidades", roles: OPERACIONAL },
-    { to: "/assistente", label: "Assistente LavaFlow", icon: Bot, tour: "assistente", roles: GESTAO },
-  ]},
-  { label: "Operação", items: [
+  { label: "Operacao", items: [
+    { to: "/dashboard", label: "Operacao do Dia", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
+    { to: "/agendamentos", label: "Agenda", icon: CalendarDays, roles: OPERACIONAL },
     { to: "/fila", label: "Fila", icon: ListChecks, roles: OPERACIONAL },
-    { to: "/ordens", label: "Ordens de serviço", icon: ClipboardList, roles: OPERACIONAL },
-    { to: "/agendamentos", label: "Agendamentos", icon: CalendarDays, roles: OPERACIONAL },
+    { to: "/ordens", label: "Ordens de Servico", icon: ClipboardList, roles: OPERACIONAL },
   ]},
-  { label: "Crescimento", items: [
+  { label: "Relacionamento", items: [
     { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes", roles: OPERACIONAL },
-    { to: "/clientes/inativos", label: "Inativos", icon: UserMinus, roles: OPERACIONAL },
     { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: OPERACIONAL },
     { to: "/fidelidade", label: "Fidelidade", icon: Award, roles: ADMINS },
   ]},
-  { label: "Gestão", items: [
+  { label: "Gestao", items: [
     { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },
-    { to: "/relatorios", label: "Relatórios", icon: BarChart3, roles: GESTAO },
-    { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
+    { to: "/relatorios", label: "Relatorios", icon: BarChart3, roles: GESTAO },
+    { to: "/assistente", label: "Consultor IA", icon: Bot, tour: "assistente", roles: GESTAO },
+    { to: "/configuracoes", label: "Configuracoes", icon: Settings, roles: ADMINS },
   ]},
 ];
 
 const colabGroups: NavGroup[] = [
-  { label: "Operação", items: [
+  { label: "Operacao", items: [
     { to: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, roles: ["lavador", "colaborador"] },
   ]},
 ];
@@ -108,7 +118,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <div key={g.label}>
               <p className="px-3 pb-2 text-[10px] font-semibold tracking-widest uppercase text-muted-foreground">{g.label}</p>
               <ul className="space-y-1">
-                {g.items.map((it: any) => {
+                {g.items.map((it) => {
                   const Icon = it.icon;
                   const active = pathname === it.to || (it.to !== "/dashboard" && pathname.startsWith(it.to));
                   return (
