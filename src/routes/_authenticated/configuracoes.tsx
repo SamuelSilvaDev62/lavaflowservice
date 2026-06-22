@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getEmpresa, updateEmpresa, listServicos, upsertServico, getAgendaConfig, updateAgendaConfig, listTenantMembers, setMemberRole } from "@/lib/lavaflow.functions";
+import { getEmpresa, updateEmpresa, listServicos, upsertServico, getAgendaConfig, updateAgendaConfig, listTenantMembers, setMemberRole, listUpsellRegras, upsertUpsellRegra } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { allTemplates, setTemplate, type WhatsAppTemplateKey } from "@/lib/whatsapp";
 import { FIDELIDADE_DEFAULTS, type TplKey as FidTplKey } from "@/lib/fidelidade-messages";
@@ -34,17 +34,160 @@ function Page() {
         <TabsList className="mb-4 flex-wrap h-auto">
           <TabsTrigger value="empresa">Empresa</TabsTrigger>
           <TabsTrigger value="servicos">Serviços</TabsTrigger>
+          <TabsTrigger value="upsell">Upsell</TabsTrigger>
           <TabsTrigger value="agenda">Agenda</TabsTrigger>
           <TabsTrigger value="membros">Membros e papéis</TabsTrigger>
           <TabsTrigger value="msg">Mensagens</TabsTrigger>
         </TabsList>
         <TabsContent value="empresa"><EmpresaTab /></TabsContent>
         <TabsContent value="servicos"><ServicosTab /></TabsContent>
+        <TabsContent value="upsell"><UpsellTab /></TabsContent>
         <TabsContent value="agenda"><AgendaTab /></TabsContent>
         <TabsContent value="membros"><MembrosTab /></TabsContent>
         <TabsContent value="msg"><MsgTab /></TabsContent>
       </Tabs>
     </>
+  );
+}
+
+function UpsellTab() {
+  const list = useServerFn(listUpsellRegras);
+  const save = useServerFn(upsertUpsellRegra);
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["upsell-regras"], queryFn: () => list() });
+  const empty = {
+    id: undefined as string | undefined,
+    item_chave: "",
+    item_label: "",
+    servico_sugerido: "",
+    servico_id: null as string | null,
+    termosTexto: "",
+    motivo: "",
+    ativo: true,
+    prioridade: 1,
+  };
+  const [form, setForm] = useState(empty);
+  const mut = useMutation({
+    mutationFn: () => save({
+      data: {
+        id: form.id,
+        item_chave: form.item_chave,
+        item_label: form.item_label,
+        servico_sugerido: form.servico_sugerido,
+        servico_id: form.servico_id,
+        termos: form.termosTexto.split(",").map((s) => s.trim()).filter(Boolean),
+        motivo: form.motivo,
+        ativo: form.ativo,
+        prioridade: Number(form.prioridade) || 1,
+      },
+    }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["upsell-regras"] });
+      setForm(empty);
+      toast.success("Regra de upsell salva");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar regra"),
+  });
+
+  function edit(row: any) {
+    setForm({
+      id: row.id,
+      item_chave: row.item_chave,
+      item_label: row.item_label,
+      servico_sugerido: row.servico_sugerido,
+      servico_id: row.servico_id ?? null,
+      termosTexto: (row.termos ?? []).join(", "),
+      motivo: row.motivo,
+      ativo: row.ativo ?? true,
+      prioridade: Number(row.prioridade ?? 1),
+    });
+  }
+
+  function setItem(chave: string) {
+    const item = data?.itensChecklist.find((i: any) => i.chave === chave);
+    setForm({ ...form, item_chave: chave, item_label: item?.label ?? chave });
+  }
+
+  function setServico(id: string) {
+    const svc = data?.servicos.find((s: any) => s.id === id);
+    setForm({
+      ...form,
+      servico_id: id,
+      servico_sugerido: svc?.nome ?? form.servico_sugerido,
+      termosTexto: form.termosTexto || svc?.nome || "",
+    });
+  }
+
+  return (
+    <div className="grid gap-4 lg:grid-cols-[1fr_420px]">
+      <Card><CardContent className="p-5 space-y-4">
+        <div>
+          <h3 className="font-display font-semibold">Motor de Upsell</h3>
+          <p className="text-xs text-muted-foreground">Configure quais itens do checklist geram sugestoes comerciais automaticamente.</p>
+        </div>
+        {isLoading && <div className="h-48 rounded-md bg-muted animate-pulse" />}
+        <div className="space-y-2">
+          {(data?.regras ?? []).map((r: any) => (
+            <div key={r.id ?? r.item_chave} className="rounded-md border p-3">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div className="min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="font-medium">{r.item_label}</span>
+                    <Badge variant={r.ativo === false ? "secondary" : "outline"}>{r.ativo === false ? "Inativa" : "Ativa"}</Badge>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{r.servico_sugerido}</p>
+                  <p className="text-xs text-muted-foreground mt-1">{r.motivo}</p>
+                </div>
+                <Button type="button" size="sm" variant="outline" onClick={() => edit(r)}>Editar</Button>
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent></Card>
+
+      <Card><CardContent className="p-5">
+        <form onSubmit={(e) => { e.preventDefault(); mut.mutate(); }} className="space-y-4">
+          <div>
+            <h3 className="font-display font-semibold">{form.id ? "Editar regra" : "Nova regra"}</h3>
+            <p className="text-xs text-muted-foreground">Use servicos reais cadastrados para estimar valor do upsell.</p>
+          </div>
+          <div>
+            <Label>Item do checklist</Label>
+            <Select value={form.item_chave} onValueChange={setItem}>
+              <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+              <SelectContent>{data?.itensChecklist.map((i: any) => <SelectItem key={i.chave} value={i.chave}>{i.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div>
+            <Label>Servico sugerido</Label>
+            <Select value={form.servico_id ?? ""} onValueChange={setServico}>
+              <SelectTrigger><SelectValue placeholder="Vincular servico cadastrado" /></SelectTrigger>
+              <SelectContent>{data?.servicos.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.nome} - {brl(s.preco_padrao)}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div><Label>Nome exibido</Label><Input value={form.servico_sugerido} onChange={(e) => setForm({ ...form, servico_sugerido: e.target.value })} /></div>
+          <div><Label>Termos para encontrar servico</Label><Input placeholder="polimento, cristalizacao" value={form.termosTexto} onChange={(e) => setForm({ ...form, termosTexto: e.target.value })} /></div>
+          <div><Label>Motivo comercial</Label><Textarea rows={4} value={form.motivo} onChange={(e) => setForm({ ...form, motivo: e.target.value })} /></div>
+          <div className="grid grid-cols-2 gap-3">
+            <div><Label>Prioridade</Label><Input type="number" min={1} value={form.prioridade} onChange={(e) => setForm({ ...form, prioridade: Number(e.target.value) })} /></div>
+            <div>
+              <Label>Status</Label>
+              <Select value={form.ativo ? "true" : "false"} onValueChange={(v) => setForm({ ...form, ativo: v === "true" })}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="true">Ativa</SelectItem>
+                  <SelectItem value="false">Inativa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <Button type="submit" disabled={mut.isPending || !form.item_chave || !form.servico_sugerido || !form.motivo}>Salvar regra</Button>
+            <Button type="button" variant="outline" onClick={() => setForm(empty)}>Limpar</Button>
+          </div>
+        </form>
+      </CardContent></Card>
+    </div>
   );
 }
 

@@ -2118,6 +2118,44 @@ export const equipeIniciarAtendimento = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const listUpsellRegras = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const [{ data: regras }, { data: servicos }] = await Promise.all([
+      context.supabase.from("upsell_regras").select("*").eq("owner_id", ownerId).order("prioridade"),
+      context.supabase.from("servicos").select("id, nome, preco_padrao").eq("owner_id", ownerId).eq("ativo", true).order("nome"),
+    ]);
+    return {
+      regras: (regras?.length ? regras : defaultUpsellRuleRows).map((row: any, index: number) => ({ ...row, prioridade: row.prioridade ?? index + 1 })),
+      servicos: servicos ?? [],
+      itensChecklist: Object.entries(checklistLabels).map(([chave, label]) => ({ chave, label })),
+    };
+  });
+
+export const upsertUpsellRegra = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    id: z.string().uuid().optional(),
+    item_chave: z.string().min(1).max(80),
+    item_label: z.string().min(1).max(120),
+    servico_sugerido: z.string().min(1).max(120),
+    servico_id: z.string().uuid().nullable().optional(),
+    termos: z.array(z.string().min(1).max(80)).max(12).default([]),
+    motivo: z.string().min(1).max(500),
+    ativo: z.boolean().default(true),
+    prioridade: z.number().int().min(1).max(999).default(1),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const row = { ...data, owner_id: ownerId, updated_at: new Date().toISOString() };
+    const { error } = data.id
+      ? await context.supabase.from("upsell_regras").update(row as any).eq("id", data.id).eq("owner_id", ownerId)
+      : await context.supabase.from("upsell_regras").insert(row as any);
+    if (error) throw error;
+    return { ok: true };
+  });
+
 const checklistInicialSchema = z.object({
   riscos_visiveis: z.boolean().default(false),
   amassados: z.boolean().default(false),
@@ -2185,6 +2223,17 @@ const upsellRules: Record<string, { servico: string; termos: string[]; motivo: s
   },
 };
 
+const defaultUpsellRuleRows = Object.entries(upsellRules).map(([chave, rule], index) => ({
+  item_chave: chave,
+  item_label: checklistLabels[chave],
+  servico_sugerido: rule.servico,
+  servico_id: null,
+  termos: rule.termos,
+  motivo: rule.motivo,
+  ativo: true,
+  prioridade: index + 1,
+}));
+
 function normalizeText(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase();
 }
@@ -2207,7 +2256,14 @@ async function gerarUpsellsChecklistInicial(supabase: any, input: {
   funcionarioId: string;
   itens: Record<string, boolean>;
 }) {
-  const marcados = Object.entries(input.itens).filter(([chave, marcado]) => marcado && upsellRules[chave]);
+  const { data: regrasDb } = await supabase
+    .from("upsell_regras")
+    .select("id, item_chave, item_label, servico_sugerido, servico_id, termos, motivo, prioridade")
+    .eq("owner_id", input.ownerId)
+    .eq("ativo", true)
+    .order("prioridade", { ascending: true });
+  const regras = (regrasDb?.length ? regrasDb : defaultUpsellRuleRows).filter((rule: any) => input.itens[rule.item_chave]);
+  const marcados = regras.filter((rule: any) => rule.item_chave && rule.servico_sugerido);
   if (marcados.length === 0) return [];
 
   const { data: servicos } = await supabase
@@ -2216,11 +2272,11 @@ async function gerarUpsellsChecklistInicial(supabase: any, input: {
     .eq("owner_id", input.ownerId)
     .eq("ativo", true);
 
-  const rows = marcados.map(([chave]) => {
-    const rule = upsellRules[chave];
+  const rows = marcados.map((rule: any) => {
     const match = (servicos ?? []).find((s: any) => {
+      if (rule.servico_id && s.id === rule.servico_id) return true;
       const nome = normalizeText(s.nome ?? "");
-      return rule.termos.some((termo) => nome.includes(normalizeText(termo)));
+      return (rule.termos ?? []).some((termo: string) => nome.includes(normalizeText(termo)));
     });
     return {
       owner_id: input.ownerId,
@@ -2228,9 +2284,9 @@ async function gerarUpsellsChecklistInicial(supabase: any, input: {
       checklist_id: input.checklistId,
       funcionario_id: input.funcionarioId,
       servico_id: match?.id ?? null,
-      origem_item_chave: chave,
-      origem_item_label: checklistLabels[chave],
-      servico_sugerido: match?.nome ?? rule.servico,
+      origem_item_chave: rule.item_chave,
+      origem_item_label: rule.item_label ?? checklistLabels[rule.item_chave] ?? rule.item_chave,
+      servico_sugerido: match?.nome ?? rule.servico_sugerido,
       motivo: rule.motivo,
       valor_estimado: match?.preco_padrao ?? null,
       status: "sugerida",
