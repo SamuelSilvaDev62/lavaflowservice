@@ -1513,6 +1513,7 @@ const RECEITA_ORIGENS: Record<string, string> = {
   CAMPANHA: "Campanhas",
   ANIVERSARIO: "Aniversarios",
   LEVA_ETRAZ: "Leva e Traz",
+  ASSINATURAS: "Assinaturas",
 };
 
 function periodoReceitaInfluenciada(periodo = "mes") {

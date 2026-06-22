@@ -14,6 +14,7 @@ import {
   ListChecks,
   LogOut,
   Menu,
+  Rocket,
   Settings,
   Users,
   UsersRound,
@@ -45,6 +46,7 @@ const groupsAll: NavGroup[] = [
   ]},
   { label: "Gestao", items: [
     { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },
+    { to: "/crescimento", label: "Centro de Crescimento", icon: Rocket, roles: GESTAO },
     { to: "/relatorios", label: "Relatorios", icon: BarChart3, roles: GESTAO },
     { to: "/assistente", label: "Consultor IA", icon: Bot, tour: "assistente", roles: GESTAO },
     { to: "/configuracoes", label: "Configuracoes", icon: Settings, roles: ADMINS },

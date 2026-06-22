@@ -27,6 +27,7 @@ import { Route as AuthenticatedFilaRouteImport } from './routes/_authenticated/f
 import { Route as AuthenticatedFidelidadeRouteImport } from './routes/_authenticated/fidelidade'
 import { Route as AuthenticatedEquipeRouteImport } from './routes/_authenticated/equipe'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedCrescimentoRouteImport } from './routes/_authenticated/crescimento'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedAssistenteRouteImport } from './routes/_authenticated/assistente'
 import { Route as AuthenticatedAssinaturasRouteImport } from './routes/_authenticated/assinaturas'
@@ -126,6 +127,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedCrescimentoRoute =
+  AuthenticatedCrescimentoRouteImport.update({
+    id: '/crescimento',
+    path: '/crescimento',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedConfiguracoesRoute =
   AuthenticatedConfiguracoesRouteImport.update({
     id: '/configuracoes',
@@ -177,6 +184,7 @@ export interface FileRoutesByFullPath {
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
   '/assistente': typeof AuthenticatedAssistenteRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/crescimento': typeof AuthenticatedCrescimentoRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/equipe': typeof AuthenticatedEquipeRoute
   '/fidelidade': typeof AuthenticatedFidelidadeRoute
@@ -203,6 +211,7 @@ export interface FileRoutesByTo {
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
   '/assistente': typeof AuthenticatedAssistenteRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/crescimento': typeof AuthenticatedCrescimentoRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/equipe': typeof AuthenticatedEquipeRoute
   '/fidelidade': typeof AuthenticatedFidelidadeRoute
@@ -231,6 +240,7 @@ export interface FileRoutesById {
   '/_authenticated/assinaturas': typeof AuthenticatedAssinaturasRoute
   '/_authenticated/assistente': typeof AuthenticatedAssistenteRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/_authenticated/crescimento': typeof AuthenticatedCrescimentoRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/equipe': typeof AuthenticatedEquipeRoute
   '/_authenticated/fidelidade': typeof AuthenticatedFidelidadeRoute
@@ -259,6 +269,7 @@ export interface FileRouteTypes {
     | '/assinaturas'
     | '/assistente'
     | '/configuracoes'
+    | '/crescimento'
     | '/dashboard'
     | '/equipe'
     | '/fidelidade'
@@ -285,6 +296,7 @@ export interface FileRouteTypes {
     | '/assinaturas'
     | '/assistente'
     | '/configuracoes'
+    | '/crescimento'
     | '/dashboard'
     | '/equipe'
     | '/fidelidade'
@@ -312,6 +324,7 @@ export interface FileRouteTypes {
     | '/_authenticated/assinaturas'
     | '/_authenticated/assistente'
     | '/_authenticated/configuracoes'
+    | '/_authenticated/crescimento'
     | '/_authenticated/dashboard'
     | '/_authenticated/equipe'
     | '/_authenticated/fidelidade'
@@ -470,6 +483,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/crescimento': {
+      id: '/_authenticated/crescimento'
+      path: '/crescimento'
+      fullPath: '/crescimento'
+      preLoaderRoute: typeof AuthenticatedCrescimentoRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/configuracoes': {
       id: '/_authenticated/configuracoes'
       path: '/configuracoes'
@@ -527,6 +547,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAssinaturasRoute: typeof AuthenticatedAssinaturasRoute
   AuthenticatedAssistenteRoute: typeof AuthenticatedAssistenteRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
+  AuthenticatedCrescimentoRoute: typeof AuthenticatedCrescimentoRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEquipeRoute: typeof AuthenticatedEquipeRoute
   AuthenticatedFidelidadeRoute: typeof AuthenticatedFidelidadeRoute
@@ -545,6 +566,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAssinaturasRoute: AuthenticatedAssinaturasRoute,
   AuthenticatedAssistenteRoute: AuthenticatedAssistenteRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
+  AuthenticatedCrescimentoRoute: AuthenticatedCrescimentoRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEquipeRoute: AuthenticatedEquipeRoute,
   AuthenticatedFidelidadeRoute: AuthenticatedFidelidadeRoute,

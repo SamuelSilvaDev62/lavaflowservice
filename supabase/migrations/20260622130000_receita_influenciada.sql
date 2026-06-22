@@ -14,7 +14,8 @@ create table if not exists public.receita_influenciada (
     'CONSULTOR_IA',
     'CAMPANHA',
     'ANIVERSARIO',
-    'LEVA_ETRAZ'
+    'LEVA_ETRAZ',
+    'ASSINATURAS'
   )),
   valor numeric not null default 0,
   descricao text,
