@@ -41,7 +41,25 @@ export function buildRulesConsultorResponse(context: any, advancedUnavailable = 
     ? opportunities.clientes_inativos.length
     : Number(metrics.clientes_inativos ?? 0);
   const healthScore = Number(metrics.health_score_calculado ?? 0);
+  const indiceLavaFlow = Number(metrics.indice_lavaflow ?? healthScore);
   const topOpportunities: ConsultorOpportunity[] = [];
+
+  if (indiceLavaFlow > 0 && indiceLavaFlow < 60) {
+    const componentes = Array.isArray(metrics.indice_lavaflow_componentes) ? metrics.indice_lavaflow_componentes : [];
+    const menor = componentes.slice().sort((a: any, b: any) => Number(a.score ?? 0) - Number(b.score ?? 0))[0];
+    topOpportunities.push(makeOpportunity({
+      id: "rules-indice-lavaflow",
+      priority: indiceLavaFlow < 40 ? "alta" : "media",
+      category: "operacao",
+      title: `Indice LavaFlow em ${Math.round(indiceLavaFlow)}/100`,
+      description: menor ? `${menor.label} esta puxando a nota para baixo (${menor.score}/100).` : "A nota geral indica espaco para melhorar crescimento e eficiencia.",
+      estimatedImpact: 0,
+      whyItMatters: "O indice combina operacao, recorrencia, upsell e receita influenciada em uma leitura executiva unica.",
+      recommendedAction: menor ? `Priorizar uma acao para melhorar ${String(menor.label).toLowerCase()} nesta semana.` : "Revisar o Centro de Crescimento e escolher uma alavanca principal para a semana.",
+      actionType: "relatorio",
+      ctaLabel: "Ver Centro de Crescimento",
+    }));
+  }
 
   if (inativosCount > 0) {
     topOpportunities.push(makeOpportunity({

@@ -10,7 +10,7 @@ import { brl, pct } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { DollarSign, LineChart, Rocket, Sparkles, TrendingUp } from "lucide-react";
+import { Activity, DollarSign, LineChart, Sparkles, TrendingUp } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/crescimento")({
   component: () => <RequireRole roles={GESTAO}><Page /></RequireRole>,
@@ -54,11 +54,45 @@ function Page() {
 
       {data && (
         <div className="space-y-5">
+          <Card className="border-primary/30 bg-primary/5">
+            <CardContent className="p-4">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-5">
+                <div className="flex items-center gap-4">
+                  <div className="grid h-24 w-24 shrink-0 place-content-center rounded-full bg-card shadow-[var(--shadow-neo-inset)]">
+                    <span className="font-display text-4xl font-bold text-primary tabular-nums">{data.indiceLavaFlow.score}</span>
+                  </div>
+                  <div>
+                    <Badge variant="secondary" className="mb-2">{data.indiceLavaFlow.nivel}</Badge>
+                    <h2 className="font-display text-xl font-semibold">Indice LavaFlow</h2>
+                    <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+                      Nota operacional de 0 a 100 baseada em ticket, retorno, fidelizacao, upsell, receita influenciada, produtividade, comparecimento e uso das recomendacoes.
+                    </p>
+                  </div>
+                </div>
+                <Button asChild variant="outline"><Link to="/relatorios">Ver relatorios</Link></Button>
+              </div>
+              <div className="mt-5 grid sm:grid-cols-2 lg:grid-cols-4 gap-2">
+                {data.indiceLavaFlow.componentes.map((item: any) => (
+                  <div key={item.chave} className="rounded-md border bg-card/70 p-3">
+                    <div className="flex items-center justify-between gap-2 text-xs">
+                      <span className="font-medium">{item.label}</span>
+                      <span className="text-muted-foreground">peso {item.peso}</span>
+                    </div>
+                    <div className="mt-2 h-2 rounded-full bg-muted overflow-hidden">
+                      <div className="h-full bg-primary" style={{ width: `${item.score}%` }} />
+                    </div>
+                    <p className="mt-1 text-xs text-muted-foreground">{item.score}/100</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
           <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <Metric icon={DollarSign} label="Receita influenciada" value={brl(data.totalInfluenciada)} tone="success" />
             <Metric icon={TrendingUp} label="Participacao no faturamento" value={pct(data.percentual, 1)} />
             <Metric icon={LineChart} label="Receita total no periodo" value={brl(data.totalReceita)} />
-            <Metric icon={Rocket} label="Origens registradas" value={String(data.categorias.reduce((sum: number, cat: any) => sum + Number(cat.quantidade ?? 0), 0))} />
+            <Metric icon={Activity} label="Origens registradas" value={String(data.categorias.reduce((sum: number, cat: any) => sum + Number(cat.quantidade ?? 0), 0))} />
           </div>
 
           <Card className="border-primary/30 bg-primary/5">

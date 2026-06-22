@@ -1525,6 +1525,10 @@ function periodoReceitaInfluenciada(periodo = "mes") {
   return { inicio: new Date(now.getFullYear(), now.getMonth(), 1), fim };
 }
 
+function clampScore(value: number) {
+  return Math.round(Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0)));
+}
+
 async function getReceitaInfluenciadaData(supabase: any, ownerId: string, opts: { periodo?: string; inicio?: string; fim?: string } = {}) {
   const base = periodoReceitaInfluenciada(opts.periodo);
   const inicio = opts.inicio ? new Date(opts.inicio) : base.inicio;
@@ -1534,8 +1538,8 @@ async function getReceitaInfluenciadaData(supabase: any, ownerId: string, opts: 
   const inicioDia = inicioIso.slice(0, 10);
   const fimDia = fimIso.slice(0, 10);
 
-  const [{ data: ordens }, { data: eventos }, { data: levaTraz }] = await Promise.all([
-    supabase.from("ordens_servico").select("id, valor, created_at").eq("owner_id", ownerId).gte("created_at", inicioIso).lte("created_at", fimIso),
+  const [{ data: ordens }, { data: eventos }, { data: levaTraz }, { data: clientes }, { data: assinaturas }, { data: agendamentos }, { data: upsells }, { data: funcionarios }] = await Promise.all([
+    supabase.from("ordens_servico").select("id, valor, status, created_at, cliente_id, funcionario_id").eq("owner_id", ownerId).gte("created_at", inicioIso).lte("created_at", fimIso),
     supabase.from("receita_influenciada").select("*").eq("owner_id", ownerId).gte("created_at", inicioIso).lte("created_at", fimIso),
     supabase.from("agendamentos")
       .select("id, ordem_id, cliente_id, taxa_leva_traz, data_agendada, clientes:cliente_id(nome)")
@@ -1544,6 +1548,11 @@ async function getReceitaInfluenciadaData(supabase: any, ownerId: string, opts: 
       .gt("taxa_leva_traz", 0)
       .gte("data_agendada", inicioDia)
       .lte("data_agendada", fimDia),
+    supabase.from("clientes").select("id, pontos_saldo").eq("owner_id", ownerId),
+    supabase.from("assinaturas_clientes").select("id, cliente_id, status").eq("owner_id", ownerId),
+    supabase.from("agendamentos").select("id, status, data_agendada").eq("owner_id", ownerId).gte("data_agendada", inicioDia).lte("data_agendada", fimDia),
+    supabase.from("os_upsell_oportunidades").select("id, status, valor_estimado").eq("owner_id", ownerId).gte("created_at", inicioIso).lte("created_at", fimIso),
+    supabase.from("funcionarios").select("id, ativo").eq("owner_id", ownerId).eq("ativo", true),
   ]);
 
   const rows = [...(eventos ?? [])];
@@ -1578,6 +1587,38 @@ async function getReceitaInfluenciadaData(supabase: any, ownerId: string, opts: 
     };
   });
   const totalInfluenciada = categorias.reduce((sum, row) => sum + row.valor, 0);
+  const ticketMedio = (ordens ?? []).length ? totalReceita / (ordens ?? []).length : 0;
+  const ordensPorCliente = new Map<string, number>();
+  (ordens ?? []).forEach((row: any) => {
+    if (!row.cliente_id) return;
+    ordensPorCliente.set(row.cliente_id, (ordensPorCliente.get(row.cliente_id) ?? 0) + 1);
+  });
+  const clientesRows = clientes ?? [];
+  const retorno = clientesRows.length ? Array.from(ordensPorCliente.values()).filter((qtd) => qtd >= 2).length / clientesRows.length : 0;
+  const assinantesAtivos = new Set((assinaturas ?? []).filter((row: any) => row.status === "ativa").map((row: any) => row.cliente_id));
+  const clientesComPontos = clientesRows.filter((row: any) => Number(row.pontos_saldo ?? 0) > 0).length;
+  const fidelizacao = clientesRows.length ? Math.min(1, (assinantesAtivos.size + clientesComPontos) / clientesRows.length) : 0;
+  const upsellRows = upsells ?? [];
+  const conversaoUpsell = upsellRows.length ? upsellRows.filter((row: any) => row.status === "aceita").length / upsellRows.length : 0;
+  const funcionariosAtivos = Math.max(1, (funcionarios ?? []).length);
+  const ordensConcluidas = (ordens ?? []).filter((row: any) => ["pronto", "entregue"].includes(row.status)).length;
+  const produtividade = Math.min(1, (ordensConcluidas / funcionariosAtivos) / 25);
+  const agendaRows = agendamentos ?? [];
+  const compareceu = agendaRows.filter((row: any) => ["confirmado", "concluido"].includes(row.status)).length;
+  const naoCompareceu = agendaRows.filter((row: any) => ["cancelado", "nao_compareceu"].includes(row.status)).length;
+  const comparecimento = compareceu + naoCompareceu ? compareceu / (compareceu + naoCompareceu) : 0;
+  const usoIa = rows.some((row: any) => row.origem === "CONSULTOR_IA") ? 1 : rows.length > 0 ? 0.4 : 0;
+  const componentesIndice = [
+    { chave: "ticket_medio", label: "Ticket medio", peso: 15, score: clampScore((ticketMedio / 80) * 100) },
+    { chave: "retorno", label: "Retorno", peso: 15, score: clampScore(retorno * 100) },
+    { chave: "fidelizacao", label: "Fidelizacao", peso: 10, score: clampScore(fidelizacao * 100) },
+    { chave: "upsell", label: "Conversao de upsell", peso: 15, score: clampScore(conversaoUpsell * 100) },
+    { chave: "receita_influenciada", label: "Receita influenciada", peso: 15, score: clampScore(((totalReceita ? totalInfluenciada / totalReceita : 0) / 0.2) * 100) },
+    { chave: "produtividade", label: "Produtividade", peso: 15, score: clampScore(produtividade * 100) },
+    { chave: "comparecimento", label: "Comparecimento", peso: 10, score: clampScore(comparecimento * 100) },
+    { chave: "uso_ia", label: "Uso das recomendacoes da IA", peso: 5, score: clampScore(usoIa * 100) },
+  ];
+  const indiceScore = clampScore(componentesIndice.reduce((sum, item) => sum + (item.score * item.peso) / 100, 0));
   const porDia = new Map<string, number>();
   rows.forEach((row: any) => {
     const dia = String(row.created_at ?? "").slice(0, 10);
@@ -1592,6 +1633,19 @@ async function getReceitaInfluenciadaData(supabase: any, ownerId: string, opts: 
     totalReceita,
     totalInfluenciada,
     percentual: totalReceita ? totalInfluenciada / totalReceita : 0,
+    indiceLavaFlow: {
+      score: indiceScore,
+      nivel: indiceScore >= 80 ? "Excelente" : indiceScore >= 60 ? "Saudavel" : indiceScore >= 40 ? "Atencao" : "Critico",
+      componentes: componentesIndice,
+      resumo: {
+        ticketMedio,
+        retorno,
+        fidelizacao,
+        conversaoUpsell,
+        produtividade,
+        comparecimento,
+      },
+    },
     categorias,
     timeline: Array.from(porDia, ([dia, valor]) => ({ dia, valor })).sort((a, b) => a.dia.localeCompare(b.dia)),
     ultimosEventos: rows

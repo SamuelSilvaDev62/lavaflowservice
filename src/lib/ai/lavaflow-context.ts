@@ -8,6 +8,10 @@ function roundMoney(value: number) {
   return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
 }
 
+function clampScore(value: number) {
+  return Math.round(Math.max(0, Math.min(100, Number.isFinite(value) ? value : 0)));
+}
+
 function daysBetween(dateIso?: string | null) {
   if (!dateIso) return null;
   return Math.max(0, Math.floor((Date.now() - new Date(dateIso).getTime()) / DAY_MS));
@@ -200,6 +204,22 @@ export async function buildBusinessContext(supabase: SupabaseLike, ownerId: stri
     (mrr > 0 ? 20 : 0) +
     (ordens.length > 0 ? 25 : 0),
   )));
+  const retornoIndice = clientesRows.length ? clientesAtivos / clientesRows.length : 0;
+  const fidelizacaoIndice = clientesRows.length ? Math.min(1, (assinantesAtivos.size + clientesRows.filter((row: any) => Number(row.pontos_saldo ?? 0) > 0).length) / clientesRows.length) : 0;
+  const conversaoUpsellIndice = upsellRows.length ? upsellsAceitos.length / upsellRows.length : 0;
+  const produtividadeMedia = rankingColaboradores.length ? rankingColaboradores.reduce((sum: number, row: any) => sum + Number(row.ordens ?? 0), 0) / rankingColaboradores.length : 0;
+  const usoIaIndice = receitaInfluenciada.some((row: any) => row.origem === "CONSULTOR_IA") ? 1 : receitaInfluenciada.length > 0 ? 0.4 : 0;
+  const indiceComponentes = [
+    { chave: "ticket_medio", label: "Ticket medio", peso: 15, score: clampScore((ticketMedio / 80) * 100) },
+    { chave: "retorno", label: "Retorno", peso: 15, score: clampScore(retornoIndice * 100) },
+    { chave: "fidelizacao", label: "Fidelizacao", peso: 10, score: clampScore(fidelizacaoIndice * 100) },
+    { chave: "upsell", label: "Conversao de upsell", peso: 15, score: clampScore(conversaoUpsellIndice * 100) },
+    { chave: "receita_influenciada", label: "Receita influenciada", peso: 15, score: clampScore(((receitaPeriodo ? receitaInfluenciadaTotal / receitaPeriodo : 0) / 0.2) * 100) },
+    { chave: "produtividade", label: "Produtividade", peso: 15, score: clampScore((produtividadeMedia / 25) * 100) },
+    { chave: "comparecimento", label: "Comparecimento", peso: 10, score: clampScore((agendamentosValidos ? compareceu / agendamentosValidos : 0) * 100) },
+    { chave: "uso_ia", label: "Uso das recomendacoes da IA", peso: 5, score: clampScore(usoIaIndice * 100) },
+  ];
+  const indiceLavaFlow = clampScore(indiceComponentes.reduce((sum, item) => sum + (item.score * item.peso) / 100, 0));
 
   return {
     business: {
@@ -219,6 +239,8 @@ export async function buildBusinessContext(supabase: SupabaseLike, ownerId: stri
       mrr: roundMoney(mrr),
       assinantes_ativos: assinaturasAtivas.length,
       health_score_calculado: healthScore,
+      indice_lavaflow: indiceLavaFlow,
+      indice_lavaflow_componentes: indiceComponentes,
     },
     opportunities: {
       clientes_inativos: clientesInativosRows,
