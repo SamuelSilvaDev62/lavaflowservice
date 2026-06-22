@@ -249,7 +249,7 @@ function Page() {
               <Plus className="h-6 w-6" />
             </Button>
           </DrawerTrigger>
-          <DrawerContent className="max-h-[92vh] overflow-hidden px-0 pb-0">
+          <DrawerContent className="flex max-h-[92vh] flex-col overflow-hidden px-0 pb-0">
             <DrawerHeader className="px-4 text-left"><DrawerTitle>Nova reserva</DrawerTitle></DrawerHeader>
             <NovoAgendamentoForm onClose={() => setOpen(false)} defaultDate={date} />
           </DrawerContent>
@@ -414,7 +414,7 @@ function Row({ label, value }: { label: string; value: string }) {
 
 function NovoAgendamentoDialog({ onClose, defaultDate }: { onClose: () => void; defaultDate: string }) {
   return (
-    <DialogContent className="max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl overflow-hidden p-0">
+    <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden p-0">
       <DialogHeader className="px-5 pt-5"><DialogTitle>Nova reserva</DialogTitle></DialogHeader>
       <NovoAgendamentoForm onClose={onClose} defaultDate={defaultDate} />
     </DialogContent>
@@ -491,7 +491,11 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
           <SelectContent>{servicos?.servicos.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
         </Select>
       </div>
-      <div className="order-5 space-y-2"><Label>Colaborador responsável</Label>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        <div className="space-y-2"><Label>Data</Label><Input type="date" required value={f.data_agendada} onChange={(e) => setF({ ...f, data_agendada: e.target.value, funcionario_id: "" })} /></div>
+        <div className="space-y-2"><Label>Horário</Label><Input type="time" required value={f.hora_agendada} onChange={(e) => setF({ ...f, hora_agendada: e.target.value, funcionario_id: "" })} /></div>
+      </div>
+      <div className="space-y-2"><Label>Colaborador responsável</Label>
         <Select value={f.funcionario_id || "__none__"} onValueChange={(v) => setF({ ...f, funcionario_id: v === "__none__" ? "" : v })}>
           <SelectTrigger><SelectValue placeholder="Sem definir" /></SelectTrigger>
           <SelectContent>
@@ -509,17 +513,13 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
           </p>
         )}
       </div>
-      <div className="order-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div className="space-y-2"><Label>Data</Label><Input type="date" required value={f.data_agendada} onChange={(e) => setF({ ...f, data_agendada: e.target.value, funcionario_id: "" })} /></div>
-        <div className="space-y-2"><Label>Horário</Label><Input type="time" required value={f.hora_agendada} onChange={(e) => setF({ ...f, hora_agendada: e.target.value, funcionario_id: "" })} /></div>
-      </div>
-      <div className="order-6 space-y-2"><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
-      <label className="order-7 flex items-center gap-2 rounded-md border p-3 text-sm">
+      <div className="space-y-2"><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
+      <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
         <input type="checkbox" checked={f.leva_traz} onChange={(e) => setF({ ...f, leva_traz: e.target.checked })} />
         <span>Adicionar Leva e Traz</span>
       </label>
       {f.leva_traz && (
-        <div className="order-8 space-y-3 rounded-md border p-3">
+        <div className="space-y-3 rounded-md border p-3">
           <p className="font-display text-sm font-semibold">Leva e Traz</p>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-2"><Label>Horário de retirada</Label><Input type="time" placeholder="Selecione o horário de retirada" value={f.horario_retirada} onChange={(e) => setF({ ...f, horario_retirada: e.target.value })} /></div>
@@ -554,7 +554,7 @@ function DistribuicaoEquipe({ agendamentos }: { agendamentos: any[] }) {
     <div className="mb-3 flex flex-wrap gap-1.5">
       <span className="text-xs text-muted-foreground self-center mr-1">Distribuição:</span>
       {Array.from(counts.entries()).sort((a, b) => b[1] - a[1]).map(([nome, qtd]) => (
-        <Badge key={nome} variant="secondary" className="font-normal">?? {nome} - {qtd}</Badge>
+        <Badge key={nome} variant="secondary" className="font-normal">{nome} - {qtd}</Badge>
       ))}
       {semDef > 0 && <Badge variant="outline">Sem definir - {semDef}</Badge>}
     </div>

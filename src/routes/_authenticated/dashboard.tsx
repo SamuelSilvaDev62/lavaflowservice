@@ -77,7 +77,7 @@ function Dashboard() {
 
       <div className="mt-4 grid gap-4 xl:grid-cols-[1.35fr_.9fr]">
         <section className="space-y-4">
-          <Card>
+          <Card className="overflow-hidden">
             <CardContent className="p-4">
               <SectionTitle icon={Clock} title="Agenda do Dia" action={<Link to="/agendamentos">Ver agenda completa</Link>} />
               {data.agendaHoje.length === 0 ? (

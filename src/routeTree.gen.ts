@@ -9,6 +9,7 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TrustRouteImport } from './routes/trust'
 import { Route as LpRouteImport } from './routes/lp'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
@@ -32,6 +33,11 @@ import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authen
 import { Route as AuthenticatedClientesInativosRouteImport } from './routes/_authenticated/clientes/inativos'
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes/$id'
 
+const TrustRoute = TrustRouteImport.update({
+  id: '/trust',
+  path: '/trust',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LpRoute = LpRouteImport.update({
   id: '/lp',
   path: '/lp',
@@ -153,6 +159,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/lp': typeof LpRoute
+  '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
   '/assistente': typeof AuthenticatedAssistenteRoute
@@ -176,6 +183,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/lp': typeof LpRoute
+  '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
   '/assistente': typeof AuthenticatedAssistenteRoute
@@ -201,6 +209,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/lp': typeof LpRoute
+  '/trust': typeof TrustRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/_authenticated/assinaturas': typeof AuthenticatedAssinaturasRoute
   '/_authenticated/assistente': typeof AuthenticatedAssistenteRoute
@@ -226,6 +235,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/lp'
+    | '/trust'
     | '/agendamentos'
     | '/assinaturas'
     | '/assistente'
@@ -249,6 +259,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/lp'
+    | '/trust'
     | '/agendamentos'
     | '/assinaturas'
     | '/assistente'
@@ -273,6 +284,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/lp'
+    | '/trust'
     | '/_authenticated/agendamentos'
     | '/_authenticated/assinaturas'
     | '/_authenticated/assistente'
@@ -298,6 +310,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   LpRoute: typeof LpRoute
+  TrustRoute: typeof TrustRoute
   AgendarSlugRoute: typeof AgendarSlugRoute
   ApiAssistenteChatRoute: typeof ApiAssistenteChatRoute
   PlanoSlugRoute: typeof PlanoSlugRoute
@@ -305,6 +318,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/trust': {
+      id: '/trust'
+      path: '/trust'
+      fullPath: '/trust'
+      preLoaderRoute: typeof TrustRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/lp': {
       id: '/lp'
       path: '/lp'
@@ -506,6 +526,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   LpRoute: LpRoute,
+  TrustRoute: TrustRoute,
   AgendarSlugRoute: AgendarSlugRoute,
   ApiAssistenteChatRoute: ApiAssistenteChatRoute,
   PlanoSlugRoute: PlanoSlugRoute,
@@ -513,13 +534,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
