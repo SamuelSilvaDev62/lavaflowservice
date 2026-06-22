@@ -1250,10 +1250,19 @@ export const getCampanhas = createServerFn({ method: "GET" })
     const { data: alvos } = ids.length
       ? await context.supabase.from("campanha_alvos").select("*").eq("owner_id", ownerId).in("campanha_id", ids)
       : { data: [] as any[] };
+    const { data: receitas } = ids.length
+      ? await context.supabase.from("receita_influenciada").select("valor, metadata").eq("owner_id", ownerId).eq("origem", "CAMPANHA").eq("referencia_tipo", "campanha_alvo").limit(1000)
+      : { data: [] as any[] };
     const byCampanha = new Map<string, any[]>();
+    const receitaByCampanha = new Map<string, number>();
     (alvos ?? []).forEach((a: any) => byCampanha.set(a.campanha_id, [...(byCampanha.get(a.campanha_id) ?? []), a]));
+    (receitas ?? []).forEach((r: any) => {
+      const campanhaId = r.metadata?.campanha_id;
+      if (!campanhaId || !ids.includes(campanhaId)) return;
+      receitaByCampanha.set(campanhaId, (receitaByCampanha.get(campanhaId) ?? 0) + Number(r.valor ?? 0));
+    });
     return {
-      campanhas: (campanhas ?? []).map((c: any) => ({ ...c, alvos: byCampanha.get(c.id) ?? [] })),
+      campanhas: (campanhas ?? []).map((c: any) => ({ ...c, alvos: byCampanha.get(c.id) ?? [], receitaInfluenciada: receitaByCampanha.get(c.id) ?? 0 })),
       sugestoes: sugestoesData.sugestoes,
     };
   });
@@ -1301,6 +1310,70 @@ export const marcarCampanhaAlvoEnviado = createServerFn({ method: "POST" })
     const { error } = await context.supabase.from("campanha_alvos").update({ status: "enviado", sent_at: new Date().toISOString() } as any).eq("id", data.id).eq("owner_id", ownerId);
     if (error) throw error;
     return { ok: true };
+  });
+
+export const processarConversoesCampanhas = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { data: alvos } = await context.supabase
+      .from("campanha_alvos")
+      .select("id, campanha_id, cliente_id, sent_at, status, campanhas:campanha_id(nome, tipo)")
+      .eq("owner_id", ownerId)
+      .eq("status", "enviado")
+      .not("cliente_id", "is", null)
+      .not("sent_at", "is", null)
+      .limit(200);
+
+    let convertidos = 0;
+    let receita = 0;
+    for (const alvo of alvos ?? []) {
+      const { data: ordem } = await context.supabase
+        .from("ordens_servico")
+        .select("id, cliente_id, valor, created_at")
+        .eq("owner_id", ownerId)
+        .eq("cliente_id", alvo.cliente_id)
+        .gte("created_at", alvo.sent_at)
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+      if (!ordem) continue;
+
+      const { data: existente } = await context.supabase
+        .from("receita_influenciada")
+        .select("id")
+        .eq("owner_id", ownerId)
+        .eq("origem", "CAMPANHA")
+        .eq("referencia_tipo", "campanha_alvo")
+        .eq("referencia_id", alvo.id)
+        .maybeSingle();
+      if (!existente) {
+        await context.supabase.from("receita_influenciada").insert({
+          owner_id: ownerId,
+          ordem_id: ordem.id,
+          cliente_id: ordem.cliente_id,
+          origem: "CAMPANHA",
+          valor: Number(ordem.valor ?? 0),
+          descricao: `Conversao de campanha: ${(alvo.campanhas as any)?.nome ?? "Campanha"}`,
+          referencia_tipo: "campanha_alvo",
+          referencia_id: alvo.id,
+          metadata: {
+            campanha_id: alvo.campanha_id,
+            campanha_nome: (alvo.campanhas as any)?.nome ?? null,
+            campanha_tipo: (alvo.campanhas as any)?.tipo ?? null,
+          },
+        } as any);
+      }
+      await context.supabase
+        .from("campanha_alvos")
+        .update({ status: "convertido", converted_at: ordem.created_at } as any)
+        .eq("id", alvo.id)
+        .eq("owner_id", ownerId);
+      convertidos += 1;
+      receita += Number(ordem.valor ?? 0);
+    }
+
+    return { convertidos, receita };
   });
 
 export const createCliente = createServerFn({ method: "POST" })

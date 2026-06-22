@@ -11,7 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { getMissaoDoDia, getSaudeNegocio } from "@/lib/lavaflow.functions";
-import { AlertTriangle, Bot, CalendarDays, CheckCircle2, Loader2, MessageCircle, RefreshCw, Send, Sparkles, Target, User } from "lucide-react";
+import { AlertTriangle, Bot, CalendarDays, CheckCircle2, DollarSign, Loader2, MessageCircle, RefreshCw, Send, Sparkles, Target, TrendingUp, User } from "lucide-react";
 import { toast } from "sonner";
 
 const Markdown = lazy(() => import("@/components/markdown-message"));
@@ -46,6 +46,11 @@ type ConsultorData = {
   summary: string;
   healthScore: number;
   fallbackNotice?: string;
+  contextInfluence?: {
+    total: number;
+    percentual: number;
+    porOrigem: Array<{ origem: string; quantidade: number; valor: number }>;
+  };
   diagnosis: {
     status: string;
     strengths: string[];
@@ -65,6 +70,20 @@ function priorityVariant(priority: ConsultorOpportunity["priority"]) {
   if (priority === "alta") return "destructive";
   if (priority === "media") return "default";
   return "secondary";
+}
+
+const ORIGEM_LABELS: Record<string, string> = {
+  CLIENTE_RECUPERADO: "Clientes recuperados",
+  FIDELIDADE: "Fidelidade",
+  UPSELL_CHECKLIST: "Checklist",
+  CONSULTOR_IA: "Consultor IA",
+  CAMPANHA: "Campanhas",
+  ANIVERSARIO: "Aniversarios",
+  LEVA_ETRAZ: "Leva e Traz",
+};
+
+function origemLabel(origem: string) {
+  return ORIGEM_LABELS[origem] ?? origem.replaceAll("_", " ");
 }
 
 function Page() {
@@ -254,6 +273,46 @@ function Page() {
                   <p className="mt-1 text-xs text-muted-foreground">{acao.detalhe}</p>
                 </button>
               ))}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {consultor?.contextInfluence && (
+        <section className="grid gap-3 lg:grid-cols-[minmax(240px,0.8fr)_1fr]">
+          <div className="rounded-3xl border border-emerald-500/20 bg-emerald-500/5 p-5 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-medium text-emerald-700">
+              <DollarSign className="h-4 w-4" />
+              Receita atribuida ao LavaFlow
+            </div>
+            <p className="mt-3 font-display text-3xl font-bold leading-none">{fmtBrl(Number(consultor.contextInfluence.total ?? 0))}</p>
+            <p className="mt-2 text-sm text-muted-foreground">
+              {Number(consultor.contextInfluence.percentual ?? 0) > 0
+                ? `${(Number(consultor.contextInfluence.percentual) * 100).toFixed(1)}% do faturamento do periodo.`
+                : "Ainda sem percentual calculado para o periodo."}
+            </p>
+          </div>
+          <div className="rounded-3xl border border-border/60 bg-card/70 p-5 shadow-sm">
+            <div className="flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 text-sm font-medium">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                Origens com retorno
+              </div>
+              <Badge variant="secondary">{consultor.contextInfluence.porOrigem?.length ?? 0} origens</Badge>
+            </div>
+            <div className="mt-4 grid gap-2 md:grid-cols-2">
+              {(consultor.contextInfluence.porOrigem ?? []).slice(0, 4).map((item) => (
+                <div key={item.origem} className="rounded-2xl border border-border/60 bg-background/50 px-3 py-2">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-sm font-medium">{origemLabel(item.origem)}</p>
+                    <p className="text-sm font-semibold text-emerald-600">{fmtBrl(Number(item.valor ?? 0))}</p>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">{Number(item.quantidade ?? 0)} registros atribuidos</p>
+                </div>
+              ))}
+              {(consultor.contextInfluence.porOrigem ?? []).length === 0 && (
+                <p className="text-sm text-muted-foreground">Quando campanhas, checklist, fidelidade ou Leva e Traz gerarem vendas, o ranking aparece aqui.</p>
+              )}
             </div>
           </div>
         </section>

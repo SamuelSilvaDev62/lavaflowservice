@@ -125,7 +125,15 @@ export const Route = createFileRoute("/api/assistente-chat")({
             saveRecommendations(supabase, ownerId, userId, payload.topOpportunities ?? []),
           ]);
 
-          return json({ ...payload, contextMetrics: context.metrics });
+          return json({
+            ...payload,
+            contextMetrics: context.metrics,
+            contextInfluence: {
+              total: context.opportunities?.receita_influenciada_total ?? 0,
+              percentual: context.opportunities?.receita_influenciada_percentual ?? 0,
+              porOrigem: context.opportunities?.receita_influenciada_por_origem ?? [],
+            },
+          });
         } catch (err) {
           console.error("[assistente-consultor]", err);
           return json({ error: "Nao foi possivel carregar o Consultor LavaFlow IA." }, { status: 500 });

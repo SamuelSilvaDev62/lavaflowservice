@@ -33,6 +33,24 @@ function makeOpportunity(input: Partial<ConsultorOpportunity> & Pick<ConsultorOp
   };
 }
 
+const ORIGEM_LABELS: Record<string, string> = {
+  CLIENTE_RECUPERADO: "clientes recuperados",
+  FIDELIDADE: "programa de fidelidade",
+  UPSELL_CHECKLIST: "upsells do checklist",
+  CONSULTOR_IA: "Consultor IA",
+  CAMPANHA: "campanhas",
+  ANIVERSARIO: "aniversarios",
+  LEVA_ETRAZ: "Leva e Traz",
+};
+
+function brl(value: number) {
+  return `R$ ${Number(value || 0).toFixed(2)}`;
+}
+
+function origemLabel(origem?: string | null) {
+  return ORIGEM_LABELS[String(origem ?? "")] ?? String(origem ?? "origem registrada").toLowerCase();
+}
+
 export function buildRulesConsultorResponse(context: any, advancedUnavailable = false): ConsultorResponse & { fallbackNotice?: string } {
   const metrics = context.metrics ?? {};
   const opportunities = context.opportunities ?? {};
@@ -132,19 +150,41 @@ export function buildRulesConsultorResponse(context: any, advancedUnavailable = 
     const topOrigem = Array.isArray(opportunities.receita_influenciada_por_origem)
       ? opportunities.receita_influenciada_por_origem[0]
       : null;
+    const percentual = Number(opportunities.receita_influenciada_percentual ?? 0);
     topOpportunities.push(makeOpportunity({
       id: "rules-receita-influenciada",
       priority: "media",
       category: "relatorio",
-      title: `LavaFlow influenciou R$ ${Number(opportunities.receita_influenciada_total).toFixed(2)} no periodo`,
+      title: `LavaFlow influenciou ${brl(Number(opportunities.receita_influenciada_total))} no periodo`,
       description: topOrigem
-        ? `A principal origem registrada foi ${topOrigem.origem}, com R$ ${Number(topOrigem.valor ?? 0).toFixed(2)}.`
+        ? `A principal origem registrada foi ${origemLabel(topOrigem.origem)}, com ${brl(Number(topOrigem.valor ?? 0))}.`
         : "As funcionalidades do sistema ja possuem receita atribuida no periodo.",
       estimatedImpact: Math.round(Number(opportunities.receita_influenciada_total ?? 0)),
       whyItMatters: "Medir receita influenciada mostra quais rotinas realmente aumentam o faturamento.",
-      recommendedAction: "Revisar o relatorio de Receita Influenciada e reforcar as origens com maior retorno.",
+      recommendedAction: percentual > 0
+        ? `Revisar as origens que ja representam ${(percentual * 100).toFixed(1)}% do faturamento do periodo e repetir as acoes com maior retorno.`
+        : "Revisar o relatorio de Receita Influenciada e reforcar as origens com maior retorno.",
       actionType: "relatorio",
       ctaLabel: "Ver relatorios",
+    }));
+  }
+
+  const receitaPorOrigem = Array.isArray(opportunities.receita_influenciada_por_origem)
+    ? opportunities.receita_influenciada_por_origem
+    : [];
+  const receitaCampanhas = receitaPorOrigem.find((item: any) => item.origem === "CAMPANHA");
+  if (Number(receitaCampanhas?.valor ?? 0) > 0) {
+    topOpportunities.push(makeOpportunity({
+      id: "rules-campanhas-conversao",
+      priority: "alta",
+      category: "retencao",
+      title: `Campanhas geraram ${brl(Number(receitaCampanhas.valor))}`,
+      description: `${Number(receitaCampanhas.quantidade ?? 0)} conversoes foram atribuidas a campanhas no periodo.`,
+      estimatedImpact: Math.round(Number(receitaCampanhas.valor ?? 0)),
+      whyItMatters: "Quando uma campanha vira ordem de servico, o LavaFlow consegue provar retorno financeiro direto, nao apenas envio de mensagens.",
+      recommendedAction: "Duplicar o tipo de campanha com melhor retorno e manter o acompanhamento de conversoes atualizado.",
+      actionType: "campanha",
+      ctaLabel: "Ver campanhas",
     }));
   }
 
@@ -163,8 +203,11 @@ export function buildRulesConsultorResponse(context: any, advancedUnavailable = 
     }));
   }
 
+  const receitaInfluenciadaTotal = Number(opportunities.receita_influenciada_total ?? 0);
   const summary = topOpportunities.length
-    ? `Hoje encontramos ${topOpportunities.length} oportunidades com potencial estimado de R$ ${Math.round(topOpportunities.reduce((sum, item) => sum + item.estimatedImpact, 0))}.`
+    ? receitaInfluenciadaTotal > 0
+      ? `Hoje encontramos ${topOpportunities.length} oportunidades e ${brl(receitaInfluenciadaTotal)} ja atribuidos ao LavaFlow no periodo.`
+      : `Hoje encontramos ${topOpportunities.length} oportunidades com potencial estimado de ${brl(Math.round(topOpportunities.reduce((sum, item) => sum + item.estimatedImpact, 0)))}.`
     : "Ainda nao tenho dados suficientes para uma analise confiavel. Recomendo registrar mais ordens de servico e clientes para melhorar minhas recomendacoes.";
 
   return {
@@ -183,7 +226,9 @@ export function buildRulesConsultorResponse(context: any, advancedUnavailable = 
     topOpportunities: topOpportunities.slice(0, 6),
     weeklyActionPlan: [
       { day: "Segunda", action: "Chamar clientes inativos de maior gasto.", expectedResult: "Recuperar parte da receita estimada de retencao." },
-      { day: "Terca", action: "Oferecer assinatura para clientes frequentes.", expectedResult: "Criar novas conversas de recorrencia." },
+      Number(receitaCampanhas?.valor ?? 0) > 0
+        ? { day: "Terca", action: "Repetir a campanha que mais converteu e acompanhar novas OS atribuidas.", expectedResult: "Aumentar receita rastreavel de campanhas." }
+        : { day: "Terca", action: "Oferecer assinatura para clientes frequentes.", expectedResult: "Criar novas conversas de recorrencia." },
       { day: "Quarta", action: "Divulgar servico de baixa adesao em dia fraco.", expectedResult: "Testar aumento de demanda no horario ocioso." },
     ],
     suggestedCampaigns: topOpportunities

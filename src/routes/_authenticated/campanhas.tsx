@@ -4,13 +4,13 @@ import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/app-layout";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
-import { getCampanhas, criarCampanhaInteligente, marcarCampanhaAlvoEnviado } from "@/lib/lavaflow.functions";
+import { getCampanhas, criarCampanhaInteligente, marcarCampanhaAlvoEnviado, processarConversoesCampanhas } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { MessageCircle, Megaphone, Sparkles, Users } from "lucide-react";
+import { MessageCircle, Megaphone, RefreshCw, Sparkles, Users } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/campanhas")({
@@ -29,6 +29,7 @@ function Page() {
   const list = useServerFn(getCampanhas);
   const criar = useServerFn(criarCampanhaInteligente);
   const marcar = useServerFn(marcarCampanhaAlvoEnviado);
+  const processar = useServerFn(processarConversoesCampanhas);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["campanhas"], queryFn: () => list() });
 
@@ -43,6 +44,15 @@ function Page() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["campanhas"] }),
     onError: (e: any) => toast.error(e?.message ?? "Erro ao marcar envio"),
   });
+  const processarMut = useMutation({
+    mutationFn: () => processar(),
+    onSuccess: (res: any) => {
+      qc.invalidateQueries({ queryKey: ["campanhas"] });
+      qc.invalidateQueries({ queryKey: ["receita-influenciada"] });
+      toast.success(`${res.convertidos} conversao(oes) encontradas`);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar conversoes"),
+  });
 
   function msgFor(template: string, alvo: any) {
     return template.replaceAll("{{nome}}", String(alvo.nome ?? "Cliente").split(" ")[0]);
@@ -53,6 +63,11 @@ function Page() {
       <PageHeader
         title="Campanhas Inteligentes"
         subtitle="Transforme oportunidades do Consultor IA em acoes de WhatsApp rastreaveis."
+        actions={
+          <Button variant="outline" onClick={() => processarMut.mutate()} disabled={processarMut.isPending}>
+            <RefreshCw className="mr-1 h-4 w-4" />Atualizar conversoes
+          </Button>
+        }
       />
 
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
@@ -107,6 +122,11 @@ function Page() {
                 {data.campanhas.map((c: any) => (
                   <Card key={c.id}>
                     <CardContent className="p-4">
+                      {(() => {
+                        const enviados = c.alvos.filter((a: any) => ["enviado", "convertido"].includes(a.status)).length;
+                        const convertidos = c.alvos.filter((a: any) => a.status === "convertido").length;
+                        const conversao = enviados ? convertidos / enviados : 0;
+                        return (
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -116,8 +136,14 @@ function Page() {
                           </div>
                           <p className="mt-1 text-sm text-muted-foreground">{c.mensagem}</p>
                         </div>
-                        <p className="text-sm font-medium">{c.alvos.length} alvo(s)</p>
+                        <div className="text-left sm:text-right">
+                          <p className="text-sm font-medium">{c.alvos.length} alvo(s)</p>
+                          <p className="text-xs text-muted-foreground">{convertidos} conv. · {Math.round(conversao * 100)}%</p>
+                          <p className="text-xs font-semibold text-success">{brl(c.receitaInfluenciada ?? 0)}</p>
+                        </div>
                       </div>
+                        );
+                      })()}
                       <div className="mt-3 divide-y rounded-md border">
                         {c.alvos.slice(0, 12).map((a: any) => (
                           <div key={a.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">

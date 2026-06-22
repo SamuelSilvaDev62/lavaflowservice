@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const aiPrioritySchema = z.enum(["alta", "media", "baixa"]);
-export const aiCategorySchema = z.enum(["retencao", "fidelidade", "assinatura", "upsell", "agenda", "equipe", "financeiro"]);
+export const aiCategorySchema = z.enum(["retencao", "fidelidade", "assinatura", "upsell", "agenda", "equipe", "financeiro", "relatorio"]);
 export const aiActionTypeSchema = z.enum(["whatsapp", "campanha", "assinatura", "agendamento", "relatorio", "configuracao"]);
 
 export const consultorOpportunitySchema = z.object({
@@ -63,7 +63,7 @@ const opportunityJsonSchema = {
   properties: {
     id: { type: "string" },
     priority: { type: "string", enum: ["alta", "media", "baixa"] },
-    category: { type: "string", enum: ["retencao", "fidelidade", "assinatura", "upsell", "agenda", "equipe", "financeiro"] },
+    category: { type: "string", enum: ["retencao", "fidelidade", "assinatura", "upsell", "agenda", "equipe", "financeiro", "relatorio"] },
     title: { type: "string" },
     description: { type: "string" },
     estimatedImpact: { type: "number", minimum: 0 },
