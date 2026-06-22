@@ -30,7 +30,6 @@ import {
   Plus, MessageCircle, Play, Check, X as XIcon, AlertTriangle, CalendarDays,
   Link2, ChevronDown, Phone, Calendar as CalendarIcon, ChevronRight, MapPin,
 } from "lucide-react";
-import { EmptyState } from "@/components/empty-state";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/agendamentos")({
@@ -172,7 +171,6 @@ function Page() {
         <KpiCard label="Pendentes" value={pendentesDia} tone="warning" />
         <KpiCard label="Leva e Traz" value={levaTrazDia} tone="primary" />
         <KpiCard label="Receita prevista" value={brl(receitaPrevistaDia)} tone="success" wide />
-        <KpiCard label="Não compareceu" value={st?.naoCompareceuMes ?? 0} tone="destructive" sub="mês" />
       </div>
 
       {/* Link público colapsável */}
@@ -298,8 +296,13 @@ function Page() {
         <TabsContent value="agenda" className="mt-3">
           {isLoading ? <div className="h-40 bg-muted rounded-xl animate-pulse" />
             : (ag?.agendamentos.length ?? 0) === 0 ? (
-              <EmptyState icon={CalendarDays} title="Nenhum agendamento neste dia"
-                description="Toque no botão + para criar a primeira reserva ou compartilhe seu link público." />
+              <Card className="border-dashed">
+                <CardContent className="p-5 text-center">
+                  <CalendarDays className="mx-auto mb-2 h-5 w-5 text-muted-foreground" />
+                  <p className="font-medium">Nenhum agendamento neste dia</p>
+                  <p className="mt-1 text-sm text-muted-foreground">Os proximos agendamentos continuam visiveis acima.</p>
+                </CardContent>
+              </Card>
             ) : (
               <>
                 <DistribuicaoEquipe agendamentos={ag!.agendamentos} />
