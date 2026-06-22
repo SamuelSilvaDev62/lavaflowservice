@@ -27,7 +27,7 @@ export function OperationalAlerts() {
   return (
     <div className="fixed bottom-4 right-4 z-50 flex flex-col items-end gap-2">
       {open && (
-        <div className="w-[min(92vw,380px)] rounded-lg border bg-card shadow-xl overflow-hidden">
+        <div className="w-[min(92vw,380px)] overflow-hidden rounded-lg border bg-card shadow-[var(--shadow-neo)]">
           <div className="flex items-center justify-between border-b p-3">
             <div className="flex items-center gap-2">
               <Bell className="h-4 w-4 text-primary" />
@@ -57,10 +57,20 @@ export function OperationalAlerts() {
           </div>
         </div>
       )}
-      <Button onClick={() => setOpen((v) => !v)} className="h-12 rounded-full shadow-lg gap-2">
-        <Bell className="h-4 w-4" />
-        Alertas
-        <Badge variant={urgentes ? "destructive" : "secondary"}>{alertas.length}</Badge>
+      <Button
+        onClick={() => setOpen((v) => !v)}
+        variant="outline"
+        size="icon"
+        className="relative h-[38px] w-[38px] rounded-2xl bg-card/95 shadow-[var(--shadow-neo-sm)] hover:shadow-[var(--shadow-neo)]"
+        aria-label="Abrir alertas operacionais"
+      >
+        <Bell className="h-[18px] w-[18px]" />
+        <Badge
+          variant={urgentes ? "destructive" : "secondary"}
+          className="absolute -right-1 -top-1 h-4 min-w-4 rounded-full px-1 text-[10px] leading-none shadow-sm"
+        >
+          {alertas.length}
+        </Badge>
       </Button>
     </div>
   );

@@ -23,7 +23,7 @@ import {
   iniciarAtendimento, listClientes, listServicos, getEmpresa, listFuncionarios, updateAgendamento,
   getColaboradoresDisponiveis, type AgendamentoStatus,
 } from "@/lib/lavaflow.functions";
-import { dateBr } from "@/lib/format";
+import { brl, dateBr } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import { toast } from "sonner";
 import {
@@ -51,6 +51,11 @@ const STATUS_COLOR: Record<AgendamentoStatus, string> = {
 };
 
 function todayIso() { return new Date().toISOString().slice(0, 10); }
+function addDaysIso(baseIso: string, days: number) {
+  const d = new Date(baseIso + "T00:00:00");
+  d.setDate(d.getDate() + days);
+  return isoFromDate(d);
+}
 function isoFromDate(d: Date) {
   const y = d.getFullYear(); const m = String(d.getMonth() + 1).padStart(2, "0"); const day = String(d.getDate()).padStart(2, "0");
   return `${y}-${m}-${day}`;
@@ -72,17 +77,55 @@ function buildDayStrip(centerIso: string, days = 14) {
 }
 const WD = ["dom", "seg", "ter", "qua", "qui", "sex", "sáb"];
 
+const WEEKDAY_LONG = ["Domingo", "Segunda-feira", "Terca-feira", "Quarta-feira", "Quinta-feira", "Sexta-feira", "Sabado"];
+
+function dayLabel(iso: string) {
+  const today = todayIso();
+  if (iso === today) return "Hoje";
+  if (iso === addDaysIso(today, 1)) return "Amanha";
+  const d = new Date(iso + "T00:00:00");
+  const diff = Math.floor((d.getTime() - new Date(today + "T00:00:00").getTime()) / 86_400_000);
+  if (diff >= 2 && diff <= 6) return WEEKDAY_LONG[d.getDay()];
+  if (diff >= 7 && diff <= 13) return "Proxima semana";
+  return dateBr(iso);
+}
+
+function groupByDate(items: any[]) {
+  const groups = new Map<string, any[]>();
+  items.forEach((item) => {
+    const key = item.data_agendada;
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  });
+  return Array.from(groups.entries());
+}
+
+function estimatedValue(items: any[]) {
+  return items.reduce((sum, a) => sum + Number(a.servicos?.preco_padrao ?? 0) + Number(a.taxa_leva_traz ?? 0), 0);
+}
+
 function Page() {
   const [date, setDate] = useState(todayIso());
   const [open, setOpen] = useState(false);
   const [linkOpen, setLinkOpen] = useState(false);
   const [levaOnly, setLevaOnly] = useState(false);
   const isMobile = useIsMobile();
+  const dayStrip = useMemo(() => buildDayStrip(date), [date]);
+  const todayStr = todayIso();
+  const stripFrom = dayStrip[0]?.iso ?? todayStr;
+  const stripTo = dayStrip[dayStrip.length - 1]?.iso ?? addDaysIso(todayStr, 13);
 
   const list = useServerFn(listAgendamentos);
   const stats = useServerFn(agendamentoStats);
   const emp = useServerFn(getEmpresa);
   const { data: ag, isLoading } = useQuery({ queryKey: ["agendamentos", date, levaOnly], queryFn: () => list({ data: { date, leva_traz: levaOnly } }) });
+  const { data: proximosData, isLoading: loadingProximos } = useQuery({
+    queryKey: ["agendamentos-proximos", todayStr],
+    queryFn: () => list({ data: { from: todayStr, to: addDaysIso(todayStr, 30) } }),
+  });
+  const { data: densidadeData } = useQuery({
+    queryKey: ["agendamentos-densidade", stripFrom, stripTo],
+    queryFn: () => list({ data: { from: stripFrom, to: stripTo } }),
+  });
   const { data: st } = useQuery({ queryKey: ["agendamento-stats"], queryFn: () => stats() });
   const { data: empresa } = useQuery({ queryKey: ["empresa"], queryFn: () => emp() });
 
@@ -90,8 +133,22 @@ function Page() {
     ? `${typeof window !== "undefined" ? window.location.origin : ""}/agendar/${empresa.empresa.slug}`
     : "";
 
-  const dayStrip = useMemo(() => buildDayStrip(date), [date]);
-  const todayStr = todayIso();
+  const agendamentosDia = ag?.agendamentos ?? [];
+  const proximosAgendamentos = (proximosData?.agendamentos ?? [])
+    .filter((a: any) => !["concluido", "cancelado", "nao_compareceu"].includes(a.status))
+    .slice(0, 12);
+  const densidadePorDia = useMemo(() => {
+    const map = new Map<string, number>();
+    (densidadeData?.agendamentos ?? []).forEach((a: any) => {
+      if (["cancelado", "nao_compareceu"].includes(a.status)) return;
+      map.set(a.data_agendada, (map.get(a.data_agendada) ?? 0) + 1);
+    });
+    return map;
+  }, [densidadeData]);
+  const pendentesDia = agendamentosDia.filter((a: any) => a.status === "agendado").length;
+  const confirmadosDia = agendamentosDia.filter((a: any) => a.status === "confirmado").length;
+  const levaTrazDia = agendamentosDia.filter((a: any) => a.leva_traz).length;
+  const receitaPrevistaDia = estimatedValue(agendamentosDia.filter((a: any) => !["cancelado", "nao_compareceu"].includes(a.status)));
 
   return (
     <>
@@ -109,10 +166,12 @@ function Page() {
       />
 
       {/* KPIs - grid no desktop, scroll horizontal no mobile */}
-      <div className="-mx-4 px-4 mb-4 flex gap-2 overflow-x-auto snap-x snap-mandatory sm:mx-0 sm:px-0 sm:grid sm:grid-cols-4 sm:gap-3 sm:overflow-visible">
+      <div className="-mx-4 px-4 mb-4 flex gap-2 overflow-x-auto snap-x snap-mandatory sm:mx-0 sm:px-0 lg:grid lg:grid-cols-5 lg:gap-3 lg:overflow-visible">
         <KpiCard label="Hoje" value={st?.hoje ?? 0} />
-        <KpiCard label="Confirmados" value={st?.confirmadosHoje ?? 0} tone="primary" />
-        <KpiCard label="Em atendimento" value={st?.emAndamentoHoje ?? 0} tone="warning" />
+        <KpiCard label="Confirmados" value={confirmadosDia} tone="primary" />
+        <KpiCard label="Pendentes" value={pendentesDia} tone="warning" />
+        <KpiCard label="Leva e Traz" value={levaTrazDia} tone="primary" />
+        <KpiCard label="Receita prevista" value={brl(receitaPrevistaDia)} tone="success" wide />
         <KpiCard label="Não compareceu" value={st?.naoCompareceuMes ?? 0} tone="destructive" sub="mês" />
       </div>
 
@@ -168,6 +227,7 @@ function Page() {
                   {isToday ? "hoje" : WD[d.getDay()]}
                 </span>
                 <span className="text-lg font-bold leading-tight">{d.getDate()}</span>
+                <DayDots count={densidadePorDia.get(iso) ?? 0} active={active} />
               </button>
             );
           })}
@@ -196,6 +256,38 @@ function Page() {
           <span className="text-xs text-muted-foreground">Comparecimento 30 dias: {Math.round(st.taxaComparecimento * 100)}%</span>
         )}
       </div>
+
+      <Card className="mb-4 overflow-hidden">
+        <CardContent className="p-4">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <h2 className="font-display font-semibold">Proximos Agendamentos</h2>
+              <p className="text-xs text-muted-foreground">Reservas futuras em ordem cronologica.</p>
+            </div>
+            <Badge variant="secondary">{proximosAgendamentos.length}</Badge>
+          </div>
+          {loadingProximos ? (
+            <div className="h-24 rounded-lg bg-muted animate-pulse" />
+          ) : proximosAgendamentos.length === 0 ? (
+            <p className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">Nenhum agendamento futuro encontrado.</p>
+          ) : (
+            <div className="space-y-4">
+              {groupByDate(proximosAgendamentos).map(([iso, items]) => (
+                <div key={iso}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <h3 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">{dayLabel(iso)}</h3>
+                    <span className="h-px flex-1 bg-border" />
+                    <span className="text-[11px] text-muted-foreground">{items.length}</span>
+                  </div>
+                  <div className="grid gap-2 lg:grid-cols-2">
+                    {items.map((a: any) => <AgendamentoPlanejamentoCard key={a.id} a={a} />)}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       <Tabs defaultValue="agenda">
         <TabsList className="sticky top-0 z-20 bg-background/95 backdrop-blur">
@@ -259,10 +351,80 @@ function Page() {
   );
 }
 
-function KpiCard({ label, value, tone, sub }: { label: string; value: number; tone?: "primary"|"warning"|"destructive"; sub?: string }) {
-  const cls = tone === "primary" ? "text-primary" : tone === "warning" ? "text-warning" : tone === "destructive" ? "text-destructive" : "";
+function DayDots({ count, active }: { count: number; active: boolean }) {
+  const dots = Math.min(4, count);
+  if (!dots) return <span className="mt-1 h-1" />;
   return (
-    <Card className="snap-start shrink-0 min-w-[120px] sm:min-w-0">
+    <span className="mt-1 flex h-1 items-center gap-0.5">
+      {Array.from({ length: dots }).map((_, i) => (
+        <span key={i} className={cn("h-1 w-1 rounded-full", active ? "bg-primary-foreground" : count >= 4 ? "bg-primary" : "bg-primary/60")} />
+      ))}
+    </span>
+  );
+}
+
+function AgendamentoPlanejamentoCard({ a }: { a: any }) {
+  return (
+    <Card className="bg-card/80">
+      <CardContent className="grid gap-3 p-3 sm:grid-cols-[1fr_auto] sm:items-center">
+        <div className="min-w-0">
+          <div className="mb-1 flex flex-wrap items-center gap-1.5">
+            <Badge variant="outline" className="h-5 text-[10px]">{dateBr(a.data_agendada)} - {a.hora_agendada?.slice(0, 5)}</Badge>
+            <Badge className={cn("h-5 text-[10px]", STATUS_COLOR[a.status as AgendamentoStatus])}>
+              {STATUS_LABEL[a.status as AgendamentoStatus]}
+            </Badge>
+            {a.leva_traz && (
+              <Badge className="h-5 bg-primary/10 text-[10px] text-primary">
+                <MapPin className="mr-1 h-3 w-3" />Leva e Traz
+              </Badge>
+            )}
+          </div>
+          <p className="truncate font-semibold">{a.clientes?.nome ?? "Cliente"}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {a.veiculos?.placa ?? a.veiculos?.modelo ?? "Veiculo"} - {a.servicos?.nome ?? "Servico"}
+          </p>
+          {a.funcionarios?.nome && <p className="mt-1 truncate text-xs text-muted-foreground">Lavador: {a.funcionarios.nome}</p>}
+        </div>
+        <AgendamentoAbrirButton a={a} />
+      </CardContent>
+    </Card>
+  );
+}
+
+function AgendamentoAbrirButton({ a }: { a: any }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Drawer open={open} onOpenChange={setOpen}>
+      <DrawerTrigger asChild>
+        <Button size="sm" variant="outline" className="w-full sm:w-auto">Abrir agendamento</Button>
+      </DrawerTrigger>
+      <DrawerContent className="max-h-[92vh] overflow-hidden px-4 pb-6">
+        <DrawerHeader className="px-0 text-left">
+          <DrawerTitle>{a.hora_agendada?.slice(0,5)} - {a.clientes?.nome}</DrawerTitle>
+          <Badge className={cn("w-fit mt-1", STATUS_COLOR[a.status as AgendamentoStatus])}>
+            {STATUS_LABEL[a.status as AgendamentoStatus]}
+          </Badge>
+        </DrawerHeader>
+        <div className="space-y-1 text-sm mb-4">
+          <Row label="Servico" value={a.servicos?.nome ?? "-"} />
+          <Row label="Veiculo" value={a.veiculos?.placa ?? a.veiculos?.modelo ?? "-"} />
+          <Row label="Data" value={dateBr(a.data_agendada)} />
+          <Row label="Colaborador" value={a.funcionarios?.nome ?? "Sem definir"} />
+          {a.leva_traz && <Row label="Leva e Traz" value="Ativo" />}
+          {a.observacoes && <Row label="Observacoes" value={a.observacoes} />}
+        </div>
+        <DrawerClose asChild>
+          <Button className="w-full h-11">Fechar</Button>
+        </DrawerClose>
+      </DrawerContent>
+    </Drawer>
+  );
+}
+
+function KpiCard({ label, value, tone, sub, wide }: { label: string; value: number | string; tone?: "primary"|"warning"|"destructive"|"success"; sub?: string; wide?: boolean }) {
+  const cls = tone === "primary" ? "text-primary" : tone === "warning" ? "text-warning" : tone === "destructive" ? "text-destructive" : tone === "success" ? "text-success" : "";
+  return (
+    <Card className={cn("snap-start shrink-0 min-w-[120px] sm:min-w-0", wide && "min-w-[168px]")}>
       <CardContent className="p-3 sm:p-4">
         <p className="text-xs text-muted-foreground truncate">{label}{sub && <span className="opacity-70"> ({sub})</span>}</p>
         <p className={cn("text-2xl font-bold mt-0.5 tabular-nums", cls)}>{value}</p>
