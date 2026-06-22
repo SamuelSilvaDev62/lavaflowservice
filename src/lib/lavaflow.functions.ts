@@ -2067,30 +2067,31 @@ export const getEquipePainel = createServerFn({ method: "GET" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const { start, end } = rangeForPeriodo(data.periodo, data.inicio, data.fim);
     const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
-    await ensureComissoesEntregues(supabase, userId, start, end);
+    await ensureComissoesEntregues(supabase, ownerId, start, end);
 
     const [{ data: func }, { data: ordens }, { data: comissoes }, { data: pagamentos }, { data: empresa }] = await Promise.all([
       supabase.from("funcionarios")
         .select("id, nome, ativo, comissao_tipo, comissao_valor, comissao_modo, auth_user_id, cargo, telefone, email, avatar_url, pin_digits, pin_hash, perm_iniciar_atendimento, perm_finalizar_atendimento, perm_realizar_checklist, perm_ver_apenas_atribuidos, perm_ver_todos_veiculos, especialidades, horario_inicio, horario_fim, dias_disponiveis, capacidade_por_horario")
-        .eq("owner_id", userId).order("nome"),
+        .eq("owner_id", ownerId).order("nome"),
       supabase.from("ordens_servico")
         .select("id, valor, status, funcionario_id, iniciado_em, entregue_em, created_at")
-        .eq("owner_id", userId)
+        .eq("owner_id", ownerId)
         .or(`entregue_em.gte.${start.toISOString()},created_at.gte.${start.toISOString()}`),
       supabase.from("comissoes")
         .select("funcionario_id, valor, pagamento_id, created_at")
-        .eq("owner_id", userId)
+        .eq("owner_id", ownerId)
         .gte("created_at", start.toISOString())
         .lte("created_at", end.toISOString()),
       supabase.from("pagamentos_comissao")
         .select("funcionario_id, valor, pago_em")
-        .eq("owner_id", userId)
+        .eq("owner_id", ownerId)
         .order("pago_em", { ascending: false }),
-      supabase.from("empresas")
+      supabase.from("empresa")
         .select("slug, nome_fantasia")
-        .eq("owner_id", userId)
+        .eq("owner_id", ownerId)
         .maybeSingle(),
     ]);
 
