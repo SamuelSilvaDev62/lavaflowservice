@@ -143,13 +143,12 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
     const { ownerId } = await getOwnerScope(supabase, userId);
     const hoje = localDateIso();
     const now = new Date();
-    const sixtyAgo = new Date(Date.now() - 60 * 86_400_000).toISOString();
-
-    const [{ data: agendamentos }, { data: ordens }, { data: clientes }, { data: funcionarios }] = await Promise.all([
+    const [{ data: agendamentos }, { data: ordens }, { data: ordensFinalizadas }, { data: funcionarios }] = await Promise.all([
       supabase.from("agendamentos")
         .select(`id, data_agendada, hora_agendada, status, leva_traz, endereco_retirada, endereco_devolucao,
                  horario_retirada, horario_devolucao, taxa_leva_traz, cliente_id, servico_id, funcionario_id,
-                 clientes:cliente_id(nome, telefone), servicos:servico_id(nome, preco_padrao), funcionarios:funcionario_id(nome)`)
+                 clientes:cliente_id(nome, telefone), veiculos:veiculo_id(placa, modelo),
+                 servicos:servico_id(nome, preco_padrao), funcionarios:funcionario_id(nome)`)
         .eq("owner_id", ownerId)
         .eq("data_agendada", hoje)
         .order("hora_agendada", { ascending: true }),
@@ -159,9 +158,10 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         .eq("owner_id", ownerId)
         .in("status", ["aguardando", "em_lavagem", "finalizacao", "pronto"]),
       supabase.from("ordens_servico")
-        .select("cliente_id, valor, created_at")
+        .select("id, status, valor, finalizado_em, entregue_em")
         .eq("owner_id", ownerId)
-        .gte("created_at", sixtyAgo),
+        .in("status", ["pronto", "entregue"])
+        .or(`finalizado_em.gte.${startOfTodayIso()},entregue_em.gte.${startOfTodayIso()}`),
       supabase.from("funcionarios")
         .select("id, nome, capacidade_por_horario, ativo")
         .eq("owner_id", ownerId)
@@ -175,25 +175,9 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
       .reduce((s: number, a: any) => s + Number(a.servicos?.preco_padrao ?? 0) + Number(a.taxa_leva_traz ?? 0), 0);
     const faturamentoAberto = osAbertas.reduce((s: number, o: any) => s + Number(o.valor ?? 0), 0);
 
-    const lastByCliente = new Map<string, { last: string; total: number; visitas: number }>();
-    (clientes ?? []).forEach((o: any) => {
-      const cur = lastByCliente.get(o.cliente_id) ?? { last: o.created_at, total: 0, visitas: 0 };
-      if (o.created_at > cur.last) cur.last = o.created_at;
-      cur.total += Number(o.valor ?? 0);
-      cur.visitas += 1;
-      lastByCliente.set(o.cliente_id, cur);
-    });
-    const ticketMedio = clientes?.length
-      ? (clientes ?? []).reduce((s: number, o: any) => s + Number(o.valor ?? 0), 0) / (clientes ?? []).length
-      : 50;
-    const clientesInativos = Array.from(lastByCliente.values()).filter((c) => {
-      const dias = Math.floor((Date.now() - new Date(c.last).getTime()) / 86_400_000);
-      return dias >= 60;
-    }).length;
-
     const proximos = agHoje
       .filter((a: any) => isActiveStatus(a.status) && agendamentoDateTime(a) >= now)
-      .slice(0, 6);
+      .slice(0, 5);
     const levaTrazProximos = agHoje.filter((a: any) => {
       if (!a.leva_traz || !a.horario_retirada || !isActiveStatus(a.status)) return false;
       const t = new Date(`${a.data_agendada}T${String(a.horario_retirada).slice(0, 5)}:00`).getTime();
@@ -215,7 +199,9 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
       .filter((f: any) => f.ocupacao >= f.capacidade)
       .slice(0, 3);
 
-    const recomendacoes = [
+    const clientesInativos = 0;
+    const ticketMedio = 0;
+    const alertas = [
       clientesInativos > 0 ? {
         tipo: "receita",
         prioridade: "media",
@@ -252,10 +238,11 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao"].includes(o.status)).length,
         servicosPendentes: osAbertas.filter((o: any) => ["aguardando", "pronto"].includes(o.status)).length,
         previsaoFaturamentoDia: previstosAgenda + faturamentoAberto,
+        finalizadosHoje: (ordensFinalizadas ?? []).length,
       },
       agendaHoje: proximos,
       veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao", "pronto"].includes(o.status)).slice(0, 6),
-      recomendacoes,
+      alertas,
     };
   });
 
