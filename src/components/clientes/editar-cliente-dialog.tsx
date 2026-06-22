@@ -19,7 +19,7 @@ export function EditarClienteDialog({
   const qc = useQueryClient();
   const [f, setF] = useState({
     nome: "", telefone: "", whatsapp: "", email: "", observacoes: "",
-    placa: "", modelo: "", marca: "", cor: "",
+    placa: "", modelo: "", marca: "", cor: "", vehicle_year: "",
   });
 
   useEffect(() => {
@@ -34,6 +34,7 @@ export function EditarClienteDialog({
         modelo: veiculo?.modelo ?? "",
         marca: veiculo?.marca ?? "",
         cor: veiculo?.cor ?? "",
+        vehicle_year: veiculo?.vehicle_year ? String(veiculo.vehicle_year) : "",
       });
     }
   }, [open, cliente, veiculo]);
@@ -49,7 +50,11 @@ export function EditarClienteDialog({
         observacoes: f.observacoes || null,
         veiculo: f.placa ? {
           id: veiculo?.id,
-          placa: f.placa, modelo: f.modelo || null, marca: f.marca || null, cor: f.cor || null,
+          placa: f.placa,
+          modelo: f.modelo || null,
+          marca: f.marca || null,
+          cor: f.cor || null,
+          vehicle_year: f.vehicle_year ? Number(f.vehicle_year) : null,
         } : undefined,
       },
     }),
@@ -94,6 +99,7 @@ export function EditarClienteDialog({
               <div><Label>Cor</Label><Input value={f.cor} onChange={(e) => setF({ ...f, cor: e.target.value })} /></div>
               <div><Label>Marca</Label><Input value={f.marca} onChange={(e) => setF({ ...f, marca: e.target.value })} /></div>
               <div><Label>Modelo</Label><Input value={f.modelo} onChange={(e) => setF({ ...f, modelo: e.target.value })} /></div>
+              <div><Label>Ano</Label><Input type="number" min={1990} max={new Date().getFullYear() + 1} value={f.vehicle_year} onChange={(e) => setF({ ...f, vehicle_year: e.target.value })} /></div>
             </div>
           </div>
 

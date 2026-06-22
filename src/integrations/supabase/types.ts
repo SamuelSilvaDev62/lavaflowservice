@@ -1087,6 +1087,7 @@ export type Database = {
           modelo: string | null
           owner_id: string
           placa: string
+          vehicle_year: number | null
         }
         Insert: {
           cliente_id: string
@@ -1096,6 +1097,7 @@ export type Database = {
           modelo?: string | null
           owner_id: string
           placa: string
+          vehicle_year?: number | null
         }
         Update: {
           cliente_id?: string
@@ -1105,6 +1107,7 @@ export type Database = {
           modelo?: string | null
           owner_id?: string
           placa?: string
+          vehicle_year?: number | null
         }
         Relationships: [
           {

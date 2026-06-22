@@ -9,10 +9,11 @@ import { getAlertasOperacionais, getDashboardOperacional } from "@/lib/lavaflow.
 import { getOnboardingState as getOnboardingStateFn } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
+import { VehicleVisual } from "@/components/vehicle-visual";
 import { brl } from "@/lib/format";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
-import { AlertTriangle, ArrowRight, CalendarDays, Car, CheckCircle2, Clock, DollarSign, Play } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarDays, Car, CheckCircle2, Clock, DollarSign, ExternalLink, Play } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: () => <RequireRole roles={GESTAO}><Dashboard /></RequireRole>,
@@ -130,19 +131,13 @@ function Dashboard() {
         <aside>
           <Card className={alertas.length > 0 ? "border-warning/40" : ""}>
             <CardContent className="p-4">
-              <SectionTitle icon={AlertTriangle} title="Alertas" />
+              <SectionTitle icon={AlertTriangle} title="Alertas" action={<Link to="/fila">Ver todos</Link>} />
               {alertas.length === 0 ? (
                 <div className="rounded-md border bg-muted/40 p-3 text-sm text-muted-foreground">Operacao funcionando normalmente.</div>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-3">
                   {alertas.map((alerta: any, i: number) => (
-                    <Link key={`${alerta.tipo}-${i}`} to={(alerta.rota ?? "/dashboard") as any} className="block rounded-md border bg-card p-3 transition-colors hover:border-primary/50">
-                      <div className="mb-1 flex items-center justify-between gap-2">
-                        <p className="text-sm font-semibold">{alerta.titulo}</p>
-                        <Badge variant={alerta.prioridade === "alta" ? "destructive" : "secondary"}>{alerta.prioridade}</Badge>
-                      </div>
-                      <p className="text-xs text-muted-foreground">{alerta.mensagem}</p>
-                    </Link>
+                    <AlertCard key={`${alerta.tipo}-${i}`} alerta={alerta} />
                   ))}
                 </div>
               )}
@@ -151,6 +146,52 @@ function Dashboard() {
         </aside>
       </div>
     </>
+  );
+}
+
+function vehicleName(veiculo: any) {
+  return [veiculo?.marca, veiculo?.modelo, veiculo?.vehicle_year].filter(Boolean).join(" ") || veiculo?.placa || "Veiculo";
+}
+
+function AlertCard({ alerta }: { alerta: any }) {
+  const veiculo = alerta.veiculo ?? alerta.veiculos;
+  const cliente = alerta.cliente ?? alerta.clientes;
+  const rota = (alerta.rota ?? "/dashboard") as any;
+  return (
+    <Link to={rota} className="block rounded-lg border bg-card p-3 shadow-soft transition-colors hover:border-primary/50">
+      <div className="grid gap-3 sm:grid-cols-[112px_1fr] sm:items-center xl:grid-cols-1 2xl:grid-cols-[120px_1fr]">
+        <div className="rounded-lg bg-gradient-to-br from-primary/10 via-muted to-background">
+          <VehicleVisual
+            brand={veiculo?.marca}
+            model={veiculo?.modelo}
+            year={veiculo?.vehicle_year}
+            color={veiculo?.cor}
+            size="sm"
+            show360Effect
+            className="mx-auto"
+          />
+        </div>
+        <div className="min-w-0">
+          <div className="mb-1 flex items-start justify-between gap-2">
+            <p className="text-sm font-semibold leading-tight">{alerta.titulo}</p>
+            <Badge variant={alerta.prioridade === "alta" ? "destructive" : "secondary"} className="shrink-0 text-[10px] capitalize">
+              {alerta.prioridade ?? "media"}
+            </Badge>
+          </div>
+          <p className="truncate text-xs font-medium">{cliente?.nome ?? "Operacao"}</p>
+          <p className="truncate text-xs text-muted-foreground">
+            {vehicleName(veiculo)}
+            {veiculo?.placa ? ` - ${veiculo.placa}` : ""}
+          </p>
+          <div className="mt-2 flex items-center justify-between gap-2">
+            <Badge variant="outline" className="text-[10px]">{STATUS_LABEL[alerta.status] ?? alerta.status ?? alerta.tipo}</Badge>
+            <span className="inline-flex items-center gap-1 text-[11px] font-medium text-primary">
+              {alerta.acao_label ?? "Abrir"} <ExternalLink className="h-3 w-3" />
+            </span>
+          </div>
+        </div>
+      </div>
+    </Link>
   );
 }
 

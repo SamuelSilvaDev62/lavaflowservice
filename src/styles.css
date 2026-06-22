@@ -51,6 +51,27 @@
   --color-sidebar-ring: var(--sidebar-ring);
 }
 
+@keyframes vehicle-orbit-pulse {
+  0%, 100% {
+    transform: scaleX(1);
+    opacity: .62;
+  }
+  50% {
+    transform: scaleX(.92);
+    opacity: .88;
+  }
+}
+
+.vehicle-visual-orbit {
+  animation: vehicle-orbit-pulse 3.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .vehicle-visual-orbit {
+    animation: none;
+  }
+}
+
 /* LavaFlow Neo Premium — Soft UI / Neomorphism moderno */
 :root {
   --radius: 1.25rem;

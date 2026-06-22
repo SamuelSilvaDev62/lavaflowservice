@@ -31,10 +31,10 @@ function Page() {
 
   const [open, setOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
-  const [veic, setVeic] = useState({ placa: "", modelo: "", cor: "" });
+  const [veic, setVeic] = useState({ placa: "", marca: "", modelo: "", cor: "", vehicle_year: "" });
   const mut = useMutation({
-    mutationFn: () => addV({ data: { cliente_id: id, ...veic } }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cliente", id] }); setOpen(false); setVeic({ placa: "", modelo: "", cor: "" }); toast.success("Veículo adicionado"); },
+    mutationFn: () => addV({ data: { cliente_id: id, ...veic, vehicle_year: veic.vehicle_year ? Number(veic.vehicle_year) : null } }),
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["cliente", id] }); setOpen(false); setVeic({ placa: "", marca: "", modelo: "", cor: "", vehicle_year: "" }); toast.success("Veículo adicionado"); },
     onError: (e: any) => toast.error(e?.message ?? "Erro"),
   });
 
@@ -112,7 +112,9 @@ function Page() {
                   <DialogHeader><DialogTitle>Novo veículo</DialogTitle></DialogHeader>
                   <form onSubmit={(e) => { e.preventDefault(); mut.mutate(); }} className="space-y-3">
                     <div><Label>Placa</Label><Input required value={veic.placa} onChange={(e) => setVeic({ ...veic, placa: e.target.value.toUpperCase() })} /></div>
+                    <div><Label>Marca</Label><Input value={veic.marca} onChange={(e) => setVeic({ ...veic, marca: e.target.value })} /></div>
                     <div><Label>Modelo</Label><Input value={veic.modelo} onChange={(e) => setVeic({ ...veic, modelo: e.target.value })} /></div>
+                    <div><Label>Ano</Label><Input type="number" min={1990} max={new Date().getFullYear() + 1} value={veic.vehicle_year} onChange={(e) => setVeic({ ...veic, vehicle_year: e.target.value })} /></div>
                     <div><Label>Cor</Label><Input value={veic.cor} onChange={(e) => setVeic({ ...veic, cor: e.target.value })} /></div>
                     <Button type="submit" className="w-full" disabled={mut.isPending}>Adicionar</Button>
                   </form>
@@ -123,7 +125,7 @@ function Page() {
               {data.veiculos.map((v: any) => (
                 <div key={v.id} className="flex items-center justify-between p-2 rounded-md bg-muted">
                   <span className="font-mono font-semibold">{v.placa}</span>
-                  <span className="text-sm text-muted-foreground">{[v.marca, v.modelo, v.cor].filter(Boolean).join(" · ") || "—"}</span>
+                  <span className="text-sm text-muted-foreground">{[v.marca, v.modelo, v.vehicle_year, v.cor].filter(Boolean).join(" · ") || "—"}</span>
                 </div>
               ))}
               {data.veiculos.length === 0 && <p className="text-sm text-muted-foreground">Sem veículos.</p>}

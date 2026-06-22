@@ -175,14 +175,14 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
       supabase.from("agendamentos")
         .select(`id, data_agendada, hora_agendada, status, leva_traz, endereco_retirada, endereco_devolucao,
                  horario_retirada, horario_devolucao, taxa_leva_traz, cliente_id, servico_id, funcionario_id,
-                 clientes:cliente_id(nome, telefone), veiculos:veiculo_id(placa, modelo),
+                 clientes:cliente_id(nome, telefone), veiculos:veiculo_id(placa, marca, modelo, cor, vehicle_year),
                  servicos:servico_id(nome, preco_padrao), funcionarios:funcionario_id(nome)`)
         .eq("owner_id", ownerId)
         .eq("data_agendada", hoje)
         .order("hora_agendada", { ascending: true }),
       supabase.from("ordens_servico")
         .select(`id, status, valor, iniciado_em, finalizado_em, entregue_em, created_at, cliente_id, servico_id, funcionario_id,
-                 clientes:cliente_id(nome), veiculos:veiculo_id(placa, modelo), servicos:servico_id(nome), funcionarios:funcionario_id(nome)`)
+                 clientes:cliente_id(nome), veiculos:veiculo_id(placa, marca, modelo, cor, vehicle_year), servicos:servico_id(nome), funcionarios:funcionario_id(nome)`)
         .eq("owner_id", ownerId)
         .in("status", ["aguardando", "em_lavagem", "finalizacao", "pronto"]),
       supabase.from("ordens_servico")
@@ -706,12 +706,12 @@ export const getAlertasOperacionais = createServerFn({ method: "GET" })
     const [{ data: agendamentos }, { data: ordens }, { data: notificacoes }] = await Promise.all([
       supabase.from("agendamentos")
         .select(`id, data_agendada, hora_agendada, status, leva_traz, endereco_retirada, endereco_devolucao,
-                 horario_retirada, horario_devolucao, clientes:cliente_id(nome), veiculos:veiculo_id(placa, modelo)`)
+                 horario_retirada, horario_devolucao, clientes:cliente_id(nome), veiculos:veiculo_id(placa, marca, modelo, cor, vehicle_year)`)
         .eq("owner_id", ownerId)
         .eq("data_agendada", hoje)
         .order("hora_agendada", { ascending: true }),
       supabase.from("ordens_servico")
-        .select(`id, status, iniciado_em, finalizado_em, created_at, clientes:cliente_id(nome), veiculos:veiculo_id(placa, modelo)`)
+        .select(`id, status, iniciado_em, finalizado_em, created_at, clientes:cliente_id(nome), veiculos:veiculo_id(placa, marca, modelo, cor, vehicle_year)`)
         .eq("owner_id", ownerId)
         .in("status", ["em_lavagem", "finalizacao", "pronto"]),
       supabase.from("notificacoes")
@@ -737,6 +737,10 @@ export const getAlertasOperacionais = createServerFn({ method: "GET" })
               mensagem: `Buscar o veículo de ${a.clientes?.nome ?? "cliente"} em ${Math.round(diff)} minutos.`,
               rota: "/agendamentos",
               referencia_id: a.id,
+              cliente: a.clientes,
+              veiculo: a.veiculos,
+              status: a.status,
+              acao_label: "Abrir agenda",
               created_at: new Date().toISOString(),
             });
           }
@@ -753,6 +757,10 @@ export const getAlertasOperacionais = createServerFn({ method: "GET" })
               mensagem: `Devolver o veículo de ${a.clientes?.nome ?? "cliente"} em ${Math.round(diff)} minutos.`,
               rota: "/agendamentos",
               referencia_id: a.id,
+              cliente: a.clientes,
+              veiculo: a.veiculos,
+              status: a.status,
+              acao_label: "Abrir agenda",
               created_at: new Date().toISOString(),
             });
           }
@@ -769,6 +777,10 @@ export const getAlertasOperacionais = createServerFn({ method: "GET" })
             mensagem: `${o.clientes?.nome ?? "Cliente"} já pode ser avisado para retirar o veículo.`,
             rota: "/fila",
             referencia_id: o.id,
+            cliente: o.clientes,
+            veiculo: o.veiculos,
+            status: o.status,
+            acao_label: "Avisar cliente",
             created_at: new Date().toISOString(),
           }];
         }
@@ -783,6 +795,10 @@ export const getAlertasOperacionais = createServerFn({ method: "GET" })
               mensagem: `${o.clientes?.nome ?? "Cliente"} está em atendimento há ${Math.round(mins)} minutos.`,
               rota: "/fila",
               referencia_id: o.id,
+              cliente: o.clientes,
+              veiculo: o.veiculos,
+              status: o.status,
+              acao_label: "Abrir fila",
               created_at: new Date().toISOString(),
             }];
           }
@@ -1104,8 +1120,10 @@ export const addVeiculo = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     cliente_id: z.string().uuid(),
     placa: z.string().min(1).max(10),
+    marca: z.string().max(60).optional().nullable(),
     modelo: z.string().max(60).optional().nullable(),
     cor: z.string().max(30).optional().nullable(),
+    vehicle_year: z.number().int().min(1990).max(new Date().getFullYear() + 1).optional().nullable(),
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
@@ -2248,6 +2266,7 @@ export const updateClienteCompleto = createServerFn({ method: "POST" })
       modelo: z.string().max(60).optional().nullable(),
       marca: z.string().max(60).optional().nullable(),
       cor: z.string().max(30).optional().nullable(),
+      vehicle_year: z.number().int().min(1990).max(new Date().getFullYear() + 1).optional().nullable(),
     }).optional(),
   }).parse(d))
   .handler(async ({ data, context }) => {
@@ -2268,6 +2287,7 @@ export const updateClienteCompleto = createServerFn({ method: "POST" })
         modelo: data.veiculo.modelo || null,
         marca: data.veiculo.marca || null,
         cor: data.veiculo.cor || null,
+        vehicle_year: data.veiculo.vehicle_year ?? null,
       };
       if (data.veiculo.id) {
         const { error } = await supabase.from("veiculos")
