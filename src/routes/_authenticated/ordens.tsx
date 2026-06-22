@@ -114,6 +114,11 @@ function OrdemRow({ o }: { o: any }) {
       <div className="min-w-0 flex-1">
         <p className="font-medium truncate">{o.clientes?.nome ?? "—"} <span className="text-xs text-muted-foreground font-mono">{o.veiculos?.placa ?? ""}</span></p>
         <p className="text-xs text-muted-foreground">{o.servicos?.nome ?? "Serviço"} · {o.funcionarios?.nome ?? "Sem responsável"} · {dateTimeBr(o.created_at)}</p>
+        <p className="mt-1 text-xs text-muted-foreground">
+          Checklist inicial: {o.checklist_inicial_status === "concluido" ? "concluido" : o.checklist_inicial_status === "pulado" ? "pulado" : "pendente"}
+          {o.checklist_funcionario?.nome ? ` · ${o.checklist_funcionario.nome}` : ""}
+          {o.checklist_inicial_em ? ` · ${dateTimeBr(o.checklist_inicial_em)}` : ""}
+        </p>
       </div>
       <div className="flex items-center gap-2 shrink-0">
         <p className="font-semibold">{brl(o.valor)}</p>

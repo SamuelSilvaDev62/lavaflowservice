@@ -430,6 +430,7 @@ export type Database = {
           email: string | null
           endereco: string | null
           facebook: string | null
+          exigir_checklist_inicial: boolean
           horario_funcionamento: string | null
           id: string
           instagram: string | null
@@ -450,6 +451,7 @@ export type Database = {
           email?: string | null
           endereco?: string | null
           facebook?: string | null
+          exigir_checklist_inicial?: boolean
           horario_funcionamento?: string | null
           id?: string
           instagram?: string | null
@@ -470,6 +472,7 @@ export type Database = {
           email?: string | null
           endereco?: string | null
           facebook?: string | null
+          exigir_checklist_inicial?: boolean
           horario_funcionamento?: string | null
           id?: string
           instagram?: string | null
@@ -774,8 +777,47 @@ export type Database = {
         }
         Relationships: []
       }
+      os_checklists: {
+        Row: {
+          created_at: string
+          funcionario_id: string | null
+          id: string
+          itens: Json
+          observacoes: string | null
+          ordem_id: string
+          owner_id: string
+          status: string
+          tipo: string
+        }
+        Insert: {
+          created_at?: string
+          funcionario_id?: string | null
+          id?: string
+          itens?: Json
+          observacoes?: string | null
+          ordem_id: string
+          owner_id: string
+          status: string
+          tipo?: string
+        }
+        Update: {
+          created_at?: string
+          funcionario_id?: string | null
+          id?: string
+          itens?: Json
+          observacoes?: string | null
+          ordem_id?: string
+          owner_id?: string
+          status?: string
+          tipo?: string
+        }
+        Relationships: []
+      }
       ordens_servico: {
         Row: {
+          checklist_inicial_em: string | null
+          checklist_inicial_funcionario_id: string | null
+          checklist_inicial_status: string
           cliente_id: string
           created_at: string
           entregue_em: string | null
@@ -1090,6 +1132,9 @@ export type Database = {
           vehicle_year: number | null
         }
         Insert: {
+          checklist_inicial_em?: string | null
+          checklist_inicial_funcionario_id?: string | null
+          checklist_inicial_status?: string
           cliente_id: string
           cor?: string | null
           id?: string
@@ -1100,6 +1145,9 @@ export type Database = {
           vehicle_year?: number | null
         }
         Update: {
+          checklist_inicial_em?: string | null
+          checklist_inicial_funcionario_id?: string | null
+          checklist_inicial_status?: string
           cliente_id?: string
           cor?: string | null
           id?: string

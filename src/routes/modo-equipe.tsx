@@ -6,10 +6,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { equipeFinalizarAtendimento, equipeIniciarAtendimento, getModoEquipe } from "@/lib/lavaflow.functions";
-import { Car, CheckCircle2, Clock, LogOut, Play, UserRound, Wrench } from "lucide-react";
+import { equipeConcluirChecklistInicial, equipeFinalizarAtendimento, equipeIniciarAtendimento, equipePularChecklistInicial, getModoEquipe } from "@/lib/lavaflow.functions";
+import { Car, CheckCircle2, ClipboardCheck, Clock, LogOut, Play, UserRound, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/modo-equipe")({
@@ -33,6 +34,26 @@ function statusLabel(status: string) {
   return status;
 }
 
+function checklistLabel(status?: string | null) {
+  if (status === "concluido") return "Checklist concluido";
+  if (status === "pulado") return "Checklist pulado";
+  return "Checklist pendente";
+}
+
+const checklistItems = [
+  ["riscos_visiveis", "Riscos visiveis"],
+  ["amassados", "Amassados"],
+  ["vidro_trincado", "Vidro trincado"],
+  ["retrovisor_danificado", "Retrovisor danificado"],
+  ["farol_lanterna_danificado", "Farol ou lanterna danificado"],
+  ["rodas_avarias", "Rodas com avarias"],
+  ["bancos_manchados", "Bancos manchados"],
+  ["objetos_pessoais", "Objetos pessoais no veiculo"],
+  ["chave_recebida", "Chave recebida"],
+] as const;
+
+const emptyChecklist = Object.fromEntries(checklistItems.map(([key]) => [key, false])) as Record<string, boolean>;
+
 function tempoEmAtendimento(start?: string | null) {
   if (!start) return null;
   const minutes = Math.max(0, Math.round((Date.now() - new Date(start).getTime()) / 60000));
@@ -50,10 +71,15 @@ function Page() {
   const qc = useQueryClient();
   const modoFn = useServerFn(getModoEquipe);
   const iniciarFn = useServerFn(equipeIniciarAtendimento);
+  const concluirChecklistFn = useServerFn(equipeConcluirChecklistInicial);
+  const pularChecklistFn = useServerFn(equipePularChecklistInicial);
   const finalizarFn = useServerFn(equipeFinalizarAtendimento);
   const [token, setToken] = useState("");
   const [finalizar, setFinalizar] = useState<any>(null);
+  const [checklistOrdem, setChecklistOrdem] = useState<any>(null);
+  const [checklist, setChecklist] = useState<Record<string, boolean>>(emptyChecklist);
   const [obs, setObs] = useState("");
+  const [checklistObs, setChecklistObs] = useState("");
 
   useEffect(() => {
     const saved = getToken();
@@ -103,6 +129,30 @@ function Page() {
     onError: (e: any) => toast.error(e?.message ?? "Falhou"),
   });
 
+  const concluirChecklist = useMutation({
+    mutationFn: () => concluirChecklistFn({ data: { token, ordem_id: checklistOrdem.id, itens: checklist as any, observacoes: checklistObs || undefined } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["modo-equipe"] });
+      setChecklistOrdem(null);
+      setChecklist(emptyChecklist);
+      setChecklistObs("");
+      toast.success("Checklist concluido e atendimento iniciado");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falhou"),
+  });
+
+  const pularChecklist = useMutation({
+    mutationFn: () => pularChecklistFn({ data: { token, ordem_id: checklistOrdem.id, observacoes: checklistObs || undefined } }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["modo-equipe"] });
+      setChecklistOrdem(null);
+      setChecklist(emptyChecklist);
+      setChecklistObs("");
+      toast.success("Checklist pulado e atendimento iniciado");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falhou"),
+  });
+
   const finalizarMut = useMutation({
     mutationFn: () => finalizarFn({ data: { token, ordem_id: finalizar.id, observacoes: obs || undefined } }),
     onSuccess: () => {
@@ -127,6 +177,22 @@ function Page() {
 
   const funcionario = data?.funcionario;
   const fila = data?.fila ?? [];
+  const exigirChecklist = data?.config?.exigirChecklistInicial !== false;
+
+  function iniciarFluxo(o: any) {
+    if (o.status === "em_lavagem") {
+      toast.info("Atendimento em andamento");
+      return;
+    }
+    if (o.status !== "aguardando") return;
+    if (o.checklist_inicial_status !== "concluido" && o.checklist_inicial_status !== "pulado") {
+      setChecklistOrdem(o);
+      setChecklist(emptyChecklist);
+      setChecklistObs("");
+      return;
+    }
+    iniciar.mutate(o.id);
+  }
 
   return (
     <div className="min-h-screen bg-background pb-24">
@@ -176,6 +242,9 @@ function Page() {
                             <div className="mb-1 flex flex-wrap items-center gap-2">
                               <p className="truncate text-lg font-semibold">{o.clientes?.nome ?? "Cliente"}</p>
                               <Badge variant={o.status === "em_lavagem" ? "default" : "secondary"}>{statusLabel(o.status)}</Badge>
+                              <Badge variant={o.checklist_inicial_status === "pendente" ? "outline" : "secondary"} className={o.checklist_inicial_status === "pendente" ? "border-warning/60 text-warning-foreground" : ""}>
+                                {checklistLabel(o.checklist_inicial_status)}
+                              </Badge>
                             </div>
                             <p className="text-sm text-muted-foreground">
                               {o.veiculos?.modelo ?? "Veiculo"} {o.veiculos?.placa ? `· ${o.veiculos.placa}` : ""} · {o.servicos?.nome ?? "Servico"}
@@ -188,10 +257,11 @@ function Page() {
                           <div className="grid grid-cols-2 gap-2 sm:w-64">
                             <Button
                               className="h-12"
-                              disabled={o.status === "em_lavagem" || iniciar.isPending || !funcionario?.perm_iniciar_atendimento}
-                              onClick={() => iniciar.mutate(o.id)}
+                              disabled={iniciar.isPending || !funcionario?.perm_iniciar_atendimento}
+                              onClick={() => iniciarFluxo(o)}
                             >
-                              <Play className="mr-1 h-4 w-4" /> Iniciar
+                              {o.checklist_inicial_status === "pendente" ? <ClipboardCheck className="mr-1 h-4 w-4" /> : <Play className="mr-1 h-4 w-4" />}
+                              {o.status === "em_lavagem" ? "Continuar" : o.checklist_inicial_status === "pendente" ? "Checklist" : "Iniciar"}
                             </Button>
                             <Button
                               variant="outline"
@@ -199,7 +269,7 @@ function Page() {
                               disabled={o.status !== "em_lavagem" || !funcionario?.perm_finalizar_atendimento}
                               onClick={() => setFinalizar(o)}
                             >
-                              Pronto
+                              Finalizar
                             </Button>
                           </div>
                         </div>
@@ -226,6 +296,39 @@ function Page() {
             <Button className="h-12 w-full" onClick={() => finalizarMut.mutate()} disabled={finalizarMut.isPending}>
               Marcar como pronto
             </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!checklistOrdem} onOpenChange={(v) => !v && setChecklistOrdem(null)}>
+        <DialogContent className="max-w-lg rounded-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader><DialogTitle>Checklist Inicial</DialogTitle></DialogHeader>
+          <div className="space-y-4">
+            <div className="rounded-lg bg-muted p-3">
+              <p className="font-semibold">{checklistOrdem?.clientes?.nome ?? "Cliente"}</p>
+              <p className="text-xs text-muted-foreground">
+                {checklistOrdem?.veiculos?.modelo ?? "Veiculo"} {checklistOrdem?.veiculos?.placa ? `- ${checklistOrdem.veiculos.placa}` : ""}
+              </p>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {checklistItems.map(([key, label]) => (
+                <label key={key} className="flex items-center gap-2 rounded-lg border p-3 text-sm">
+                  <Checkbox checked={!!checklist[key]} onCheckedChange={(v) => setChecklist({ ...checklist, [key]: v === true })} />
+                  <span>{label}</span>
+                </label>
+              ))}
+            </div>
+            <Textarea rows={3} value={checklistObs} onChange={(e) => setChecklistObs(e.target.value)} placeholder="Observacoes do checklist" />
+            <div className="grid gap-2 sm:grid-cols-2">
+              {!exigirChecklist && (
+                <Button variant="outline" className="h-12" onClick={() => pularChecklist.mutate()} disabled={pularChecklist.isPending || concluirChecklist.isPending}>
+                  Pular checklist
+                </Button>
+              )}
+              <Button className="h-12 sm:col-start-2" onClick={() => concluirChecklist.mutate()} disabled={concluirChecklist.isPending || pularChecklist.isPending || !funcionario?.perm_realizar_checklist}>
+                Concluir checklist
+              </Button>
+            </div>
           </div>
         </DialogContent>
       </Dialog>

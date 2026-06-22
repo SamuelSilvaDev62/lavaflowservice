@@ -935,6 +935,29 @@ export const getInsights = createServerFn({ method: "GET" })
 // ============ FILA / KANBAN ============
 export type OsStatus = "aguardando" | "em_lavagem" | "finalizacao" | "pronto" | "entregue";
 
+async function getExigeChecklistInicial(supabase: any, ownerId: string) {
+  const { data } = await supabase
+    .from("empresa")
+    .select("exigir_checklist_inicial")
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+  return data?.exigir_checklist_inicial !== false;
+}
+
+async function assertPodeIniciarLavagem(supabase: any, ownerId: string, ordemId: string) {
+  const obrigatorio = await getExigeChecklistInicial(supabase, ownerId);
+  if (!obrigatorio) return;
+  const { data: ordem } = await supabase
+    .from("ordens_servico")
+    .select("checklist_inicial_status")
+    .eq("id", ordemId)
+    .eq("owner_id", ownerId)
+    .maybeSingle();
+  if (ordem?.checklist_inicial_status !== "concluido") {
+    throw new Error("Conclua o checklist inicial antes de iniciar o atendimento.");
+  }
+}
+
 export const getFila = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -943,6 +966,7 @@ export const getFila = createServerFn({ method: "GET" })
       .from("ordens_servico")
       .select(`
         id, status, posicao, valor, created_at, iniciado_em, finalizado_em, entregue_em,
+        checklist_inicial_status, checklist_inicial_em, checklist_inicial_funcionario_id,
         observacoes, cliente_id, veiculo_id, servico_id, funcionario_id,
         clientes:cliente_id(nome, telefone),
         veiculos:veiculo_id(placa, modelo, cor),
@@ -961,11 +985,15 @@ export const updateOrdemStatus = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid(), status: z.enum(["aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"]) }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const patch: any = { status: data.status };
-    if (data.status === "em_lavagem") patch.iniciado_em = new Date().toISOString();
+    if (data.status === "em_lavagem") {
+      await assertPodeIniciarLavagem(supabase, ownerId, data.id);
+      patch.iniciado_em = new Date().toISOString();
+    }
     if (data.status === "pronto") patch.finalizado_em = new Date().toISOString();
     if (data.status === "entregue") patch.entregue_em = new Date().toISOString();
-    const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", userId);
+    const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", ownerId);
     if (error) throw error;
     return { ok: true };
   });
@@ -1029,7 +1057,9 @@ export const listOrdens = createServerFn({ method: "GET" })
     const { supabase, userId } = context;
     const { data, error } = await supabase
       .from("ordens_servico")
-      .select(`id, status, valor, created_at, clientes:cliente_id(nome), veiculos:veiculo_id(placa), servicos:servico_id(nome), funcionarios:funcionario_id(nome)`)
+      .select(`id, status, valor, created_at, checklist_inicial_status, checklist_inicial_em,
+               clientes:cliente_id(nome), veiculos:veiculo_id(placa), servicos:servico_id(nome),
+               funcionarios:funcionario_id(nome), checklist_funcionario:checklist_inicial_funcionario_id(nome)`)
       .eq("owner_id", userId).order("created_at", { ascending: false }).limit(200);
     if (error) throw error;
     return { ordens: data ?? [] };
@@ -1814,9 +1844,11 @@ export const getModoEquipe = createServerFn({ method: "POST" })
     if (!funcionario?.ativo) throw new Error("Colaborador inativo");
 
     const startToday = startOfTodayIso();
+    const exigirChecklistInicial = await getExigeChecklistInicial(supabaseAdmin, sessao.owner_id);
     let query = supabaseAdmin
       .from("ordens_servico")
       .select(`id, status, valor, created_at, iniciado_em, finalizado_em, entregue_em, funcionario_id, observacoes,
+               checklist_inicial_status, checklist_inicial_em, checklist_inicial_funcionario_id,
                clientes:cliente_id(nome, telefone), veiculos:veiculo_id(placa, modelo), servicos:servico_id(nome)`)
       .eq("owner_id", sessao.owner_id)
       .in("status", ["aguardando", "em_lavagem", "pronto"])
@@ -1826,11 +1858,29 @@ export const getModoEquipe = createServerFn({ method: "POST" })
     }
     const { data: ordens, error } = await query;
     if (error) throw error;
+    const ordemIds = (ordens ?? []).map((o: any) => o.id);
+    const { data: checklists } = ordemIds.length
+      ? await supabaseAdmin
+          .from("os_checklists")
+          .select("id, ordem_id, status, itens, observacoes, created_at, funcionarios:funcionario_id(nome)")
+          .eq("owner_id", sessao.owner_id)
+          .eq("tipo", "inicial")
+          .in("ordem_id", ordemIds)
+          .order("created_at", { ascending: false })
+      : { data: [] as any[] };
+    const checklistByOrdem = new Map<string, any>();
+    (checklists ?? []).forEach((c: any) => {
+      if (!checklistByOrdem.has(c.ordem_id)) checklistByOrdem.set(c.ordem_id, c);
+    });
+    const ordensComChecklist = (ordens ?? []).map((o: any) => ({
+      ...o,
+      checklist_inicial: checklistByOrdem.get(o.id) ?? null,
+    }));
 
-    const minhas = (ordens ?? []).filter((o: any) => o.funcionario_id === funcionario.id);
+    const minhas = ordensComChecklist.filter((o: any) => o.funcionario_id === funcionario.id);
     const concluidasHoje = minhas.filter((o: any) => o.finalizado_em && new Date(o.finalizado_em) >= new Date(startToday)).length;
-    const emAtendimento = (ordens ?? []).filter((o: any) => o.status === "em_lavagem" && o.funcionario_id === funcionario.id);
-    const proximas = (ordens ?? []).filter((o: any) => o.status === "aguardando" || o.status === "em_lavagem").slice(0, 12);
+    const emAtendimento = ordensComChecklist.filter((o: any) => o.status === "em_lavagem" && o.funcionario_id === funcionario.id);
+    const proximas = ordensComChecklist.filter((o: any) => o.status === "aguardando" || o.status === "em_lavagem").slice(0, 12);
     const proximo = proximas.find((o: any) => o.status === "aguardando") ?? null;
 
     return {
@@ -1841,6 +1891,7 @@ export const getModoEquipe = createServerFn({ method: "POST" })
         proximoServico: proximo?.servicos?.nome ?? "Livre",
         concluidosHoje: concluidasHoje,
       },
+      config: { exigirChecklistInicial },
       fila: proximas,
     };
   });
@@ -1855,6 +1906,7 @@ export const equipeIniciarAtendimento = createServerFn({ method: "POST" })
       .eq("id", sessao.funcionario_id)
       .maybeSingle();
     if (!funcionario?.perm_iniciar_atendimento) throw new Error("Sem permissao para iniciar atendimento");
+    await assertPodeIniciarLavagem(supabaseAdmin, sessao.owner_id, data.ordem_id);
 
     const now = new Date().toISOString();
     const { error } = await supabaseAdmin.from("ordens_servico").update({
@@ -1869,6 +1921,112 @@ export const equipeIniciarAtendimento = createServerFn({ method: "POST" })
       ordem_id: data.ordem_id,
       acao: "iniciou_atendimento",
       metadata: { iniciado_em: now },
+    } as any);
+    return { ok: true };
+  });
+
+const checklistInicialSchema = z.object({
+  riscos_visiveis: z.boolean().default(false),
+  amassados: z.boolean().default(false),
+  vidro_trincado: z.boolean().default(false),
+  retrovisor_danificado: z.boolean().default(false),
+  farol_lanterna_danificado: z.boolean().default(false),
+  rodas_avarias: z.boolean().default(false),
+  bancos_manchados: z.boolean().default(false),
+  objetos_pessoais: z.boolean().default(false),
+  chave_recebida: z.boolean().default(false),
+});
+
+export const equipeConcluirChecklistInicial = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    token: z.string().min(20),
+    ordem_id: z.string().uuid(),
+    itens: checklistInicialSchema,
+    observacoes: z.string().max(1000).optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin, sessao } = await getEquipeSession(data.token);
+    const { data: funcionario } = await supabaseAdmin
+      .from("funcionarios")
+      .select("id, perm_realizar_checklist, perm_iniciar_atendimento")
+      .eq("id", sessao.funcionario_id)
+      .maybeSingle();
+    if (!funcionario?.perm_realizar_checklist) throw new Error("Sem permissao para realizar checklist");
+    if (!funcionario?.perm_iniciar_atendimento) throw new Error("Sem permissao para iniciar atendimento");
+
+    const now = new Date().toISOString();
+    const { error: insertError } = await supabaseAdmin.from("os_checklists").insert({
+      owner_id: sessao.owner_id,
+      ordem_id: data.ordem_id,
+      funcionario_id: funcionario.id,
+      tipo: "inicial",
+      status: "concluido",
+      itens: data.itens,
+      observacoes: data.observacoes ?? null,
+    } as any);
+    if (insertError) throw insertError;
+    const { error } = await supabaseAdmin.from("ordens_servico").update({
+      status: "em_lavagem",
+      iniciado_em: now,
+      funcionario_id: funcionario.id,
+      checklist_inicial_status: "concluido",
+      checklist_inicial_funcionario_id: funcionario.id,
+      checklist_inicial_em: now,
+    } as any).eq("id", data.ordem_id).eq("owner_id", sessao.owner_id);
+    if (error) throw error;
+    await supabaseAdmin.from("equipe_auditoria").insert({
+      owner_id: sessao.owner_id,
+      funcionario_id: funcionario.id,
+      ordem_id: data.ordem_id,
+      acao: "concluiu_checklist_inicial",
+      metadata: { itens: data.itens, observacoes: data.observacoes ?? null },
+    } as any);
+    return { ok: true };
+  });
+
+export const equipePularChecklistInicial = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    token: z.string().min(20),
+    ordem_id: z.string().uuid(),
+    observacoes: z.string().max(1000).optional(),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin, sessao } = await getEquipeSession(data.token);
+    const exigir = await getExigeChecklistInicial(supabaseAdmin, sessao.owner_id);
+    if (exigir) throw new Error("Conclua o checklist inicial antes de iniciar o atendimento.");
+    const { data: funcionario } = await supabaseAdmin
+      .from("funcionarios")
+      .select("id, perm_iniciar_atendimento")
+      .eq("id", sessao.funcionario_id)
+      .maybeSingle();
+    if (!funcionario?.perm_iniciar_atendimento) throw new Error("Sem permissao para iniciar atendimento");
+
+    const now = new Date().toISOString();
+    const { error: insertError } = await supabaseAdmin.from("os_checklists").insert({
+      owner_id: sessao.owner_id,
+      ordem_id: data.ordem_id,
+      funcionario_id: funcionario.id,
+      tipo: "inicial",
+      status: "pulado",
+      itens: {},
+      observacoes: data.observacoes ?? null,
+    } as any);
+    if (insertError) throw insertError;
+    const { error } = await supabaseAdmin.from("ordens_servico").update({
+      status: "em_lavagem",
+      iniciado_em: now,
+      funcionario_id: funcionario.id,
+      checklist_inicial_status: "pulado",
+      checklist_inicial_funcionario_id: funcionario.id,
+      checklist_inicial_em: now,
+    } as any).eq("id", data.ordem_id).eq("owner_id", sessao.owner_id);
+    if (error) throw error;
+    await supabaseAdmin.from("equipe_auditoria").insert({
+      owner_id: sessao.owner_id,
+      funcionario_id: funcionario.id,
+      ordem_id: data.ordem_id,
+      acao: "pulou_checklist_inicial",
+      metadata: { observacoes: data.observacoes ?? null },
     } as any);
     return { ok: true };
   });
@@ -2366,10 +2524,12 @@ export const iniciarOs = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const { data: meFunc } = await supabase.from("funcionarios").select("id").eq("auth_user_id", userId).maybeSingle();
+    await assertPodeIniciarLavagem(supabase, ownerId, data.id);
     const patch: any = { status: "em_lavagem", iniciado_em: new Date().toISOString() };
     if (meFunc?.id) patch.funcionario_id = meFunc.id;
-    const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id);
+    const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", ownerId);
     if (error) throw error;
     return { ok: true };
   });
