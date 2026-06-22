@@ -282,6 +282,87 @@ export type Database = {
           },
         ]
       }
+      campanha_alvos: {
+        Row: {
+          campanha_id: string
+          cliente_id: string | null
+          converted_at: string | null
+          created_at: string
+          id: string
+          metadata: Json
+          nome: string | null
+          owner_id: string
+          sent_at: string | null
+          status: string
+          telefone: string | null
+        }
+        Insert: {
+          campanha_id: string
+          cliente_id?: string | null
+          converted_at?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          nome?: string | null
+          owner_id: string
+          sent_at?: string | null
+          status?: string
+          telefone?: string | null
+        }
+        Update: {
+          campanha_id?: string
+          cliente_id?: string | null
+          converted_at?: string | null
+          created_at?: string
+          id?: string
+          metadata?: Json
+          nome?: string | null
+          owner_id?: string
+          sent_at?: string | null
+          status?: string
+          telefone?: string | null
+        }
+        Relationships: []
+      }
+      campanhas: {
+        Row: {
+          canal: string
+          created_at: string
+          id: string
+          mensagem: string
+          metadata: Json
+          nome: string
+          owner_id: string
+          status: string
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          canal?: string
+          created_at?: string
+          id?: string
+          mensagem: string
+          metadata?: Json
+          nome: string
+          owner_id: string
+          status?: string
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          canal?: string
+          created_at?: string
+          id?: string
+          mensagem?: string
+          metadata?: Json
+          nome?: string
+          owner_id?: string
+          status?: string
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       clientes: {
         Row: {
           created_at: string
@@ -864,6 +945,33 @@ export type Database = {
           status?: string
           updated_at?: string
           valor_estimado?: number | null
+        }
+        Relationships: []
+      }
+      public_page_events: {
+        Row: {
+          created_at: string
+          evento: string
+          id: string
+          metadata: Json
+          owner_id: string
+          slug: string | null
+        }
+        Insert: {
+          created_at?: string
+          evento: string
+          id?: string
+          metadata?: Json
+          owner_id: string
+          slug?: string | null
+        }
+        Update: {
+          created_at?: string
+          evento?: string
+          id?: string
+          metadata?: Json
+          owner_id?: string
+          slug?: string | null
         }
         Relationships: []
       }

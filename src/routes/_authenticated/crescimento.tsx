@@ -10,7 +10,7 @@ import { brl, pct } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Activity, DollarSign, LineChart, Sparkles, TrendingUp } from "lucide-react";
+import { Activity, CalendarDays, DollarSign, Eye, LineChart, MousePointerClick, Sparkles, TrendingUp } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/crescimento")({
   component: () => <RequireRole roles={GESTAO}><Page /></RequireRole>,
@@ -108,6 +108,35 @@ function Page() {
                 </p>
               </div>
               <Button asChild variant="outline"><Link to="/assistente">Abrir Consultor IA</Link></Button>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardContent className="p-4">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 mb-4">
+                <div>
+                  <h2 className="font-display font-semibold flex items-center gap-2">
+                    <MousePointerClick className="h-4 w-4 text-primary" />Vitrine publica
+                  </h2>
+                  <p className="text-sm text-muted-foreground mt-1">Conversao da pagina publica de agendamento no periodo selecionado.</p>
+                </div>
+                <Button asChild variant="outline"><Link to="/agendamentos">Ver agenda</Link></Button>
+              </div>
+              <div className="grid sm:grid-cols-3 gap-3">
+                <Metric icon={Eye} label="Visualizacoes" value={String(data.vitrinePublica.visualizacoes)} />
+                <Metric icon={CalendarDays} label="Solicitacoes" value={String(data.vitrinePublica.solicitacoes)} />
+                <Metric icon={TrendingUp} label="Conversao" value={pct(data.vitrinePublica.conversao, 1)} tone={data.vitrinePublica.conversao >= 0.08 ? "success" : undefined} />
+              </div>
+              {data.vitrinePublica.timeline.length > 0 && (
+                <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+                  {data.vitrinePublica.timeline.slice(-8).map((item: any) => (
+                    <div key={item.dia} className="rounded-md border bg-muted/40 px-3 py-2 text-sm">
+                      <p className="text-xs text-muted-foreground">{item.dia.slice(5).split("-").reverse().join("/")}</p>
+                      <p className="font-medium">{item.solicitacoes} solic. / {item.visualizacoes} views</p>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 

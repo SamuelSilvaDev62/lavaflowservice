@@ -1132,6 +1132,177 @@ export const getClienteInativos = createServerFn({ method: "GET" })
     return { inativos };
   });
 
+function campanhaMensagem(tipo: string, nome?: string) {
+  const primeiroNome = nome ? nome.split(" ")[0] : "{{nome}}";
+  const mensagens: Record<string, string> = {
+    inativos: `Ola ${primeiroNome}! Sentimos sua falta por aqui. Quer agendar um horario esta semana para cuidar do seu veiculo?`,
+    fidelidade: `Ola ${primeiroNome}! Voce possui beneficio disponivel no nosso programa de fidelidade. Quer aproveitar na sua proxima lavagem?`,
+    assinatura: `Ola ${primeiroNome}! Temos planos para deixar suas lavagens mais praticas e previsiveis. Posso te explicar como funciona?`,
+    baixa_ocupacao: `Ola ${primeiroNome}! Temos horarios disponiveis esta semana para cuidar do seu veiculo. Quer reservar um horario?`,
+    aniversario: `Ola ${primeiroNome}! Feliz aniversario! Temos um convite especial para voce cuidar do seu veiculo com a gente.`,
+  };
+  return mensagens[tipo] ?? mensagens.inativos;
+}
+
+async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
+  const now = new Date();
+  const hoje = now.toISOString().slice(0, 10);
+  const futuro = new Date(Date.now() + 7 * 86_400_000).toISOString().slice(0, 10);
+  const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
+  const fortyFiveAgo = new Date(Date.now() - 45 * 86_400_000).toISOString();
+
+  const [{ data: clientes }, { data: ordens }, { data: recompensas }, { data: assinaturas }, { data: agendamentos }, { data: planos }] = await Promise.all([
+    supabase.from("clientes").select("id, nome, telefone, pontos_saldo, created_at").eq("owner_id", ownerId),
+    supabase.from("ordens_servico").select("id, cliente_id, valor, created_at").eq("owner_id", ownerId).gte("created_at", ninetyAgo),
+    supabase.from("recompensas").select("custo_pontos, ativo").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos").limit(1),
+    supabase.from("assinaturas_clientes").select("cliente_id, status").eq("owner_id", ownerId),
+    supabase.from("agendamentos").select("id, data_agendada, status").eq("owner_id", ownerId).gte("data_agendada", hoje).lte("data_agendada", futuro),
+    supabase.from("planos_assinatura").select("id, nome, valor_mensal, ativo").eq("owner_id", ownerId).eq("ativo", true).order("valor_mensal").limit(1),
+  ]);
+
+  const clientesRows = clientes ?? [];
+  const ordensRows = ordens ?? [];
+  const ticketMedio = ordensRows.length ? ordensRows.reduce((sum: number, row: any) => sum + Number(row.valor ?? 0), 0) / ordensRows.length : 50;
+  const lastVisit = new Map<string, string>();
+  const visitas = new Map<string, number>();
+  ordensRows.forEach((row: any) => {
+    if (!lastVisit.has(row.cliente_id) || lastVisit.get(row.cliente_id)! < row.created_at) lastVisit.set(row.cliente_id, row.created_at);
+    visitas.set(row.cliente_id, (visitas.get(row.cliente_id) ?? 0) + 1);
+  });
+
+  const inativos = clientesRows
+    .map((c: any) => {
+      const ultima = lastVisit.get(c.id);
+      const dias = ultima ? Math.floor((Date.now() - new Date(ultima).getTime()) / 86_400_000) : 999;
+      return { ...c, dias_inativo: dias };
+    })
+    .filter((c: any) => c.telefone && (!lastVisit.get(c.id) || lastVisit.get(c.id)! < fortyFiveAgo))
+    .sort((a: any, b: any) => b.dias_inativo - a.dias_inativo)
+    .slice(0, 30);
+
+  const menorRecompensa = Number(recompensas?.[0]?.custo_pontos ?? 0);
+  const fidelidade = menorRecompensa
+    ? clientesRows.filter((c: any) => c.telefone && Number(c.pontos_saldo ?? 0) >= menorRecompensa).slice(0, 30)
+    : [];
+
+  const assinantes = new Set((assinaturas ?? []).filter((a: any) => a.status === "ativa").map((a: any) => a.cliente_id));
+  const assinatura = clientesRows
+    .filter((c: any) => c.telefone && (visitas.get(c.id) ?? 0) >= 4 && !assinantes.has(c.id))
+    .slice(0, 30);
+
+  const ocupacaoPorDia = new Map<string, number>();
+  (agendamentos ?? []).forEach((a: any) => {
+    if (["cancelado", "nao_compareceu"].includes(a.status)) return;
+    ocupacaoPorDia.set(a.data_agendada, (ocupacaoPorDia.get(a.data_agendada) ?? 0) + 1);
+  });
+  const diasBaixos = Array.from({ length: 7 }).map((_, idx) => {
+    const d = new Date(Date.now() + idx * 86_400_000).toISOString().slice(0, 10);
+    return { data: d, qtd: ocupacaoPorDia.get(d) ?? 0 };
+  }).filter((d) => d.qtd <= 2);
+
+  const sugestoes = [
+    {
+      tipo: "inativos",
+      titulo: "Recuperar clientes inativos",
+      descricao: `${inativos.length} cliente(s) sem retorno ha mais de 45 dias.`,
+      impactoEstimado: roundMoney(inativos.length * ticketMedio),
+      alvos: inativos.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { dias_inativo: c.dias_inativo } })),
+      mensagem: campanhaMensagem("inativos"),
+    },
+    {
+      tipo: "fidelidade",
+      titulo: "Ativar beneficios de fidelidade",
+      descricao: `${fidelidade.length} cliente(s) possuem pontos para resgate.`,
+      impactoEstimado: roundMoney(fidelidade.length * ticketMedio),
+      alvos: fidelidade.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { pontos: c.pontos_saldo } })),
+      mensagem: campanhaMensagem("fidelidade"),
+    },
+    {
+      tipo: "assinatura",
+      titulo: "Oferecer plano para clientes frequentes",
+      descricao: `${assinatura.length} cliente(s) frequentes ainda nao assinam um plano.`,
+      impactoEstimado: roundMoney(assinatura.length * Number(planos?.[0]?.valor_mensal ?? ticketMedio)),
+      alvos: assinatura.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { visitas: visitas.get(c.id) ?? 0 } })),
+      mensagem: campanhaMensagem("assinatura"),
+    },
+    {
+      tipo: "baixa_ocupacao",
+      titulo: "Preencher dias com baixa ocupacao",
+      descricao: `${diasBaixos.length} dia(s) da semana estao com baixa demanda.`,
+      impactoEstimado: roundMoney(Math.max(0, diasBaixos.length) * ticketMedio),
+      alvos: inativos.slice(0, 15).map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { dias_baixos: diasBaixos } })),
+      mensagem: campanhaMensagem("baixa_ocupacao"),
+    },
+  ].filter((s) => s.alvos.length > 0);
+
+  return { sugestoes, ticketMedio };
+}
+
+export const getCampanhas = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const [{ data: campanhas }, sugestoesData] = await Promise.all([
+      context.supabase.from("campanhas").select("*").eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(100),
+      getCampanhaSugestoesData(context.supabase, ownerId),
+    ]);
+    const ids = (campanhas ?? []).map((c: any) => c.id);
+    const { data: alvos } = ids.length
+      ? await context.supabase.from("campanha_alvos").select("*").eq("owner_id", ownerId).in("campanha_id", ids)
+      : { data: [] as any[] };
+    const byCampanha = new Map<string, any[]>();
+    (alvos ?? []).forEach((a: any) => byCampanha.set(a.campanha_id, [...(byCampanha.get(a.campanha_id) ?? []), a]));
+    return {
+      campanhas: (campanhas ?? []).map((c: any) => ({ ...c, alvos: byCampanha.get(c.id) ?? [] })),
+      sugestoes: sugestoesData.sugestoes,
+    };
+  });
+
+export const criarCampanhaInteligente = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    tipo: z.enum(["inativos", "aniversario", "baixa_ocupacao", "fidelidade", "assinatura"]),
+    nome: z.string().min(1).max(120),
+    mensagem: z.string().min(1).max(1000),
+  }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const sugestoes = await getCampanhaSugestoesData(context.supabase, ownerId);
+    const sugestao = sugestoes.sugestoes.find((s: any) => s.tipo === data.tipo);
+    if (!sugestao || sugestao.alvos.length === 0) throw new Error("Nao ha alvos disponiveis para esta campanha.");
+    const { data: campanha, error } = await context.supabase.from("campanhas").insert({
+      owner_id: ownerId,
+      nome: data.nome,
+      tipo: data.tipo,
+      canal: "whatsapp",
+      status: "ativa",
+      mensagem: data.mensagem,
+      metadata: { impacto_estimado: sugestao.impactoEstimado },
+    } as any).select("*").single();
+    if (error) throw error;
+    const rows = sugestao.alvos.map((a: any) => ({
+      owner_id: ownerId,
+      campanha_id: campanha.id,
+      cliente_id: a.cliente_id,
+      nome: a.nome,
+      telefone: a.telefone,
+      metadata: a.metadata ?? {},
+    }));
+    const { error: e2 } = await context.supabase.from("campanha_alvos").insert(rows as any);
+    if (e2) throw e2;
+    return { campanha };
+  });
+
+export const marcarCampanhaAlvoEnviado = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { error } = await context.supabase.from("campanha_alvos").update({ status: "enviado", sent_at: new Date().toISOString() } as any).eq("id", data.id).eq("owner_id", ownerId);
+    if (error) throw error;
+    return { ok: true };
+  });
+
 export const createCliente = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({
@@ -1538,7 +1709,7 @@ async function getReceitaInfluenciadaData(supabase: any, ownerId: string, opts: 
   const inicioDia = inicioIso.slice(0, 10);
   const fimDia = fimIso.slice(0, 10);
 
-  const [{ data: ordens }, { data: eventos }, { data: levaTraz }, { data: clientes }, { data: assinaturas }, { data: agendamentos }, { data: upsells }, { data: funcionarios }] = await Promise.all([
+  const [{ data: ordens }, { data: eventos }, { data: levaTraz }, { data: clientes }, { data: assinaturas }, { data: agendamentos }, { data: upsells }, { data: funcionarios }, { data: vitrineEventos }] = await Promise.all([
     supabase.from("ordens_servico").select("id, valor, status, created_at, cliente_id, funcionario_id").eq("owner_id", ownerId).gte("created_at", inicioIso).lte("created_at", fimIso),
     supabase.from("receita_influenciada").select("*").eq("owner_id", ownerId).gte("created_at", inicioIso).lte("created_at", fimIso),
     supabase.from("agendamentos")
@@ -1553,6 +1724,7 @@ async function getReceitaInfluenciadaData(supabase: any, ownerId: string, opts: 
     supabase.from("agendamentos").select("id, status, data_agendada").eq("owner_id", ownerId).gte("data_agendada", inicioDia).lte("data_agendada", fimDia),
     supabase.from("os_upsell_oportunidades").select("id, status, valor_estimado").eq("owner_id", ownerId).gte("created_at", inicioIso).lte("created_at", fimIso),
     supabase.from("funcionarios").select("id, ativo").eq("owner_id", ownerId).eq("ativo", true),
+    supabase.from("public_page_events").select("id, evento, created_at").eq("owner_id", ownerId).gte("created_at", inicioIso).lte("created_at", fimIso),
   ]);
 
   const rows = [...(eventos ?? [])];
@@ -1619,6 +1791,18 @@ async function getReceitaInfluenciadaData(supabase: any, ownerId: string, opts: 
     { chave: "uso_ia", label: "Uso das recomendacoes da IA", peso: 5, score: clampScore(usoIa * 100) },
   ];
   const indiceScore = clampScore(componentesIndice.reduce((sum, item) => sum + (item.score * item.peso) / 100, 0));
+  const vitrineRows = vitrineEventos ?? [];
+  const visualizacoes = vitrineRows.filter((row: any) => row.evento === "visualizacao").length;
+  const solicitacoes = vitrineRows.filter((row: any) => row.evento === "solicitacao_agendamento").length;
+  const vitrinePorDia = new Map<string, { visualizacoes: number; solicitacoes: number }>();
+  vitrineRows.forEach((row: any) => {
+    const dia = String(row.created_at ?? "").slice(0, 10);
+    if (!dia) return;
+    const cur = vitrinePorDia.get(dia) ?? { visualizacoes: 0, solicitacoes: 0 };
+    if (row.evento === "visualizacao") cur.visualizacoes += 1;
+    if (row.evento === "solicitacao_agendamento") cur.solicitacoes += 1;
+    vitrinePorDia.set(dia, cur);
+  });
   const porDia = new Map<string, number>();
   rows.forEach((row: any) => {
     const dia = String(row.created_at ?? "").slice(0, 10);
@@ -1645,6 +1829,12 @@ async function getReceitaInfluenciadaData(supabase: any, ownerId: string, opts: 
         produtividade,
         comparecimento,
       },
+    },
+    vitrinePublica: {
+      visualizacoes,
+      solicitacoes,
+      conversao: visualizacoes ? solicitacoes / visualizacoes : 0,
+      timeline: Array.from(vitrinePorDia, ([dia, valores]) => ({ dia, ...valores })).sort((a, b) => a.dia.localeCompare(b.dia)),
     },
     categorias,
     timeline: Array.from(porDia, ([dia, valor]) => ({ dia, valor })).sort((a, b) => a.dia.localeCompare(b.dia)),
@@ -3354,6 +3544,12 @@ export const getEmpresaPublica = createServerFn({ method: "GET" })
       supabaseAdmin.rpc("get_servicos_publicos", { _owner: empresa.owner_id }),
       supabaseAdmin.rpc("get_agenda_config_publica", { _owner: empresa.owner_id }),
     ]);
+    await supabaseAdmin.from("public_page_events").insert({
+      owner_id: empresa.owner_id,
+      slug: data.slug,
+      evento: "visualizacao",
+      metadata: { origem: "pagina_publica" },
+    } as any);
     return {
       empresa,
       servicos: servicos ?? [],
@@ -3443,6 +3639,12 @@ export const solicitarAgendamentoPublico = createServerFn({ method: "POST" })
       origem: "publico",
     });
     if (e2) throw e2;
+    await supabaseAdmin.from("public_page_events").insert({
+      owner_id,
+      slug: data.slug,
+      evento: "solicitacao_agendamento",
+      metadata: { servico_id: data.servico_id ?? null, data: data.data, hora: data.hora },
+    } as any);
     return { ok: true };
   });
 

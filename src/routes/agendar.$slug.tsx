@@ -8,8 +8,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Badge } from "@/components/ui/badge";
 import { getEmpresaPublica, getHorariosDisponiveis, solicitarAgendamentoPublico } from "@/lib/lavaflow.functions";
-import { Car, CheckCircle2, MapPin, Phone } from "lucide-react";
+import { brl } from "@/lib/format";
+import { CalendarDays, Car, CheckCircle2, Clock, Instagram, MapPin, Phone, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/agendar/$slug")({
@@ -64,6 +66,7 @@ function Page() {
   if (error || !data) return <div className="min-h-screen grid place-content-center px-6 text-center text-muted-foreground">Link inválido ou empresa não encontrada.</div>;
 
   const { empresa, servicos } = data;
+  const destaque = (servicos ?? []).slice(0, 4);
 
   if (sent) {
     return (
@@ -81,25 +84,73 @@ function Page() {
 
   return (
     <div className="min-h-screen bg-background">
-      <header className="border-b bg-card">
-        <div className="mx-auto max-w-2xl px-3 py-5 sm:px-4">
-          <div className="flex items-center gap-3">
-            <div className="grid h-10 w-10 shrink-0 place-content-center rounded-lg bg-gradient-to-br from-primary to-primary/60">
-              <Car className="h-5 w-5 text-primary-foreground" />
-            </div>
-            <div className="min-w-0">
-              <h1 className="break-words text-xl font-bold leading-tight">{empresa.nome_fantasia}</h1>
-              <div className="mt-1 flex flex-wrap gap-2 text-xs text-muted-foreground">
-                {empresa.telefone && <span className="inline-flex min-w-0 items-center gap-1 break-words"><Phone className="h-3 w-3 shrink-0" />{empresa.telefone}</span>}
-                {empresa.endereco && <span className="inline-flex min-w-0 items-center gap-1 break-words"><MapPin className="h-3 w-3 shrink-0" />{empresa.endereco}</span>}
+      <header className="border-b bg-card/80 backdrop-blur-xl">
+        <div className="mx-auto flex max-w-6xl items-center justify-between gap-3 px-4 py-4">
+          <div className="flex min-w-0 items-center gap-3">
+            {empresa.logo_url ? (
+              <img src={empresa.logo_url} alt={empresa.nome_fantasia} className="h-11 w-11 shrink-0 rounded-lg object-cover" />
+            ) : (
+              <div className="grid h-11 w-11 shrink-0 place-content-center rounded-lg bg-gradient-to-br from-primary to-primary/60">
+                <Car className="h-5 w-5 text-primary-foreground" />
               </div>
+            )}
+            <div className="min-w-0">
+              <p className="break-words font-display text-xl font-bold leading-tight">{empresa.nome_fantasia}</p>
+              {empresa.endereco && <p className="truncate text-xs text-muted-foreground">{empresa.endereco}</p>}
             </div>
+          </div>
+          <div className="hidden items-center gap-2 sm:flex">
+            {empresa.instagram && <Button asChild size="sm" variant="outline"><a href={`https://instagram.com/${String(empresa.instagram).replace("@", "")}`} target="_blank" rel="noreferrer"><Instagram className="h-4 w-4" /></a></Button>}
+            {(empresa.whatsapp || empresa.telefone) && <Button asChild size="sm"><a href={`https://wa.me/${String(empresa.whatsapp ?? empresa.telefone).replace(/\D/g, "")}`} target="_blank" rel="noreferrer">WhatsApp</a></Button>}
           </div>
         </div>
       </header>
 
-      <main className="mx-auto max-w-2xl px-3 py-5 sm:px-4 sm:py-6">
-        <Card><CardContent className="space-y-4 p-4 sm:p-5">
+      <main className="mx-auto grid max-w-6xl gap-5 px-4 py-5 lg:grid-cols-[1fr_440px] lg:py-8">
+        <section className="space-y-5">
+          <div className="rounded-xl border bg-card p-5 shadow-[var(--shadow-neo-sm)] sm:p-7">
+            <Badge variant="secondary" className="mb-3">Agendamento online</Badge>
+            <h1 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">{empresa.nome_fantasia}</h1>
+            <p className="mt-3 max-w-2xl text-sm text-muted-foreground">
+              Escolha o servico, reserve um horario disponivel e aguarde a confirmacao da equipe.
+            </p>
+            <div className="mt-5 grid gap-2 sm:grid-cols-3">
+              <Info icon={CalendarDays} label="Agenda online" />
+              <Info icon={Clock} label={empresa.horario_funcionamento ?? "Horarios flexiveis"} />
+              <Info icon={Sparkles} label="Servicos automotivos" />
+            </div>
+            <div className="mt-5 flex flex-wrap gap-2 text-xs text-muted-foreground">
+              {empresa.telefone && <span className="inline-flex items-center gap-1"><Phone className="h-3.5 w-3.5" />{empresa.telefone}</span>}
+              {empresa.endereco && <span className="inline-flex items-center gap-1"><MapPin className="h-3.5 w-3.5" />{empresa.endereco}</span>}
+            </div>
+          </div>
+
+          <Card><CardContent className="p-4 sm:p-5">
+            <div className="mb-4 flex items-center justify-between gap-3">
+              <h2 className="font-display text-lg font-semibold">Servicos em destaque</h2>
+              <Badge variant="outline">{servicos.length} disponiveis</Badge>
+            </div>
+            {destaque.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Os servicos serao exibidos assim que estiverem disponiveis para agendamento online.</p>
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2">
+                {destaque.map((s: any) => (
+                  <button key={s.id} type="button" onClick={() => setF({ ...f, servico_id: s.id })} className="overflow-hidden rounded-lg border bg-background text-left transition-colors hover:bg-accent">
+                    {s.foto_url && <img src={s.foto_url} alt={s.nome} className="h-28 w-full object-cover" />}
+                    <div className="p-3">
+                      <p className="font-medium">{s.nome}</p>
+                      {s.descricao && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{s.descricao}</p>}
+                      {s.preco_padrao != null && <p className="mt-2 text-sm font-semibold">{brl(Number(s.preco_padrao))}</p>}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </CardContent></Card>
+        </section>
+
+        <section className="lg:sticky lg:top-5 lg:self-start">
+          <Card><CardContent className="space-y-4 p-4 sm:p-5">
           <h2 className="text-lg font-semibold">Agende sua lavagem</h2>
           <form onSubmit={(e) => {
             e.preventDefault();
@@ -138,8 +189,18 @@ function Page() {
             <div className="space-y-2"><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
             <Button type="submit" className="h-11 w-full" disabled={mut.isPending}>Enviar solicitação</Button>
           </form>
-        </CardContent></Card>
+          </CardContent></Card>
+        </section>
       </main>
+    </div>
+  );
+}
+
+function Info({ icon: Icon, label }: { icon: any; label: string }) {
+  return (
+    <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
+      <Icon className="h-4 w-4 text-primary" />
+      <span className="truncate">{label}</span>
     </div>
   );
 }
