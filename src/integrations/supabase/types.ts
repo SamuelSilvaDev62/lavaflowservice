@@ -1651,11 +1651,16 @@ export type Database = {
         Args: { _slug: string }
         Returns: {
           endereco: string
+          facebook: string
+          horario_funcionamento: string
           id: string
+          instagram: string
+          logo_url: string
           nome_fantasia: string
           owner_id: string
           slug: string
           telefone: string
+          website: string
           whatsapp: string
         }[]
       }
