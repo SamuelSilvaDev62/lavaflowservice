@@ -164,6 +164,87 @@ export type Database = {
           },
         ]
       }
+      ai_recommendations: {
+        Row: {
+          created_at: string
+          description: string
+          dismissed_at: string | null
+          estimated_impact: number
+          executed_at: string | null
+          id: string
+          owner_id: string
+          payload: Json
+          priority: string
+          status: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          dismissed_at?: string | null
+          estimated_impact?: number
+          executed_at?: string | null
+          id?: string
+          owner_id: string
+          payload?: Json
+          priority: string
+          status?: string
+          title: string
+          type: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          dismissed_at?: string | null
+          estimated_impact?: number
+          executed_at?: string | null
+          id?: string
+          owner_id?: string
+          payload?: Json
+          priority?: string
+          status?: string
+          title?: string
+          type?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      ai_usage_logs: {
+        Row: {
+          created_at: string
+          estimated_cost: number
+          id: string
+          owner_id: string
+          route: string
+          tokens_input: number
+          tokens_output: number
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          estimated_cost?: number
+          id?: string
+          owner_id: string
+          route: string
+          tokens_input?: number
+          tokens_output?: number
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          estimated_cost?: number
+          id?: string
+          owner_id?: string
+          route?: string
+          tokens_input?: number
+          tokens_output?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       assinaturas_clientes: {
         Row: {
           cliente_id: string
@@ -322,7 +403,22 @@ export type Database = {
           status?: string
           telefone?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "campanha_alvos_campanha_id_fkey"
+            columns: ["campanha_id"]
+            isOneToOne: false
+            referencedRelation: "campanhas"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "campanha_alvos_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       campanhas: {
         Row: {
@@ -510,8 +606,8 @@ export type Database = {
           created_at: string
           email: string | null
           endereco: string | null
-          facebook: string | null
           exigir_checklist_inicial: boolean
+          facebook: string | null
           horario_funcionamento: string | null
           id: string
           instagram: string | null
@@ -531,8 +627,8 @@ export type Database = {
           created_at?: string
           email?: string | null
           endereco?: string | null
-          facebook?: string | null
           exigir_checklist_inicial?: boolean
+          facebook?: string | null
           horario_funcionamento?: string | null
           id?: string
           instagram?: string | null
@@ -552,8 +648,8 @@ export type Database = {
           created_at?: string
           email?: string | null
           endereco?: string | null
-          facebook?: string | null
           exigir_checklist_inicial?: boolean
+          facebook?: string | null
           horario_funcionamento?: string | null
           id?: string
           instagram?: string | null
@@ -568,27 +664,6 @@ export type Database = {
           tour_completed_at?: string | null
           website?: string | null
           whatsapp?: string | null
-        }
-        Relationships: []
-      }
-      fidelidade_config: {
-        Row: {
-          id: string
-          owner_id: string
-          pontos_por_lavagem: number
-          pontos_por_real: number
-        }
-        Insert: {
-          id?: string
-          owner_id: string
-          pontos_por_lavagem?: number
-          pontos_por_real?: number
-        }
-        Update: {
-          id?: string
-          owner_id?: string
-          pontos_por_lavagem?: number
-          pontos_por_real?: number
         }
         Relationships: []
       }
@@ -620,7 +695,22 @@ export type Database = {
           ordem_id?: string | null
           owner_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "equipe_auditoria_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipe_auditoria_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       equipe_pin_attempts: {
         Row: {
@@ -650,7 +740,15 @@ export type Database = {
           success?: boolean
           user_agent?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "equipe_pin_attempts_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       equipe_sessoes: {
         Row: {
@@ -685,6 +783,35 @@ export type Database = {
           owner_id?: string
           token_hash?: string
           user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "equipe_sessoes_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      fidelidade_config: {
+        Row: {
+          id: string
+          owner_id: string
+          pontos_por_lavagem: number
+          pontos_por_real: number
+        }
+        Insert: {
+          id?: string
+          owner_id: string
+          pontos_por_lavagem?: number
+          pontos_por_real?: number
+        }
+        Update: {
+          id?: string
+          owner_id?: string
+          pontos_por_lavagem?: number
+          pontos_por_real?: number
         }
         Relationships: []
       }
@@ -858,6 +985,102 @@ export type Database = {
         }
         Relationships: []
       }
+      ordens_servico: {
+        Row: {
+          checklist_inicial_em: string | null
+          checklist_inicial_funcionario_id: string | null
+          checklist_inicial_status: string
+          cliente_id: string
+          created_at: string
+          entregue_em: string | null
+          finalizado_em: string | null
+          funcionario_id: string | null
+          id: string
+          iniciado_em: string | null
+          observacoes: string | null
+          owner_id: string
+          posicao: number
+          servico_id: string | null
+          status: Database["public"]["Enums"]["os_status"]
+          valor: number
+          veiculo_id: string | null
+        }
+        Insert: {
+          checklist_inicial_em?: string | null
+          checklist_inicial_funcionario_id?: string | null
+          checklist_inicial_status?: string
+          cliente_id: string
+          created_at?: string
+          entregue_em?: string | null
+          finalizado_em?: string | null
+          funcionario_id?: string | null
+          id?: string
+          iniciado_em?: string | null
+          observacoes?: string | null
+          owner_id: string
+          posicao?: number
+          servico_id?: string | null
+          status?: Database["public"]["Enums"]["os_status"]
+          valor?: number
+          veiculo_id?: string | null
+        }
+        Update: {
+          checklist_inicial_em?: string | null
+          checklist_inicial_funcionario_id?: string | null
+          checklist_inicial_status?: string
+          cliente_id?: string
+          created_at?: string
+          entregue_em?: string | null
+          finalizado_em?: string | null
+          funcionario_id?: string | null
+          id?: string
+          iniciado_em?: string | null
+          observacoes?: string | null
+          owner_id?: string
+          posicao?: number
+          servico_id?: string | null
+          status?: Database["public"]["Enums"]["os_status"]
+          valor?: number
+          veiculo_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ordens_servico_checklist_inicial_funcionario_id_fkey"
+            columns: ["checklist_inicial_funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_veiculo_id_fkey"
+            columns: ["veiculo_id"]
+            isOneToOne: false
+            referencedRelation: "veiculos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       os_checklists: {
         Row: {
           created_at: string
@@ -892,7 +1115,22 @@ export type Database = {
           status?: string
           tipo?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "os_checklists_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_checklists_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       os_upsell_oportunidades: {
         Row: {
@@ -946,159 +1184,33 @@ export type Database = {
           updated_at?: string
           valor_estimado?: number | null
         }
-        Relationships: []
-      }
-      public_page_events: {
-        Row: {
-          created_at: string
-          evento: string
-          id: string
-          metadata: Json
-          owner_id: string
-          slug: string | null
-        }
-        Insert: {
-          created_at?: string
-          evento: string
-          id?: string
-          metadata?: Json
-          owner_id: string
-          slug?: string | null
-        }
-        Update: {
-          created_at?: string
-          evento?: string
-          id?: string
-          metadata?: Json
-          owner_id?: string
-          slug?: string | null
-        }
-        Relationships: []
-      }
-      receita_influenciada: {
-        Row: {
-          cliente_id: string | null
-          created_at: string
-          descricao: string | null
-          funcionario_id: string | null
-          id: string
-          metadata: Json
-          ordem_id: string | null
-          origem: string
-          owner_id: string
-          referencia_id: string | null
-          referencia_tipo: string | null
-          valor: number
-        }
-        Insert: {
-          cliente_id?: string | null
-          created_at?: string
-          descricao?: string | null
-          funcionario_id?: string | null
-          id?: string
-          metadata?: Json
-          ordem_id?: string | null
-          origem: string
-          owner_id: string
-          referencia_id?: string | null
-          referencia_tipo?: string | null
-          valor?: number
-        }
-        Update: {
-          cliente_id?: string | null
-          created_at?: string
-          descricao?: string | null
-          funcionario_id?: string | null
-          id?: string
-          metadata?: Json
-          ordem_id?: string | null
-          origem?: string
-          owner_id?: string
-          referencia_id?: string | null
-          referencia_tipo?: string | null
-          valor?: number
-        }
-        Relationships: []
-      }
-      ordens_servico: {
-        Row: {
-          checklist_inicial_em: string | null
-          checklist_inicial_funcionario_id: string | null
-          checklist_inicial_status: string
-          cliente_id: string
-          created_at: string
-          entregue_em: string | null
-          finalizado_em: string | null
-          funcionario_id: string | null
-          id: string
-          iniciado_em: string | null
-          observacoes: string | null
-          owner_id: string
-          posicao: number
-          servico_id: string | null
-          status: Database["public"]["Enums"]["os_status"]
-          valor: number
-          veiculo_id: string | null
-        }
-        Insert: {
-          cliente_id: string
-          created_at?: string
-          entregue_em?: string | null
-          finalizado_em?: string | null
-          funcionario_id?: string | null
-          id?: string
-          iniciado_em?: string | null
-          observacoes?: string | null
-          owner_id: string
-          posicao?: number
-          servico_id?: string | null
-          status?: Database["public"]["Enums"]["os_status"]
-          valor?: number
-          veiculo_id?: string | null
-        }
-        Update: {
-          cliente_id?: string
-          created_at?: string
-          entregue_em?: string | null
-          finalizado_em?: string | null
-          funcionario_id?: string | null
-          id?: string
-          iniciado_em?: string | null
-          observacoes?: string | null
-          owner_id?: string
-          posicao?: number
-          servico_id?: string | null
-          status?: Database["public"]["Enums"]["os_status"]
-          valor?: number
-          veiculo_id?: string | null
-        }
         Relationships: [
           {
-            foreignKeyName: "ordens_servico_cliente_id_fkey"
-            columns: ["cliente_id"]
+            foreignKeyName: "os_upsell_oportunidades_checklist_id_fkey"
+            columns: ["checklist_id"]
             isOneToOne: false
-            referencedRelation: "clientes"
+            referencedRelation: "os_checklists"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ordens_servico_funcionario_id_fkey"
+            foreignKeyName: "os_upsell_oportunidades_funcionario_id_fkey"
             columns: ["funcionario_id"]
             isOneToOne: false
             referencedRelation: "funcionarios"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ordens_servico_servico_id_fkey"
-            columns: ["servico_id"]
+            foreignKeyName: "os_upsell_oportunidades_ordem_id_fkey"
+            columns: ["ordem_id"]
             isOneToOne: false
-            referencedRelation: "servicos"
+            referencedRelation: "ordens_servico"
             referencedColumns: ["id"]
           },
           {
-            foreignKeyName: "ordens_servico_veiculo_id_fkey"
-            columns: ["veiculo_id"]
+            foreignKeyName: "os_upsell_oportunidades_servico_id_fkey"
+            columns: ["servico_id"]
             isOneToOne: false
-            referencedRelation: "veiculos"
+            referencedRelation: "servicos"
             referencedColumns: ["id"]
           },
         ]
@@ -1231,6 +1343,100 @@ export type Database = {
           },
         ]
       }
+      public_page_events: {
+        Row: {
+          created_at: string
+          evento: string
+          id: string
+          metadata: Json
+          owner_id: string
+          slug: string | null
+        }
+        Insert: {
+          created_at?: string
+          evento: string
+          id?: string
+          metadata?: Json
+          owner_id: string
+          slug?: string | null
+        }
+        Update: {
+          created_at?: string
+          evento?: string
+          id?: string
+          metadata?: Json
+          owner_id?: string
+          slug?: string | null
+        }
+        Relationships: []
+      }
+      receita_influenciada: {
+        Row: {
+          cliente_id: string | null
+          created_at: string
+          descricao: string | null
+          funcionario_id: string | null
+          id: string
+          metadata: Json
+          ordem_id: string | null
+          origem: string
+          owner_id: string
+          referencia_id: string | null
+          referencia_tipo: string | null
+          valor: number
+        }
+        Insert: {
+          cliente_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          funcionario_id?: string | null
+          id?: string
+          metadata?: Json
+          ordem_id?: string | null
+          origem: string
+          owner_id: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          valor?: number
+        }
+        Update: {
+          cliente_id?: string | null
+          created_at?: string
+          descricao?: string | null
+          funcionario_id?: string | null
+          id?: string
+          metadata?: Json
+          ordem_id?: string | null
+          origem?: string
+          owner_id?: string
+          referencia_id?: string | null
+          referencia_tipo?: string | null
+          valor?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "receita_influenciada_cliente_id_fkey"
+            columns: ["cliente_id"]
+            isOneToOne: false
+            referencedRelation: "clientes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receita_influenciada_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receita_influenciada_ordem_id_fkey"
+            columns: ["ordem_id"]
+            isOneToOne: false
+            referencedRelation: "ordens_servico"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       recompensas: {
         Row: {
           ativo: boolean
@@ -1303,30 +1509,6 @@ export type Database = {
         }
         Relationships: []
       }
-      user_roles: {
-        Row: {
-          created_at: string
-          id: string
-          owner_id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          id?: string
-          owner_id: string
-          role: Database["public"]["Enums"]["app_role"]
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          id?: string
-          owner_id?: string
-          role?: Database["public"]["Enums"]["app_role"]
-          user_id?: string
-        }
-        Relationships: []
-      }
       upsell_regras: {
         Row: {
           ativo: boolean
@@ -1370,6 +1552,38 @@ export type Database = {
           termos?: string[]
           updated_at?: string
         }
+        Relationships: [
+          {
+            foreignKeyName: "upsell_regras_servico_id_fkey"
+            columns: ["servico_id"]
+            isOneToOne: false
+            referencedRelation: "servicos"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          owner_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
         Relationships: []
       }
       veiculos: {
@@ -1384,9 +1598,6 @@ export type Database = {
           vehicle_year: number | null
         }
         Insert: {
-          checklist_inicial_em?: string | null
-          checklist_inicial_funcionario_id?: string | null
-          checklist_inicial_status?: string
           cliente_id: string
           cor?: string | null
           id?: string
@@ -1397,9 +1608,6 @@ export type Database = {
           vehicle_year?: number | null
         }
         Update: {
-          checklist_inicial_em?: string | null
-          checklist_inicial_funcionario_id?: string | null
-          checklist_inicial_status?: string
           cliente_id?: string
           cor?: string | null
           id?: string
