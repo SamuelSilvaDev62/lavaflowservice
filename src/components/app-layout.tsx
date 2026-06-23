@@ -52,6 +52,7 @@ const groupsAll: NavGroup[] = [
     { to: "/crescimento", label: "Centro de Crescimento", icon: Rocket, roles: GESTAO },
     { to: "/relatorios", label: "Relatorios", icon: BarChart3, roles: GESTAO },
     { to: "/assistente", label: "Consultor IA", icon: Bot, tour: "assistente", roles: GESTAO },
+    { to: "/midia", label: "Midia", icon: ImageIcon, roles: ADMINS },
     { to: "/configuracoes", label: "Configuracoes", icon: Settings, roles: ADMINS },
   ]},
 ];
