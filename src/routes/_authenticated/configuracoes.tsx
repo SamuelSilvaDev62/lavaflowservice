@@ -20,6 +20,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 import { RequireRole } from "@/components/require-role";
+import { ImageUploadField } from "@/components/image-upload-field";
 import { ADMINS } from "@/lib/rbac";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
