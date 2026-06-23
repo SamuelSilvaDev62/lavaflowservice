@@ -457,10 +457,15 @@ function ServicosTab() {
             <Textarea rows={3} placeholder="Detalhe o que está incluso no serviço" value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} />
           </div>
 
-          <div className="space-y-2">
-            <Label>Foto ou imagem</Label>
-            <Input placeholder="https://..." value={form.foto_url} onChange={(e) => setForm({ ...form, foto_url: e.target.value })} />
-          </div>
+          <ImageUploadField
+            bucket="service-images"
+            label="Foto do serviço"
+            aspect="video"
+            hint="JPG/PNG/WebP até 8MB. A imagem é otimizada automaticamente."
+            value={form.foto_url || null}
+            onChange={(url) => setForm({ ...form, foto_url: url ?? "" })}
+          />
+
 
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
