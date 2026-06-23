@@ -68,7 +68,7 @@ export function buildRulesConsultorResponse(context: any, advancedUnavailable = 
     topOpportunities.push(makeOpportunity({
       id: "rules-indice-lavaflow",
       priority: indiceLavaFlow < 40 ? "alta" : "media",
-      category: "operacao",
+      category: "relatorio",
       title: `Indice LavaFlow em ${Math.round(indiceLavaFlow)}/100`,
       description: menor ? `${menor.label} esta puxando a nota para baixo (${menor.score}/100).` : "A nota geral indica espaco para melhorar crescimento e eficiencia.",
       estimatedImpact: 0,
@@ -141,7 +141,7 @@ export function buildRulesConsultorResponse(context: any, advancedUnavailable = 
       estimatedImpact: Math.round(Number(opportunities.upsell_checklist_potencial ?? 0)),
       whyItMatters: "Essas oportunidades aparecem durante a vistoria do veiculo, quando a necessidade esta clara e contextualizada.",
       recommendedAction: "Priorizar contato da recepcao com os clientes dessas OS e registrar aceite ou recusa.",
-      actionType: "upsell",
+      actionType: "relatorio",
       ctaLabel: "Ver ordens",
     }));
   }

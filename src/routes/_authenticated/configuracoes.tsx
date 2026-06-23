@@ -18,10 +18,9 @@ import { ROLE_LABELS, type AppRole } from "@/lib/rbac";
 import { useRole } from "@/hooks/use-role";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
-import { ImageIcon, UploadCloud } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
 
 import { RequireRole } from "@/components/require-role";
+import { ImageUploadField } from "@/components/image-upload-field";
 import { ADMINS } from "@/lib/rbac";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -301,10 +300,8 @@ function EmpresaTab() {
 function ServicosTab() {
   const fn = useServerFn(listServicos);
   const up = useServerFn(upsertServico);
-  const empresaFn = useServerFn(getEmpresa);
   const qc = useQueryClient();
   const { data } = useQuery({ queryKey: ["servicos"], queryFn: () => fn() });
-  const { data: empresaData } = useQuery({ queryKey: ["empresa"], queryFn: () => empresaFn() });
   const emptyServico = {
     id: undefined as string | undefined,
     nome: "",
@@ -320,7 +317,6 @@ function ServicosTab() {
     ativo: true,
   };
   const [form, setForm] = useState(emptyServico);
-  const [uploadingImage, setUploadingImage] = useState(false);
   const mut = useMutation({
     mutationFn: (v: typeof emptyServico) => up({
       data: {
@@ -362,43 +358,6 @@ function ServicosTab() {
 
   function duplicateServico(s: any) {
     editServico({ ...s, id: undefined, nome: `${s.nome} (cópia)` });
-  }
-
-  async function uploadServiceImage(file?: File) {
-    if (!file) return;
-    if (!file.type.startsWith("image/")) {
-      toast.error("Selecione uma imagem valida");
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024) {
-      toast.error("Imagem muito grande. Envie um arquivo de ate 5MB.");
-      return;
-    }
-    const ownerId = empresaData?.empresa?.owner_id ?? empresaData?.ownerId;
-    if (!ownerId) {
-      toast.error("Cadastre ou carregue os dados da empresa antes de enviar imagens.");
-      return;
-    }
-    setUploadingImage(true);
-    try {
-      const optimized = await compressImageToWebp(file);
-      const path = serviceImagePath(ownerId);
-      const { error } = await supabase.storage
-        .from("service-images")
-        .upload(path, optimized, {
-          cacheControl: "31536000",
-          contentType: "image/webp",
-          upsert: false,
-        });
-      if (error) throw error;
-      const { data: publicData } = supabase.storage.from("service-images").getPublicUrl(path);
-      setForm((current) => ({ ...current, foto_url: publicData.publicUrl }));
-      toast.success("Imagem enviada");
-    } catch (error: any) {
-      toast.error(error?.message ?? "Nao foi possivel enviar a imagem");
-    } finally {
-      setUploadingImage(false);
-    }
   }
 
   return (
@@ -499,33 +458,14 @@ function ServicosTab() {
             <Textarea rows={3} placeholder="Detalhe o que está incluso no serviço" value={form.descricao} onChange={(e) => setForm({ ...form, descricao: e.target.value })} />
           </div>
 
-          <div className="space-y-2">
-            <Label>Imagem do servico</Label>
-            <div className="rounded-2xl border bg-background/60 p-3">
-              {form.foto_url ? (
-                <img src={form.foto_url} alt={form.nome || "Servico"} className="mb-3 h-32 w-full rounded-xl object-cover" />
-              ) : (
-                <div className="mb-3 grid h-32 place-content-center rounded-xl border border-dashed bg-muted/40 text-muted-foreground">
-                  <ImageIcon className="h-8 w-8" />
-                </div>
-              )}
-              <label className="flex cursor-pointer items-center justify-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm font-medium transition-colors hover:bg-accent">
-                <UploadCloud className="h-4 w-4" />
-                {uploadingImage ? "Enviando..." : "Selecionar imagem"}
-                <input
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp,image/gif"
-                  className="sr-only"
-                  disabled={uploadingImage}
-                  onChange={(e) => {
-                    void uploadServiceImage(e.target.files?.[0]);
-                    e.currentTarget.value = "";
-                  }}
-                />
-              </label>
-              <p className="mt-2 text-xs text-muted-foreground">Upload automatico para Storage em WebP. Tamanho maximo: 5MB.</p>
-            </div>
-          </div>
+          <ImageUploadField
+            bucket="service-images"
+            label="Foto do serviço"
+            aspect="video"
+            hint="JPG/PNG/WebP até 8MB. A imagem é otimizada automaticamente."
+            value={form.foto_url || null}
+            onChange={(url: string | null) => setForm({ ...form, foto_url: url ?? "" })}
+          />
 
           <div className="grid sm:grid-cols-2 gap-3">
             <label className="flex items-center gap-2 rounded-md border p-3 text-sm">
@@ -545,39 +485,6 @@ function ServicosTab() {
       </CardContent></Card>
     </div>
   );
-}
-
-async function compressImageToWebp(file: File) {
-  if (typeof window === "undefined") return file;
-  const objectUrl = URL.createObjectURL(file);
-  try {
-    const image = await new Promise<HTMLImageElement>((resolve, reject) => {
-      const img = new window.Image();
-      img.onload = () => resolve(img);
-      img.onerror = reject;
-      img.src = objectUrl;
-    });
-    const maxSide = 1600;
-    const scale = Math.min(1, maxSide / Math.max(image.width, image.height));
-    const canvas = document.createElement("canvas");
-    canvas.width = Math.max(1, Math.round(image.width * scale));
-    canvas.height = Math.max(1, Math.round(image.height * scale));
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return file;
-    ctx.drawImage(image, 0, 0, canvas.width, canvas.height);
-    const blob = await new Promise<Blob | null>((resolve) => canvas.toBlob(resolve, "image/webp", 0.82));
-    if (!blob) return file;
-    return new File([blob], file.name.replace(/\.[^.]+$/, ".webp"), { type: "image/webp" });
-  } finally {
-    URL.revokeObjectURL(objectUrl);
-  }
-}
-
-function serviceImagePath(ownerId: string) {
-  const random = typeof crypto !== "undefined" && "randomUUID" in crypto
-    ? crypto.randomUUID()
-    : `${Date.now()}-${Math.random().toString(16).slice(2)}`;
-  return `${ownerId}/${Date.now()}-${random}.webp`;
 }
 
 function MsgTab() {
