@@ -242,7 +242,7 @@ function MockupShowcase() {
     { k: "kanban" as const, t: "Kanban Operacional", d: "Veja cada veículo na esteira de produção em um toque." },
   ];
   const [i, setI] = useState(0);
-  useEffect(() => { const id = setInterval(() => setI((x) => (x + 1) % slides.length), 4500); return () => clearInterval(id); }, []);
+  useEffect(() => { const id = setInterval(() => setI((x) => (x + 1) % slides.length), 4500); return () => clearInterval(id); }, [slides.length]);
   const s = slides[i];
   return (
     <section className="relative bg-gradient-to-b from-muted/30 to-background border-y">

@@ -617,7 +617,11 @@ function AgendaTab() {
   const dias = ["Dom","Seg","Ter","Qua","Qui","Sex","Sáb"];
   const toggleDia = (d: number) => {
     const set = new Set<number>(f.dias_semana);
-    set.has(d) ? set.delete(d) : set.add(d);
+    if (set.has(d)) {
+      set.delete(d);
+    } else {
+      set.add(d);
+    }
     setF({ ...f, dias_semana: Array.from(set).sort() });
   };
   return (

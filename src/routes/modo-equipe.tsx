@@ -1,7 +1,7 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -86,6 +86,13 @@ function Page() {
   const [obs, setObs] = useState("");
   const [checklistObs, setChecklistObs] = useState("");
 
+  const trocarColaborador = useCallback(() => {
+    const slug = window.localStorage.getItem("lavaflow_team_slug");
+    window.localStorage.removeItem("lavaflow_team_token");
+    setToken("");
+    navigate({ to: slug ? `/equipe/${slug}` : "/auth" });
+  }, [navigate]);
+
   useEffect(() => {
     const saved = getToken();
     setToken(saved);
@@ -108,14 +115,7 @@ function Page() {
       window.clearTimeout(timer);
       ["click", "keydown", "touchstart", "mousemove"].forEach((evt) => window.removeEventListener(evt, reset));
     };
-  }, [token]);
-
-  function trocarColaborador() {
-    const slug = window.localStorage.getItem("lavaflow_team_slug");
-    window.localStorage.removeItem("lavaflow_team_token");
-    setToken("");
-    navigate({ to: slug ? `/equipe/${slug}` : "/auth" });
-  }
+  }, [token, trocarColaborador]);
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["modo-equipe", token],
