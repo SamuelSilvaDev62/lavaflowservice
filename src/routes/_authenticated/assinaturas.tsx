@@ -18,10 +18,16 @@ import { Plus, Repeat, Users, TrendingUp, Copy, Share2, QrCode, Clock, CheckCirc
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 import { QrCodeDialog } from "@/components/qr-code-dialog";
+import { RequireRole } from "@/components/require-role";
+import { GESTAO } from "@/lib/rbac";
 
 export const Route = createFileRoute("/_authenticated/assinaturas")({
-  component: Page,
+  component: PageGuarded,
 });
+
+function PageGuarded() {
+  return <RequireRole roles={GESTAO}><Page /></RequireRole>;
+}
 
 function planoUrl(slug: string) {
   if (typeof window === "undefined") return `/plano/${slug}`;

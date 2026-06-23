@@ -1461,9 +1461,14 @@ export type Database = {
       get_servicos_publicos: {
         Args: { _owner: string }
         Returns: {
+          categoria: string | null
+          descricao: string | null
+          foto_url: string | null
           id: string
           nome: string
+          pontos_gerados: number
           preco_padrao: number
+          tempo_estimado_min: number
         }[]
       }
       has_any_role: {

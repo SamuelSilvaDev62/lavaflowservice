@@ -67,6 +67,7 @@ function Page() {
 
   const { empresa, servicos } = data;
   const destaque = (servicos ?? []).slice(0, 4);
+  const selectedServico = (servicos ?? []).find((s: any) => s.id === f.servico_id);
 
   if (sent) {
     return (
@@ -136,11 +137,17 @@ function Page() {
               <div className="grid gap-3 sm:grid-cols-2">
                 {destaque.map((s: any) => (
                   <button key={s.id} type="button" onClick={() => setF({ ...f, servico_id: s.id })} className="overflow-hidden rounded-lg border bg-background text-left transition-colors hover:bg-accent">
-                    {s.foto_url && <img src={s.foto_url} alt={s.nome} className="h-28 w-full object-cover" />}
+                    <ServiceImage src={s.foto_url} alt={s.nome} />
                     <div className="p-3">
-                      <p className="font-medium">{s.nome}</p>
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-medium">{s.nome}</p>
+                        {s.categoria && <Badge variant="outline" className="shrink-0">{s.categoria}</Badge>}
+                      </div>
                       {s.descricao && <p className="mt-1 line-clamp-2 text-xs text-muted-foreground">{s.descricao}</p>}
-                      {s.preco_padrao != null && <p className="mt-2 text-sm font-semibold">{brl(Number(s.preco_padrao))}</p>}
+                      <div className="mt-2 flex items-center justify-between gap-2 text-sm">
+                        {s.preco_padrao != null && <span className="font-semibold">{brl(Number(s.preco_padrao))}</span>}
+                        {s.tempo_estimado_min != null && <span className="text-xs text-muted-foreground">{s.tempo_estimado_min} min</span>}
+                      </div>
                     </div>
                   </button>
                 ))}
@@ -166,9 +173,28 @@ function Page() {
             <div className="space-y-2"><Label>Serviço</Label>
               <Select value={f.servico_id} onValueChange={(v) => setF({ ...f, servico_id: v })}>
                 <SelectTrigger><SelectValue placeholder="Escolha um serviço" /></SelectTrigger>
-                <SelectContent>{servicos.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.nome}</SelectItem>)}</SelectContent>
+                <SelectContent>{servicos.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.nome} - {brl(Number(s.preco_padrao ?? 0))}</SelectItem>)}</SelectContent>
               </Select>
             </div>
+            {selectedServico && (
+              <div className="overflow-hidden rounded-xl border bg-background">
+                <ServiceImage src={selectedServico.foto_url} alt={selectedServico.nome} compact />
+                <div className="space-y-2 p-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <p className="font-medium">{selectedServico.nome}</p>
+                      {selectedServico.categoria && <p className="text-xs text-muted-foreground">{selectedServico.categoria}</p>}
+                    </div>
+                    <p className="font-semibold">{brl(Number(selectedServico.preco_padrao ?? 0))}</p>
+                  </div>
+                  {selectedServico.descricao && <p className="text-sm text-muted-foreground">{selectedServico.descricao}</p>}
+                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                    {selectedServico.tempo_estimado_min != null && <span>{selectedServico.tempo_estimado_min} min</span>}
+                    {selectedServico.pontos_gerados > 0 && <span>{selectedServico.pontos_gerados} pontos</span>}
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="space-y-2"><Label>Data *</Label><Input type="date" required min={todayIso()} value={f.data} onChange={(e) => setF({ ...f, data: e.target.value, hora: "" })} /></div>
             <div>
               <Label>Horário *</Label>
@@ -201,6 +227,18 @@ function Info({ icon: Icon, label }: { icon: any; label: string }) {
     <div className="flex items-center gap-2 rounded-md border bg-background px-3 py-2 text-sm">
       <Icon className="h-4 w-4 text-primary" />
       <span className="truncate">{label}</span>
+    </div>
+  );
+}
+
+function ServiceImage({ src, alt, compact = false }: { src?: string | null; alt: string; compact?: boolean }) {
+  const height = compact ? "h-24" : "h-28";
+  if (src) {
+    return <img src={src} alt={alt} className={`${height} w-full object-cover`} loading="lazy" />;
+  }
+  return (
+    <div className={`${height} grid place-content-center bg-muted/60 text-muted-foreground`}>
+      <Car className="h-7 w-7" />
     </div>
   );
 }

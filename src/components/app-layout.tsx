@@ -43,7 +43,7 @@ const groupsAll: NavGroup[] = [
   { label: "Relacionamento", items: [
     { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes", roles: OPERACIONAL },
     { to: "/campanhas", label: "Campanhas", icon: Megaphone, roles: GESTAO },
-    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: OPERACIONAL },
+    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: GESTAO },
     { to: "/fidelidade", label: "Fidelidade", icon: Award, roles: ADMINS },
   ]},
   { label: "Gestao", items: [

@@ -130,6 +130,7 @@ function Page() {
 
   const cards = data?.cards;
   const colaboradores = data?.colaboradores ?? [];
+  const canVerComissoes = data?.canVerComissoes ?? false;
   const periodoInicio = data?.periodo.inicio ?? firstOfMonthIso();
   const periodoFim = data?.periodo.fim ?? todayIso();
   const equipeSlug = data?.empresa?.slug;
@@ -162,7 +163,7 @@ function Page() {
       </div>
 
       {/* KPIs da equipe */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 mb-6">
+      <div className={`grid grid-cols-2 ${canVerComissoes ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-2 mb-6`}>
         <Kpi icon={Wallet} label="Comissão a pagar" value={brl(cards?.totalAPagar ?? 0)} tone="success" />
         <Kpi icon={Car} label="Lavagens no período" value={String(cards?.totalLavagens ?? 0)} />
         <Kpi icon={UsersRound} label="Ativos hoje" value={String(cards?.ativosHoje ?? 0)} />

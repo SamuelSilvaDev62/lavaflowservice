@@ -5,6 +5,36 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 // ============ DASHBOARD METRICS ============
 type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
 
+const ADMIN_ROLES: TenantRole[] = ["owner", "admin"];
+const GESTAO_ROLES: TenantRole[] = ["owner", "admin", "gerente"];
+const FUNCIONARIO_SAFE_SELECT = [
+  "id",
+  "owner_id",
+  "nome",
+  "cargo",
+  "telefone",
+  "email",
+  "avatar_url",
+  "ativo",
+  "auth_user_id",
+  "pin_digits",
+  "perm_iniciar_atendimento",
+  "perm_finalizar_atendimento",
+  "perm_realizar_checklist",
+  "perm_ver_apenas_atribuidos",
+  "perm_ver_todos_veiculos",
+  "especialidades",
+  "horario_inicio",
+  "horario_fim",
+  "dias_disponiveis",
+  "capacidade_por_horario",
+  "tempo_medio_servicos",
+].join(", ");
+
+function assertTenantRole(role: TenantRole, allowed: TenantRole[], message = "Sem permissao para executar esta acao.") {
+  if (!allowed.includes(role)) throw new Error(message);
+}
+
 function startOfTodayIso() {
   const d = new Date();
   d.setHours(0, 0, 0, 0);
@@ -74,6 +104,7 @@ export const getDashboardMetrics = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const now = new Date();
     const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const startOfLastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1).toISOString();
@@ -82,11 +113,11 @@ export const getDashboardMetrics = createServerFn({ method: "GET" })
     const thirtyDaysAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
 
     const [{ data: ordensMes }, { data: ordensLast }, { data: assinaturas }, { data: clientes }, { data: ordensAll }] = await Promise.all([
-      supabase.from("ordens_servico").select("id, valor, cliente_id, status, created_at, entregue_em").gte("created_at", startOfMonth).eq("owner_id", userId),
-      supabase.from("ordens_servico").select("id, valor, cliente_id").gte("created_at", startOfLastMonth).lte("created_at", endOfLastMonth).eq("owner_id", userId),
-      supabase.from("assinaturas_clientes").select("id, plano_id, status, planos_assinatura:plano_id(valor_mensal)").eq("owner_id", userId).eq("status", "ativa"),
-      supabase.from("clientes").select("id, pontos_saldo, created_at").eq("owner_id", userId),
-      supabase.from("ordens_servico").select("cliente_id, created_at, valor, servico_id").gte("created_at", ninetyDaysAgo).eq("owner_id", userId),
+      supabase.from("ordens_servico").select("id, valor, cliente_id, status, created_at, entregue_em").gte("created_at", startOfMonth).eq("owner_id", ownerId),
+      supabase.from("ordens_servico").select("id, valor, cliente_id").gte("created_at", startOfLastMonth).lte("created_at", endOfLastMonth).eq("owner_id", ownerId),
+      supabase.from("assinaturas_clientes").select("id, plano_id, status, planos_assinatura:plano_id(valor_mensal)").eq("owner_id", ownerId).eq("status", "ativa"),
+      supabase.from("clientes").select("id, pontos_saldo, created_at").eq("owner_id", ownerId),
+      supabase.from("ordens_servico").select("cliente_id, created_at, valor, servico_id").gte("created_at", ninetyDaysAgo).eq("owner_id", ownerId),
     ]);
 
     const faturamentoMes = (ordensMes ?? []).reduce((s, o) => s + Number(o.valor ?? 0), 0);
@@ -833,11 +864,12 @@ export const getOportunidades = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
 
     const [{ data: clientes }, { data: ordens }] = await Promise.all([
-      supabase.from("clientes").select("id, nome, telefone, pontos_saldo, created_at").eq("owner_id", userId),
-      supabase.from("ordens_servico").select("id, cliente_id, valor, created_at").gte("created_at", ninetyAgo).eq("owner_id", userId).order("created_at", { ascending: false }),
+      supabase.from("clientes").select("id, nome, telefone, pontos_saldo, created_at").eq("owner_id", ownerId),
+      supabase.from("ordens_servico").select("id, cliente_id, valor, created_at").gte("created_at", ninetyAgo).eq("owner_id", ownerId).order("created_at", { ascending: false }),
     ]);
 
     const lastByCliente = new Map<string, string>();
@@ -889,12 +921,13 @@ export const getInsights = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const sixtyAgo = new Date(Date.now() - 60 * 86_400_000).toISOString();
     const { data: ordens } = await supabase
       .from("ordens_servico")
       .select("id, valor, created_at, cliente_id, servico_id")
       .gte("created_at", sixtyAgo)
-      .eq("owner_id", userId);
+      .eq("owner_id", ownerId);
 
     const insights: Array<{ id: string; tipo: "positivo" | "alerta" | "info"; titulo: string; descricao: string; acao?: string }> = [];
 
@@ -962,6 +995,7 @@ export const getFila = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const { data, error } = await supabase
       .from("ordens_servico")
       .select(`
@@ -973,7 +1007,7 @@ export const getFila = createServerFn({ method: "GET" })
         servicos:servico_id(nome),
         funcionarios:funcionario_id(nome)
       `)
-      .eq("owner_id", userId)
+      .eq("owner_id", ownerId)
       .in("status", ["aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"])
       .order("posicao", { ascending: true });
     if (error) throw error;
@@ -1006,8 +1040,9 @@ export const logWhatsappEnvio = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const { error } = await supabase.from("interacoes_clientes").insert({
-      owner_id: userId,
+      owner_id: ownerId,
       cliente_id: data.cliente_id,
       tipo: "whatsapp",
       descricao: data.descricao,
@@ -1020,10 +1055,11 @@ export const getWhatsappLogs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const { data, error } = await supabase
       .from("interacoes_clientes")
       .select("id, descricao, created_at, cliente_id, clientes:cliente_id(nome)")
-      .eq("owner_id", userId)
+      .eq("owner_id", ownerId)
       .eq("tipo", "whatsapp")
       .order("created_at", { ascending: false })
       .limit(20);
@@ -1046,7 +1082,8 @@ export const createOrdem = createServerFn({ method: "POST" })
   .inputValidator((d) => ordemSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { error, data: row } = await supabase.from("ordens_servico").insert({ ...data, owner_id: userId, status: "aguardando" }).select().single();
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const { error, data: row } = await supabase.from("ordens_servico").insert({ ...data, owner_id: ownerId, status: "aguardando" }).select().single();
     if (error) throw error;
     return { ordem: row };
   });
@@ -1055,19 +1092,20 @@ export const listOrdens = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const { data, error } = await supabase
       .from("ordens_servico")
       .select(`id, status, valor, created_at, checklist_inicial_status, checklist_inicial_em,
                clientes:cliente_id(nome), veiculos:veiculo_id(placa), servicos:servico_id(nome),
                funcionarios:funcionario_id(nome), checklist_funcionario:checklist_inicial_funcionario_id(nome)`)
-      .eq("owner_id", userId).order("created_at", { ascending: false }).limit(200);
+      .eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(200);
     if (error) throw error;
     const ids = (data ?? []).map((o: any) => o.id);
     const { data: upsells } = ids.length
       ? await supabase
           .from("os_upsell_oportunidades")
           .select("id, ordem_id, servico_sugerido, motivo, valor_estimado, status, origem_item_label")
-          .eq("owner_id", userId)
+          .eq("owner_id", ownerId)
           .in("ordem_id", ids)
           .order("created_at", { ascending: false })
       : { data: [] as any[] };
@@ -1075,7 +1113,7 @@ export const listOrdens = createServerFn({ method: "GET" })
       ? await supabase
           .from("receita_influenciada")
           .select("id, ordem_id, origem, valor, descricao, created_at")
-          .eq("owner_id", userId)
+          .eq("owner_id", ownerId)
           .in("ordem_id", ids)
           .order("created_at", { ascending: false })
       : { data: [] as any[] };
@@ -1091,10 +1129,11 @@ export const listClientes = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
     const [{ data: clientes }, { data: ordens }] = await Promise.all([
-      supabase.from("clientes").select("id, nome, telefone, pontos_saldo, created_at").eq("owner_id", userId).order("nome"),
-      supabase.from("ordens_servico").select("cliente_id, created_at, valor").eq("owner_id", userId).gte("created_at", ninetyAgo),
+      supabase.from("clientes").select("id, nome, telefone, pontos_saldo, created_at").eq("owner_id", ownerId).order("nome"),
+      supabase.from("ordens_servico").select("cliente_id, created_at, valor").eq("owner_id", ownerId).gte("created_at", ninetyAgo),
     ]);
     const lastVisit = new Map<string, string>();
     const totalGasto = new Map<string, number>();
@@ -1119,8 +1158,9 @@ export const getClienteInativos = createServerFn({ method: "GET" })
   .inputValidator((d: { dias: number }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: clientes } = await supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", userId);
-    const { data: ordens } = await supabase.from("ordens_servico").select("cliente_id, created_at").eq("owner_id", userId);
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const { data: clientes } = await supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", ownerId);
+    const { data: ordens } = await supabase.from("ordens_servico").select("cliente_id, created_at").eq("owner_id", ownerId);
     const last = new Map<string, string>();
     (ordens ?? []).forEach((o) => { if (!last.has(o.cliente_id) || last.get(o.cliente_id)! < o.created_at) last.set(o.cliente_id, o.created_at); });
     const limit = Date.now() - data.dias * 86_400_000;
@@ -1385,7 +1425,8 @@ export const createCliente = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { data: row, error } = await supabase.from("clientes").insert({ ...data, owner_id: userId }).select().single();
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const { data: row, error } = await supabase.from("clientes").insert({ ...data, owner_id: ownerId }).select().single();
     if (error) throw error;
     return { cliente: row };
   });
@@ -1395,11 +1436,12 @@ export const getClienteDetalhe = createServerFn({ method: "GET" })
   .inputValidator((d: { id: string }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const [{ data: cliente }, { data: veiculos }, { data: ordens }, { data: interacoes }] = await Promise.all([
-      supabase.from("clientes").select("*").eq("id", data.id).eq("owner_id", userId).single(),
-      supabase.from("veiculos").select("*").eq("cliente_id", data.id).eq("owner_id", userId),
-      supabase.from("ordens_servico").select("id, valor, status, created_at, servicos:servico_id(nome)").eq("cliente_id", data.id).eq("owner_id", userId).order("created_at", { ascending: false }),
-      supabase.from("interacoes_clientes").select("*").eq("cliente_id", data.id).eq("owner_id", userId).order("created_at", { ascending: false }).limit(30),
+      supabase.from("clientes").select("*").eq("id", data.id).eq("owner_id", ownerId).single(),
+      supabase.from("veiculos").select("*").eq("cliente_id", data.id).eq("owner_id", ownerId),
+      supabase.from("ordens_servico").select("id, valor, status, created_at, servicos:servico_id(nome)").eq("cliente_id", data.id).eq("owner_id", ownerId).order("created_at", { ascending: false }),
+      supabase.from("interacoes_clientes").select("*").eq("cliente_id", data.id).eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(30),
     ]);
     const totalGasto = (ordens ?? []).reduce((s, o) => s + Number(o.valor ?? 0), 0);
     const visitas = (ordens ?? []).length;
@@ -1422,7 +1464,8 @@ export const addVeiculo = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { error } = await supabase.from("veiculos").insert({ ...data, owner_id: userId });
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const { error } = await supabase.from("veiculos").insert({ ...data, owner_id: ownerId });
     if (error) throw error;
     return { ok: true };
   });
@@ -1431,7 +1474,8 @@ export const addVeiculo = createServerFn({ method: "POST" })
 export const listServicos = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data } = await context.supabase.from("servicos").select("*").eq("owner_id", context.userId).order("nome");
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { data } = await context.supabase.from("servicos").select("*").eq("owner_id", ownerId).order("nome");
     return { servicos: data ?? [] };
   });
 
@@ -1452,9 +1496,10 @@ export const upsertServico = createServerFn({ method: "POST" })
     ativo: z.boolean().default(true),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const row = { ...data, owner_id: context.userId };
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const row = { ...data, owner_id: ownerId };
     const { error } = data.id
-      ? await context.supabase.from("servicos").update(row).eq("id", data.id).eq("owner_id", context.userId)
+      ? await context.supabase.from("servicos").update(row).eq("id", data.id).eq("owner_id", ownerId)
       : await context.supabase.from("servicos").insert(row);
     if (error) throw error;
     return { ok: true };
@@ -1467,7 +1512,7 @@ export const listFuncionarios = createServerFn({ method: "GET" })
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
     const ninetyAgo = new Date(Date.now() - 30 * 86_400_000).toISOString();
     const [{ data: func }, { data: ordens }] = await Promise.all([
-      context.supabase.from("funcionarios").select("*").eq("owner_id", ownerId).order("nome"),
+      context.supabase.from("funcionarios").select(FUNCIONARIO_SAFE_SELECT).eq("owner_id", ownerId).order("nome"),
       context.supabase.from("ordens_servico").select("funcionario_id, valor").eq("owner_id", ownerId).gte("created_at", ninetyAgo).eq("status", "entregue"),
     ]);
     const stats = new Map<string, { count: number; total: number }>();
@@ -1492,9 +1537,10 @@ export const upsertFuncionario = createServerFn({ method: "POST" })
     ativo: z.boolean().default(true),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const row = { ...data, owner_id: context.userId };
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const row = { ...data, owner_id: ownerId };
     const { error } = data.id
-      ? await context.supabase.from("funcionarios").update(row).eq("id", data.id).eq("owner_id", context.userId)
+      ? await context.supabase.from("funcionarios").update(row).eq("id", data.id).eq("owner_id", ownerId)
       : await context.supabase.from("funcionarios").insert(row);
     if (error) throw error;
     return { ok: true };
@@ -1504,10 +1550,12 @@ export const upsertFuncionario = createServerFn({ method: "POST" })
 export const getAssinaturas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    assertTenantRole(role, GESTAO_ROLES);
     const [{ data: planos }, { data: todas }, { data: emp }] = await Promise.all([
-      context.supabase.from("planos_assinatura").select("*").eq("owner_id", context.userId).order("valor_mensal"),
-      context.supabase.from("assinaturas_clientes").select("*, clientes:cliente_id(nome, telefone), planos_assinatura:plano_id(nome, valor_mensal)").eq("owner_id", context.userId).order("created_at", { ascending: false }),
-      context.supabase.from("empresa").select("slug").eq("owner_id", context.userId).maybeSingle(),
+      context.supabase.from("planos_assinatura").select("*").eq("owner_id", ownerId).order("valor_mensal"),
+      context.supabase.from("assinaturas_clientes").select("*, clientes:cliente_id(nome, telefone), planos_assinatura:plano_id(nome, valor_mensal)").eq("owner_id", ownerId).order("created_at", { ascending: false }),
+      context.supabase.from("empresa").select("slug").eq("owner_id", ownerId).maybeSingle(),
     ]);
     const ativas = (todas ?? []).filter((a: any) => a.status === "ativa");
     const pendentes = (todas ?? []).filter((a: any) => a.status === "pendente");
@@ -1545,13 +1593,15 @@ export const upsertPlano = createServerFn({ method: "POST" })
     ativo: z.boolean().default(true),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const row: any = { ...data, owner_id: context.userId };
+    const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    assertTenantRole(role, GESTAO_ROLES);
+    const row: any = { ...data, owner_id: ownerId };
     if (!data.id) {
       const base = slugifyPlano(data.nome) || "plano";
-      row.slug = `${base}-${context.userId.slice(0, 6)}`;
+      row.slug = `${base}-${ownerId.slice(0, 6)}`;
     }
     const { error } = data.id
-      ? await context.supabase.from("planos_assinatura").update(row).eq("id", data.id).eq("owner_id", context.userId)
+      ? await context.supabase.from("planos_assinatura").update(row).eq("id", data.id).eq("owner_id", ownerId)
       : await context.supabase.from("planos_assinatura").insert(row);
     if (error) throw error;
     return { ok: true };
@@ -1631,6 +1681,8 @@ export const confirmarPagamentoAssinatura = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid(), gateway_ref: z.string().max(120).optional() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    assertTenantRole(role, GESTAO_ROLES);
     const proxima = new Date(); proxima.setDate(proxima.getDate() + 30);
     const { error } = await context.supabase.from("assinaturas_clientes").update({
       status: "ativa" as any,
@@ -1638,7 +1690,7 @@ export const confirmarPagamentoAssinatura = createServerFn({ method: "POST" })
       proxima_cobranca: proxima.toISOString().slice(0, 10),
       lavagens_usadas_mes: 0,
       gateway_ref: data.gateway_ref ?? null,
-    }).eq("id", data.id).eq("owner_id", context.userId);
+    }).eq("id", data.id).eq("owner_id", ownerId);
     if (error) throw error;
     return { ok: true };
   });
@@ -1647,9 +1699,11 @@ export const cancelarAssinatura = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    assertTenantRole(role, GESTAO_ROLES);
     const { error } = await context.supabase.from("assinaturas_clientes")
       .update({ status: "cancelada" as any })
-      .eq("id", data.id).eq("owner_id", context.userId);
+      .eq("id", data.id).eq("owner_id", ownerId);
     if (error) throw error;
     return { ok: true };
   });
@@ -1658,10 +1712,11 @@ export const cancelarAssinatura = createServerFn({ method: "POST" })
 export const getFidelidade = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
     const [{ data: cfg }, { data: recompensas }, { data: top }] = await Promise.all([
-      context.supabase.from("fidelidade_config").select("*").eq("owner_id", context.userId).maybeSingle(),
-      context.supabase.from("recompensas").select("*").eq("owner_id", context.userId).order("custo_pontos"),
-      context.supabase.from("clientes").select("id, nome, pontos_saldo").eq("owner_id", context.userId).order("pontos_saldo", { ascending: false }).limit(10),
+      context.supabase.from("fidelidade_config").select("*").eq("owner_id", ownerId).maybeSingle(),
+      context.supabase.from("recompensas").select("*").eq("owner_id", ownerId).order("custo_pontos"),
+      context.supabase.from("clientes").select("id, nome, pontos_saldo").eq("owner_id", ownerId).order("pontos_saldo", { ascending: false }).limit(10),
     ]);
     return { config: cfg, recompensas: recompensas ?? [], top: top ?? [] };
   });
@@ -1673,7 +1728,8 @@ export const updateFidelidadeConfig = createServerFn({ method: "POST" })
     pontos_por_real: z.number().min(0).max(100),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("fidelidade_config").upsert({ ...data, owner_id: context.userId }, { onConflict: "owner_id" });
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { error } = await context.supabase.from("fidelidade_config").upsert({ ...data, owner_id: ownerId }, { onConflict: "owner_id" });
     if (error) throw error;
     return { ok: true };
   });
@@ -1687,9 +1743,10 @@ export const upsertRecompensa = createServerFn({ method: "POST" })
     ativo: z.boolean().default(true),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const row = { ...data, owner_id: context.userId };
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const row = { ...data, owner_id: ownerId };
     const { error } = data.id
-      ? await context.supabase.from("recompensas").update(row).eq("id", data.id).eq("owner_id", context.userId)
+      ? await context.supabase.from("recompensas").update(row).eq("id", data.id).eq("owner_id", ownerId)
       : await context.supabase.from("recompensas").insert(row);
     if (error) throw error;
     return { ok: true };
@@ -1699,8 +1756,9 @@ export const upsertRecompensa = createServerFn({ method: "POST" })
 export const getEmpresa = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { data } = await context.supabase.from("empresa").select("*").eq("owner_id", context.userId).maybeSingle();
-    return { empresa: data };
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { data } = await context.supabase.from("empresa").select("*").eq("owner_id", ownerId).maybeSingle();
+    return { empresa: data, ownerId };
   });
 
 export const updateEmpresa = createServerFn({ method: "POST" })
@@ -1716,7 +1774,8 @@ export const updateEmpresa = createServerFn({ method: "POST" })
     horario_funcionamento: z.string().max(120).optional().nullable(),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("empresa").upsert({ ...data, owner_id: context.userId }, { onConflict: "owner_id" });
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { error } = await context.supabase.from("empresa").upsert({ ...data, owner_id: ownerId }, { onConflict: "owner_id" });
     if (error) throw error;
     return { ok: true };
   });
@@ -1725,11 +1784,12 @@ export const updateEmpresa = createServerFn({ method: "POST" })
 export const getRelatorios = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
     const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
     const { data: ordens } = await context.supabase
       .from("ordens_servico")
       .select("valor, created_at, status, servicos:servico_id(nome), funcionarios:funcionario_id(nome)")
-      .eq("owner_id", context.userId).gte("created_at", ninetyAgo);
+      .eq("owner_id", ownerId).gte("created_at", ninetyAgo);
 
     const porServico = new Map<string, number>();
     const porFunc = new Map<string, number>();
@@ -2031,7 +2091,7 @@ export const getReceitaInfluenciada = createServerFn({ method: "GET" })
 
 // ============ COLABORADORES / MEU TRABALHO ============
 async function getOwnerScope(supabase: any, userId: string) {
-  const { data } = await supabase.from("user_roles").select("owner_id, role").eq("user_id", userId);
+  const { data } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
   const priority: Record<TenantRole, number> = {
     owner: 1,
     admin: 2,
@@ -2040,10 +2100,18 @@ async function getOwnerScope(supabase: any, userId: string) {
     lavador: 5,
     colaborador: 5,
   };
-  const sorted = ((data ?? []) as Array<{ owner_id: string; role: TenantRole }>)
+  const rows = (data ?? []) as Array<{ owner_id: string; role: TenantRole; created_at?: string | null }>;
+  const selfOwner = rows.find((r) => r.owner_id === userId && r.role === "owner");
+  const sorted = rows
     .slice()
-    .sort((a, b) => (priority[a.role] ?? 99) - (priority[b.role] ?? 99));
-  const current = sorted[0];
+    .sort((a, b) => {
+      const byRole = (priority[a.role] ?? 99) - (priority[b.role] ?? 99);
+      if (byRole) return byRole;
+      const byCreated = String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
+      if (byCreated) return byCreated;
+      return String(a.owner_id).localeCompare(String(b.owner_id));
+    });
+  const current = selfOwner ?? sorted[0];
   return {
     ownerId: current?.owner_id ?? userId,
     role: current?.role ?? "owner",
@@ -2135,12 +2203,18 @@ export const upsertFuncionarioFull = createServerFn({ method: "POST" })
     perm_ver_todos_veiculos: z.boolean().default(false),
   }).parse(d))
   .handler(async ({ data, context }) => {
-    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    const canManageComissoes = ADMIN_ROLES.includes(role);
     const row: any = { ...data, owner_id: ownerId };
     const pin = row.pin;
     delete row.pin;
     if (row.email === "") row.email = null;
     if (row.avatar_url === "") row.avatar_url = null;
+    if (!canManageComissoes) {
+      delete row.comissao_tipo;
+      delete row.comissao_valor;
+      delete row.comissao_modo;
+    }
     if (pin) {
       row.pin_hash = await hashSecret(pin);
       row.pin_failed_attempts = 0;
@@ -2766,10 +2840,12 @@ export const listComissoesServico = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d: { funcionario_id: string }) => z.object({ funcionario_id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    assertTenantRole(role, ADMIN_ROLES);
     const { data: rows } = await context.supabase
       .from("comissoes_servico")
       .select("id, servico_id, tipo, valor")
-      .eq("owner_id", context.userId)
+      .eq("owner_id", ownerId)
       .eq("funcionario_id", data.funcionario_id);
     return { itens: rows ?? [] };
   });
@@ -2786,12 +2862,14 @@ export const upsertComissoesServico = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId, role } = await getOwnerScope(supabase, userId);
+    assertTenantRole(role, ADMIN_ROLES);
     const { error: delErr } = await supabase.from("comissoes_servico")
-      .delete().eq("owner_id", userId).eq("funcionario_id", data.funcionario_id);
+      .delete().eq("owner_id", ownerId).eq("funcionario_id", data.funcionario_id);
     if (delErr) throw delErr;
     const rows = data.itens
       .filter((i) => i.valor > 0)
-      .map((i) => ({ ...i, owner_id: userId, funcionario_id: data.funcionario_id }));
+      .map((i) => ({ ...i, owner_id: ownerId, funcionario_id: data.funcionario_id }));
     if (rows.length > 0) {
       const { error } = await supabase.from("comissoes_servico").insert(rows);
       if (error) throw error;
@@ -2839,7 +2917,7 @@ function calcComissaoOrdem(ordem: any, funcionario: any, regrasServico: Map<stri
 
 async function ensureComissoesEntregues(
   supabase: any,
-  userId: string,
+  ownerId: string,
   start: Date,
   end: Date,
   funcionarioId?: string,
@@ -2849,15 +2927,15 @@ async function ensureComissoesEntregues(
   const [{ data: funcionarios }, { data: ordens }, { data: regrasServico }] = await Promise.all([
     supabase.from("funcionarios")
       .select("id, comissao_tipo, comissao_valor, comissao_modo")
-      .eq("owner_id", userId),
+      .eq("owner_id", ownerId),
     supabase.from("ordens_servico")
       .select("id, valor, status, funcionario_id, servico_id, entregue_em, created_at")
-      .eq("owner_id", userId)
+      .eq("owner_id", ownerId)
       .eq("status", "entregue")
       .or(`entregue_em.gte.${startIso},created_at.gte.${startIso}`),
     supabase.from("comissoes_servico")
       .select("funcionario_id, servico_id, tipo, valor")
-      .eq("owner_id", userId),
+      .eq("owner_id", ownerId),
   ]);
 
   const funcionariosById = new Map((funcionarios ?? []).map((f: any) => [f.id, f]));
@@ -2877,7 +2955,7 @@ async function ensureComissoesEntregues(
   const { data: existentes } = await supabase
     .from("comissoes")
     .select("ordem_id")
-    .eq("owner_id", userId)
+    .eq("owner_id", ownerId)
     .in("ordem_id", ordensElegiveis.map((o: any) => o.id));
 
   const existentesIds = new Set((existentes ?? []).map((c: any) => c.ordem_id));
@@ -2889,7 +2967,7 @@ async function ensureComissoesEntregues(
       const { tipo, valor } = calcComissaoOrdem(o, f, regrasByFuncServico);
       if (valor <= 0) return null;
       return {
-        owner_id: userId,
+        owner_id: ownerId,
         funcionario_id: o.funcionario_id,
         ordem_id: o.id,
         valor,
@@ -2914,10 +2992,11 @@ export const getEquipePainel = createServerFn({ method: "GET" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { ownerId } = await getOwnerScope(supabase, userId);
+    const { ownerId, role } = await getOwnerScope(supabase, userId);
+    const canVerComissoes = ADMIN_ROLES.includes(role);
     const { start, end } = rangeForPeriodo(data.periodo, data.inicio, data.fim);
     const startToday = new Date(); startToday.setHours(0, 0, 0, 0);
-    await ensureComissoesEntregues(supabase, ownerId, start, end);
+    if (canVerComissoes) await ensureComissoesEntregues(supabase, ownerId, start, end);
 
     const [{ data: func }, { data: ordens }, { data: comissoes }, { data: pagamentos }, { data: empresa }] = await Promise.all([
       supabase.from("funcionarios")
@@ -2927,15 +3006,19 @@ export const getEquipePainel = createServerFn({ method: "GET" })
         .select("id, valor, status, funcionario_id, iniciado_em, entregue_em, created_at")
         .eq("owner_id", ownerId)
         .or(`entregue_em.gte.${start.toISOString()},created_at.gte.${start.toISOString()}`),
-      supabase.from("comissoes")
-        .select("funcionario_id, valor, pagamento_id, created_at")
-        .eq("owner_id", ownerId)
-        .gte("created_at", start.toISOString())
-        .lte("created_at", end.toISOString()),
-      supabase.from("pagamentos_comissao")
-        .select("funcionario_id, valor, pago_em")
-        .eq("owner_id", ownerId)
-        .order("pago_em", { ascending: false }),
+      canVerComissoes
+        ? supabase.from("comissoes")
+          .select("funcionario_id, valor, pagamento_id, created_at")
+          .eq("owner_id", ownerId)
+          .gte("created_at", start.toISOString())
+          .lte("created_at", end.toISOString())
+        : Promise.resolve({ data: [] as any[] }),
+      canVerComissoes
+        ? supabase.from("pagamentos_comissao")
+          .select("funcionario_id, valor, pago_em")
+          .eq("owner_id", ownerId)
+          .order("pago_em", { ascending: false })
+        : Promise.resolve({ data: [] as any[] }),
       supabase.from("empresa")
         .select("slug, nome_fantasia")
         .eq("owner_id", ownerId)
@@ -2988,18 +3071,21 @@ export const getEquipePainel = createServerFn({ method: "GET" })
         perm_ver_apenas_atribuidos: f.perm_ver_apenas_atribuidos ?? true,
         perm_ver_todos_veiculos: f.perm_ver_todos_veiculos ?? false,
         ativo: f.ativo, vinculado: !!f.auth_user_id,
-        comissao_tipo: f.comissao_tipo, comissao_valor: Number(f.comissao_valor),
-        comissao_modo: f.comissao_modo,
-        tipo_label: tipoLabel,
+        comissao_tipo: canVerComissoes ? f.comissao_tipo : null,
+        comissao_valor: canVerComissoes ? Number(f.comissao_valor) : null,
+        comissao_modo: canVerComissoes ? f.comissao_modo : null,
+        tipo_label: canVerComissoes ? tipoLabel : null,
         lavagens: m.lavagens, receita: m.receita,
-        comissao_acumulada: m.comissaoAberta,
-        comissao_total: m.comissaoTotal,
-        status,
-        ultimo_pagamento: ultimoPagto.get(f.id) ?? null,
+        comissao_acumulada: canVerComissoes ? m.comissaoAberta : null,
+        comissao_total: canVerComissoes ? m.comissaoTotal : null,
+        status: canVerComissoes ? status : null,
+        ultimo_pagamento: canVerComissoes ? (ultimoPagto.get(f.id) ?? null) : null,
       };
     });
 
-    const totalAPagar = colaboradores.reduce((s, c) => s + c.comissao_acumulada, 0);
+    const totalAPagar = canVerComissoes
+      ? colaboradores.reduce((s, c) => s + Number(c.comissao_acumulada ?? 0), 0)
+      : null;
     const totalLavagens = colaboradores.reduce((s, c) => s + c.lavagens, 0);
     const ativosHoje = new Set(
       (ordens ?? [])
@@ -3012,6 +3098,7 @@ export const getEquipePainel = createServerFn({ method: "GET" })
       colaboradores: colaboradores.sort((a, b) => b.receita - a.receita),
       periodo: { inicio: start.toISOString().slice(0, 10), fim: end.toISOString().slice(0, 10) },
       empresa: empresa ?? null,
+      canVerComissoes,
       cards: {
         totalAPagar, totalLavagens, ativosHoje,
         melhor: melhor && melhor.lavagens > 0
@@ -3031,11 +3118,13 @@ export const marcarPagamentoComissao = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId, role } = await getOwnerScope(supabase, userId);
+    assertTenantRole(role, ADMIN_ROLES);
     const inicioIso = new Date(data.periodo_inicio + "T00:00:00").toISOString();
     const fimIso = new Date(data.periodo_fim + "T23:59:59").toISOString();
     await ensureComissoesEntregues(
       supabase,
-      userId,
+      ownerId,
       new Date(inicioIso),
       new Date(fimIso),
       data.funcionario_id,
@@ -3043,7 +3132,7 @@ export const marcarPagamentoComissao = createServerFn({ method: "POST" })
     const { data: abertas, error: eList } = await supabase
       .from("comissoes")
       .select("id, valor")
-      .eq("owner_id", userId)
+      .eq("owner_id", ownerId)
       .eq("funcionario_id", data.funcionario_id)
       .is("pagamento_id", null)
       .gte("created_at", inicioIso)
@@ -3052,7 +3141,7 @@ export const marcarPagamentoComissao = createServerFn({ method: "POST" })
     const valor = (abertas ?? []).reduce((s, c) => s + Number(c.valor ?? 0), 0);
     if (valor <= 0) throw new Error("Nada a pagar no período selecionado.");
     const { data: pag, error: ePag } = await supabase.from("pagamentos_comissao").insert({
-      owner_id: userId, funcionario_id: data.funcionario_id,
+      owner_id: ownerId, funcionario_id: data.funcionario_id,
       periodo_inicio: data.periodo_inicio, periodo_fim: data.periodo_fim,
       valor, observacao: data.observacao ?? null,
     }).select("id").single();
@@ -3070,10 +3159,12 @@ export const listPagamentosComissao = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ funcionario_id: z.string().uuid(), limit: z.number().int().min(1).max(50).default(10) }).parse(d))
   .handler(async ({ data, context }) => {
+    const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    assertTenantRole(role, ADMIN_ROLES);
     const { data: rows } = await context.supabase
       .from("pagamentos_comissao")
       .select("id, valor, pago_em, periodo_inicio, periodo_fim, observacao")
-      .eq("owner_id", context.userId)
+      .eq("owner_id", ownerId)
       .eq("funcionario_id", data.funcionario_id)
       .order("pago_em", { ascending: false })
       .limit(data.limit);
@@ -3082,7 +3173,7 @@ export const listPagamentosComissao = createServerFn({ method: "GET" })
       ? await context.supabase
         .from("comissoes")
         .select("pagamento_id")
-        .eq("owner_id", context.userId)
+        .eq("owner_id", ownerId)
         .in("pagamento_id", ids)
       : { data: [] };
     const qtdByPagamento = new Map<string, number>();
@@ -3119,6 +3210,7 @@ export const updateClienteCompleto = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const patch: any = {
       nome: data.nome.trim(),
       telefone: data.telefone || null,
@@ -3127,7 +3219,7 @@ export const updateClienteCompleto = createServerFn({ method: "POST" })
       observacoes: data.observacoes || null,
     };
     const { error: eC } = await supabase.from("clientes")
-      .update(patch).eq("id", data.id).eq("owner_id", userId);
+      .update(patch).eq("id", data.id).eq("owner_id", ownerId);
     if (eC) throw eC;
     if (data.veiculo) {
       const v = {
@@ -3139,11 +3231,11 @@ export const updateClienteCompleto = createServerFn({ method: "POST" })
       };
       if (data.veiculo.id) {
         const { error } = await supabase.from("veiculos")
-          .update(v).eq("id", data.veiculo.id).eq("owner_id", userId);
+          .update(v).eq("id", data.veiculo.id).eq("owner_id", ownerId);
         if (error) throw error;
       } else {
         const { error } = await supabase.from("veiculos").insert({
-          ...v, owner_id: userId, cliente_id: data.id,
+          ...v, owner_id: ownerId, cliente_id: data.id,
         });
         if (error) throw error;
       }
@@ -3158,7 +3250,8 @@ export const getMeuTrabalho = createServerFn({ method: "GET" })
     const { ownerId } = await getOwnerScope(supabase, userId);
     const { data: meFunc } = await supabase
       .from("funcionarios")
-      .select("*")
+      .select("id, owner_id, nome, cargo, telefone, email, avatar_url, ativo, auth_user_id, perm_iniciar_atendimento, perm_finalizar_atendimento, perm_realizar_checklist, perm_ver_apenas_atribuidos, perm_ver_todos_veiculos")
+      .eq("owner_id", ownerId)
       .eq("auth_user_id", userId)
       .maybeSingle();
 
@@ -3175,7 +3268,7 @@ export const getMeuTrabalho = createServerFn({ method: "GET" })
         .in("status", ["aguardando", "em_lavagem"])
         .order("created_at", { ascending: true }),
       meFunc?.id
-        ? supabase.from("comissoes").select("valor, created_at").eq("funcionario_id", meFunc.id).gte("created_at", startMonth.toISOString())
+        ? supabase.from("comissoes").select("valor, created_at").eq("owner_id", ownerId).eq("funcionario_id", meFunc.id).gte("created_at", startMonth.toISOString())
         : Promise.resolve({ data: [] as any[] }),
     ]);
 
@@ -3184,6 +3277,7 @@ export const getMeuTrabalho = createServerFn({ method: "GET" })
       ? await supabase
           .from("ordens_servico")
           .select("status, valor, iniciado_em, finalizado_em, entregue_em, created_at")
+          .eq("owner_id", ownerId)
           .eq("funcionario_id", meFunc.id)
           .gte("created_at", startWeek.toISOString())
       : { data: [] as any[] };
@@ -3214,7 +3308,7 @@ export const iniciarOs = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
-    const { data: meFunc } = await supabase.from("funcionarios").select("id").eq("auth_user_id", userId).maybeSingle();
+    const { data: meFunc } = await supabase.from("funcionarios").select("id").eq("owner_id", ownerId).eq("auth_user_id", userId).maybeSingle();
     await assertPodeIniciarLavagem(supabase, ownerId, data.id);
     const patch: any = { status: "em_lavagem", iniciado_em: new Date().toISOString() };
     if (meFunc?.id) patch.funcionario_id = meFunc.id;
@@ -3227,10 +3321,12 @@ export const finalizarOs = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
     const { error } = await context.supabase
       .from("ordens_servico")
       .update({ status: "pronto", finalizado_em: new Date().toISOString() })
-      .eq("id", data.id);
+      .eq("id", data.id)
+      .eq("owner_id", ownerId);
     if (error) throw error;
     return { ok: true };
   });
@@ -3240,6 +3336,8 @@ export const getEquipeMetrics = createServerFn({ method: "GET" })
   .inputValidator((d: { periodo: "hoje" | "semana" | "mes" }) => d)
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId, role } = await getOwnerScope(supabase, userId);
+    const canVerComissoes = ADMIN_ROLES.includes(role);
     const now = new Date();
     const start = new Date();
     if (data.periodo === "hoje") start.setHours(0, 0, 0, 0);
@@ -3250,10 +3348,12 @@ export const getEquipeMetrics = createServerFn({ method: "GET" })
     const [{ data: ordens }, { data: func }, { data: comissoes }] = await Promise.all([
       supabase.from("ordens_servico")
         .select("id, valor, status, funcionario_id, iniciado_em, finalizado_em, entregue_em, created_at")
-        .eq("owner_id", userId)
+        .eq("owner_id", ownerId)
         .gte("created_at", start.toISOString()),
-      supabase.from("funcionarios").select("id, nome, ativo").eq("owner_id", userId),
-      supabase.from("comissoes").select("funcionario_id, valor, created_at").eq("owner_id", userId).gte("created_at", start.toISOString()),
+      supabase.from("funcionarios").select("id, nome, ativo").eq("owner_id", ownerId),
+      canVerComissoes
+        ? supabase.from("comissoes").select("funcionario_id, valor, created_at").eq("owner_id", ownerId).gte("created_at", start.toISOString())
+        : Promise.resolve({ data: [] as any[] }),
     ]);
 
     const lavadosHoje = (ordens ?? []).filter(o => o.entregue_em && new Date(o.entregue_em) >= startToday).length;
@@ -3282,12 +3382,16 @@ export const getEquipeMetrics = createServerFn({ method: "GET" })
       byFunc.set(c.funcionario_id, cur);
     });
 
-    const ranking = (func ?? []).map(f => ({ id: f.id, nome: f.nome, ...byFunc.get(f.id)! }))
+    const ranking = (func ?? []).map(f => {
+      const metrics = byFunc.get(f.id)!;
+      return { id: f.id, nome: f.nome, ...metrics, comissao: canVerComissoes ? metrics.comissao : null };
+    })
       .sort((a, b) => b.lavagens - a.lavagens);
 
     return {
       cards: { lavadosHoje, colabAtivosHoje, tempoMedio, valorEquipe },
       ranking,
+      canVerComissoes,
     };
   });
 
@@ -3729,6 +3833,7 @@ export const getDadosMensagemPronto = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ ordemId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const { data: ordem, error } = await supabase
       .from("ordens_servico")
       .select(`id, valor, cliente_id,
@@ -3736,15 +3841,15 @@ export const getDadosMensagemPronto = createServerFn({ method: "POST" })
         veiculos:veiculo_id(placa),
         servicos:servico_id(nome)`)
       .eq("id", data.ordemId)
-      .eq("owner_id", userId)
+      .eq("owner_id", ownerId)
       .single();
     if (error) throw error;
     const cliente: any = ordem.clientes;
 
     const [{ data: cfg }, { data: recompensas }, { data: visitasRows }] = await Promise.all([
-      supabase.from("fidelidade_config").select("pontos_por_lavagem, pontos_por_real").eq("owner_id", userId).maybeSingle(),
-      supabase.from("recompensas").select("id, nome, custo_pontos, ativo").eq("owner_id", userId).eq("ativo", true).order("custo_pontos"),
-      supabase.from("ordens_servico").select("id", { count: "exact", head: false }).eq("owner_id", userId).eq("cliente_id", cliente?.id),
+      supabase.from("fidelidade_config").select("pontos_por_lavagem, pontos_por_real").eq("owner_id", ownerId).maybeSingle(),
+      supabase.from("recompensas").select("id, nome, custo_pontos, ativo").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos"),
+      supabase.from("ordens_servico").select("id", { count: "exact", head: false }).eq("owner_id", ownerId).eq("cliente_id", cliente?.id),
     ]);
 
     return {
@@ -3774,13 +3879,14 @@ export const getExtratoFidelidade = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ clienteId: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const [{ data: cliente }, { data: movs }, { data: recompensas }] = await Promise.all([
-      supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("id", data.clienteId).eq("owner_id", userId).single(),
+      supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("id", data.clienteId).eq("owner_id", ownerId).single(),
       supabase.from("pontos_movimentos")
         .select("pontos, tipo, created_at, ordem_id, ordens_servico:ordem_id(servicos:servico_id(nome))")
-        .eq("owner_id", userId).eq("cliente_id", data.clienteId)
+        .eq("owner_id", ownerId).eq("cliente_id", data.clienteId)
         .order("created_at", { ascending: false }).limit(10),
-      supabase.from("recompensas").select("id, nome, custo_pontos, ativo").eq("owner_id", userId).eq("ativo", true).order("custo_pontos"),
+      supabase.from("recompensas").select("id, nome, custo_pontos, ativo").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos"),
     ]);
 
     const movimentos = (movs ?? []).map((m: any) => ({
@@ -3796,10 +3902,11 @@ export const getClientesComRecompensa = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const [{ data: recompensas }, { data: clientes }, { data: ordens }] = await Promise.all([
-      supabase.from("recompensas").select("id, nome, custo_pontos").eq("owner_id", userId).eq("ativo", true).order("custo_pontos"),
-      supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", userId),
-      supabase.from("ordens_servico").select("valor").eq("owner_id", userId).gte("created_at", new Date(Date.now() - 90 * 86_400_000).toISOString()),
+      supabase.from("recompensas").select("id, nome, custo_pontos").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos"),
+      supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", ownerId),
+      supabase.from("ordens_servico").select("valor").eq("owner_id", ownerId).gte("created_at", new Date(Date.now() - 90 * 86_400_000).toISOString()),
     ]);
     const ativas = (recompensas ?? []).sort((a, b) => a.custo_pontos - b.custo_pontos);
     if (ativas.length === 0) return { qtd: 0, clientes: [], proximos: [], ticketMedio: 0 };
@@ -3827,15 +3934,16 @@ export const getCrescimentoKPIs = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
     const now = Date.now();
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
 
     const [{ data: clientes }, { data: ordens }, { data: assinaturas }, { data: planos }, { data: recompensas }] = await Promise.all([
-      supabase.from("clientes").select("id, pontos_saldo").eq("owner_id", userId),
-      supabase.from("ordens_servico").select("cliente_id, valor, created_at").eq("owner_id", userId).order("created_at", { ascending: false }).limit(2000),
-      supabase.from("assinaturas_clientes").select("cliente_id, status").eq("owner_id", userId),
-      supabase.from("planos_assinatura").select("valor_mensal").eq("owner_id", userId).eq("ativo", true).order("valor_mensal", { ascending: true }).limit(1),
-      supabase.from("recompensas").select("custo_pontos").eq("owner_id", userId).eq("ativo", true).order("custo_pontos", { ascending: true }).limit(1),
+      supabase.from("clientes").select("id, pontos_saldo").eq("owner_id", ownerId),
+      supabase.from("ordens_servico").select("cliente_id, valor, created_at").eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(2000),
+      supabase.from("assinaturas_clientes").select("cliente_id, status").eq("owner_id", ownerId),
+      supabase.from("planos_assinatura").select("valor_mensal").eq("owner_id", ownerId).eq("ativo", true).order("valor_mensal", { ascending: true }).limit(1),
+      supabase.from("recompensas").select("custo_pontos").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos", { ascending: true }).limit(1),
     ]);
 
     type OS = { cliente_id: string; valor: number; created_at: string };
