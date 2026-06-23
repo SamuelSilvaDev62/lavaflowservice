@@ -1522,8 +1522,9 @@ export const listFuncionarios = createServerFn({ method: "GET" })
       cur.count += 1; cur.total += Number(o.valor ?? 0);
       stats.set(o.funcionario_id, cur);
     });
+    const funcionarios = (func ?? []) as unknown as Array<Record<string, any> & { id: string }>;
     return {
-      funcionarios: (func ?? []).map((f) => ({ ...f, lavagens_mes: stats.get(f.id)?.count ?? 0, receita_mes: stats.get(f.id)?.total ?? 0 })),
+      funcionarios: funcionarios.map((f) => ({ ...f, lavagens_mes: stats.get(f.id)?.count ?? 0, receita_mes: stats.get(f.id)?.total ?? 0 })),
     };
   });
 
