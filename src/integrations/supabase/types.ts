@@ -1669,9 +1669,13 @@ export type Database = {
       get_servicos_publicos: {
         Args: { _owner: string }
         Returns: {
+          categoria: string
+          descricao: string
+          foto_url: string
           id: string
           nome: string
           preco_padrao: number
+          tempo_estimado_min: number
         }[]
       }
       has_any_role: {
@@ -1704,6 +1708,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      storage_path_owner: { Args: { _name: string }; Returns: string }
       vincular_colaborador:
         | {
             Args: { _email: string; _funcionario_id: string }
