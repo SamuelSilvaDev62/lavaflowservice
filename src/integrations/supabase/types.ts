@@ -1651,11 +1651,16 @@ export type Database = {
         Args: { _slug: string }
         Returns: {
           endereco: string
+          facebook: string
+          horario_funcionamento: string
           id: string
+          instagram: string
+          logo_url: string
           nome_fantasia: string
           owner_id: string
           slug: string
           telefone: string
+          website: string
           whatsapp: string
         }[]
       }
@@ -1669,9 +1674,13 @@ export type Database = {
       get_servicos_publicos: {
         Args: { _owner: string }
         Returns: {
+          categoria: string
+          descricao: string
+          foto_url: string
           id: string
           nome: string
           preco_padrao: number
+          tempo_estimado_min: number
         }[]
       }
       has_any_role: {
@@ -1704,6 +1713,7 @@ export type Database = {
         }
         Returns: undefined
       }
+      storage_path_owner: { Args: { _name: string }; Returns: string }
       vincular_colaborador:
         | {
             Args: { _email: string; _funcionario_id: string }
