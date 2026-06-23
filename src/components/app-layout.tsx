@@ -17,6 +17,7 @@ import {
   Menu,
   Rocket,
   Settings,
+  Image as ImageIcon,
   Users,
   UsersRound,
   X,
