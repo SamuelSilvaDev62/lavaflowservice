@@ -141,7 +141,7 @@ export function buildRulesConsultorResponse(context: any, advancedUnavailable = 
       estimatedImpact: Math.round(Number(opportunities.upsell_checklist_potencial ?? 0)),
       whyItMatters: "Essas oportunidades aparecem durante a vistoria do veiculo, quando a necessidade esta clara e contextualizada.",
       recommendedAction: "Priorizar contato da recepcao com os clientes dessas OS e registrar aceite ou recusa.",
-      actionType: "upsell",
+      actionType: "relatorio",
       ctaLabel: "Ver ordens",
     }));
   }
