@@ -68,7 +68,7 @@ export function buildRulesConsultorResponse(context: any, advancedUnavailable = 
     topOpportunities.push(makeOpportunity({
       id: "rules-indice-lavaflow",
       priority: indiceLavaFlow < 40 ? "alta" : "media",
-      category: "operacao",
+      category: "relatorio",
       title: `Indice LavaFlow em ${Math.round(indiceLavaFlow)}/100`,
       description: menor ? `${menor.label} esta puxando a nota para baixo (${menor.score}/100).` : "A nota geral indica espaco para melhorar crescimento e eficiencia.",
       estimatedImpact: 0,
