@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as TrustRouteImport } from './routes/trust'
+import { Route as PoliticaDePrivacidadeRouteImport } from './routes/politica-de-privacidade'
 import { Route as ModoEquipeRouteImport } from './routes/modo-equipe'
 import { Route as LpRouteImport } from './routes/lp'
 import { Route as AuthRouteImport } from './routes/auth'
@@ -41,6 +42,11 @@ import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authentic
 const TrustRoute = TrustRouteImport.update({
   id: '/trust',
   path: '/trust',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PoliticaDePrivacidadeRoute = PoliticaDePrivacidadeRouteImport.update({
+  id: '/politica-de-privacidade',
+  path: '/politica-de-privacidade',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ModoEquipeRoute = ModoEquipeRouteImport.update({
@@ -191,6 +197,7 @@ export interface FileRoutesByFullPath {
   '/auth': typeof AuthRoute
   '/lp': typeof LpRoute
   '/modo-equipe': typeof ModoEquipeRoute
+  '/politica-de-privacidade': typeof PoliticaDePrivacidadeRoute
   '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
@@ -220,6 +227,7 @@ export interface FileRoutesByTo {
   '/auth': typeof AuthRoute
   '/lp': typeof LpRoute
   '/modo-equipe': typeof ModoEquipeRoute
+  '/politica-de-privacidade': typeof PoliticaDePrivacidadeRoute
   '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
@@ -251,6 +259,7 @@ export interface FileRoutesById {
   '/auth': typeof AuthRoute
   '/lp': typeof LpRoute
   '/modo-equipe': typeof ModoEquipeRoute
+  '/politica-de-privacidade': typeof PoliticaDePrivacidadeRoute
   '/trust': typeof TrustRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/_authenticated/assinaturas': typeof AuthenticatedAssinaturasRoute
@@ -282,6 +291,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/lp'
     | '/modo-equipe'
+    | '/politica-de-privacidade'
     | '/trust'
     | '/agendamentos'
     | '/assinaturas'
@@ -311,6 +321,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/lp'
     | '/modo-equipe'
+    | '/politica-de-privacidade'
     | '/trust'
     | '/agendamentos'
     | '/assinaturas'
@@ -341,6 +352,7 @@ export interface FileRouteTypes {
     | '/auth'
     | '/lp'
     | '/modo-equipe'
+    | '/politica-de-privacidade'
     | '/trust'
     | '/_authenticated/agendamentos'
     | '/_authenticated/assinaturas'
@@ -372,6 +384,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   LpRoute: typeof LpRoute
   ModoEquipeRoute: typeof ModoEquipeRoute
+  PoliticaDePrivacidadeRoute: typeof PoliticaDePrivacidadeRoute
   TrustRoute: typeof TrustRoute
   AgendarSlugRoute: typeof AgendarSlugRoute
   ApiAssistenteChatRoute: typeof ApiAssistenteChatRoute
@@ -386,6 +399,13 @@ declare module '@tanstack/react-router' {
       path: '/trust'
       fullPath: '/trust'
       preLoaderRoute: typeof TrustRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/politica-de-privacidade': {
+      id: '/politica-de-privacidade'
+      path: '/politica-de-privacidade'
+      fullPath: '/politica-de-privacidade'
+      preLoaderRoute: typeof PoliticaDePrivacidadeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/modo-equipe': {
@@ -631,6 +651,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   LpRoute: LpRoute,
   ModoEquipeRoute: ModoEquipeRoute,
+  PoliticaDePrivacidadeRoute: PoliticaDePrivacidadeRoute,
   TrustRoute: TrustRoute,
   AgendarSlugRoute: AgendarSlugRoute,
   ApiAssistenteChatRoute: ApiAssistenteChatRoute,
