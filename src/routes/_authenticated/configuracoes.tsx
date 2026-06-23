@@ -464,7 +464,7 @@ function ServicosTab() {
             aspect="video"
             hint="JPG/PNG/WebP até 8MB. A imagem é otimizada automaticamente."
             value={form.foto_url || null}
-            onChange={(url) => setForm({ ...form, foto_url: url ?? "" })}
+            onChange={(url: string | null) => setForm({ ...form, foto_url: url ?? "" })}
           />
 
 
