@@ -1674,9 +1674,9 @@ export type Database = {
       get_servicos_publicos: {
         Args: { _owner: string }
         Returns: {
-          categoria: string | null
-          descricao: string | null
-          foto_url: string | null
+          categoria: string
+          descricao: string
+          foto_url: string
           id: string
           nome: string
           pontos_gerados: number
