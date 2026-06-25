@@ -213,3 +213,83 @@
   &:hover { transform: translateY(-2px); box-shadow: var(--shadow-neo-hover); }
   &:active { transform: translateY(0); box-shadow: var(--shadow-neo-inset); }
 }
+
+/* Premium motion + interactive utilities (Design Language v2.1) */
+@utility transition-premium {
+  transition-property: transform, box-shadow, background-color, color, border-color, opacity;
+  transition-duration: 200ms;
+  transition-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+@utility hover-lift {
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  &:hover { transform: translateY(-2px); }
+}
+@utility press-scale {
+  transition: transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1);
+  &:active { transform: scale(0.97); }
+}
+
+/* Premium CTA — gradient + inner glow, dark-mode safe */
+@utility btn-premium {
+  background-image: linear-gradient(135deg, color-mix(in oklab, var(--primary) 100%, white 8%), var(--primary) 60%, color-mix(in oklab, var(--primary) 88%, black 6%));
+  color: var(--primary-foreground);
+  box-shadow:
+    var(--shadow-neo-sm),
+    inset 0 1px 0 rgba(255, 255, 255, 0.22),
+    inset 0 -1px 0 rgba(0, 0, 0, 0.08);
+  transition: transform 200ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms cubic-bezier(0.2, 0.8, 0.2, 1), filter 200ms;
+  &:hover { transform: translateY(-2px); box-shadow: var(--shadow-neo), inset 0 1px 0 rgba(255,255,255,0.28); filter: saturate(1.05); }
+  &:active { transform: translateY(0); box-shadow: var(--shadow-neo-inset); }
+}
+
+/* Image fade-in for lazy-loaded media */
+@keyframes lf-image-fade { from { opacity: 0; transform: scale(1.01); } to { opacity: 1; transform: scale(1); } }
+@utility image-fade-in {
+  animation: lf-image-fade 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+/* Booking slot states */
+@utility slot-base {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem; /* 44px */
+  padding: 0.5rem 0.75rem;
+  border-radius: 1rem;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 0.875rem;
+  transition: transform 150ms cubic-bezier(0.2, 0.8, 0.2, 1), box-shadow 200ms, background-color 200ms, color 200ms;
+}
+@utility slot-available {
+  background: var(--color-card);
+  color: var(--color-foreground);
+  box-shadow: var(--shadow-neo-sm);
+  &:hover { transform: translateY(-1px); box-shadow: var(--shadow-neo); }
+}
+@utility slot-selected {
+  background-image: linear-gradient(135deg, color-mix(in oklab, var(--primary) 100%, white 8%), var(--primary));
+  color: var(--primary-foreground);
+  box-shadow: var(--shadow-neo-inset);
+}
+@utility slot-busy {
+  background: color-mix(in oklab, var(--warning) 18%, transparent);
+  color: var(--warning-foreground);
+  opacity: 0.85;
+  cursor: not-allowed;
+}
+@utility slot-disabled {
+  background: var(--color-muted);
+  color: var(--color-muted-foreground);
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+/* Skeleton shimmer */
+@keyframes lf-shimmer { 0% { background-position: -200% 0; } 100% { background-position: 200% 0; } }
+@utility skeleton-shimmer {
+  background: linear-gradient(90deg, var(--color-muted) 0%, color-mix(in oklab, var(--color-muted) 60%, white 8%) 50%, var(--color-muted) 100%);
+  background-size: 200% 100%;
+  animation: lf-shimmer 1.6s linear infinite;
+}
+
