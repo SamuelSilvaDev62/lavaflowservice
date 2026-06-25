@@ -104,9 +104,9 @@ function Dashboard() {
       <SetupChecklist />
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi icon={CalendarDays} label="Agendamentos de hoje" value={String(cards.agendamentosHoje ?? 0)} to="/agendamentos" />
-        <Kpi icon={Car} label="Veiculos em atendimento" value={String(cards.veiculosEmAtendimento ?? 0)} to="/fila" tone="warning" />
-        <Kpi icon={DollarSign} label="Projecao de faturamento" value={brl(cards.previsaoFaturamentoDia)} tone="success" />
+        <Kpi icon={CalendarDays} label="Agendamentos de hoje" value={String(cards.agendamentosHoje ?? 0)} to="/agendamentos" trend={(cards as any).trend?.agendamentos} />
+        <Kpi icon={Car} label="Veículos em atendimento" value={String(cards.veiculosEmAtendimento ?? 0)} to="/fila" tone="warning" />
+        <Kpi icon={DollarSign} label="Projeção de faturamento" value={brl(cards.previsaoFaturamentoDia)} tone="success" trend={(cards as any).trend?.faturamento} />
         <Kpi icon={CheckCircle2} label="Finalizados hoje" value={String(cards.finalizadosHoje ?? 0)} to="/fila" tone="success" />
       </div>
 
@@ -116,7 +116,14 @@ function Dashboard() {
             <CardContent className="p-4">
               <SectionTitle icon={Clock} title="Agenda do Dia" action={<Link to="/agendamentos">Ver agenda completa</Link>} />
               {data.agendaHoje.length === 0 ? (
-                <EmptyLine>Nenhum proximo agendamento para hoje.</EmptyLine>
+                <div className="rounded-2xl bg-muted/30 p-6 text-center">
+                  <p className="text-sm font-medium">Nenhum agendamento para hoje</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Aproveite para ativar sua base — escolha uma ação:</p>
+                  <div className="mt-3 flex flex-wrap items-center justify-center gap-2">
+                    <Button asChild variant="premium" size="sm"><Link to="/campanhas"><Megaphone className="h-4 w-4" /> Criar campanha</Link></Button>
+                    <Button asChild variant="outline" size="sm"><Link to="/configuracoes"><Share2 className="h-4 w-4" /> Compartilhar link</Link></Button>
+                  </div>
+                </div>
               ) : (
                 <div className="divide-y">
                   {data.agendaHoje.slice(0, 5).map((a: any) => (
@@ -125,7 +132,7 @@ function Dashboard() {
                       <div className="min-w-0">
                         <p className="truncate font-medium">{a.clientes?.nome ?? "Cliente"}</p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {a.veiculos?.placa ?? a.veiculos?.modelo ?? "Veiculo"} - {a.servicos?.nome ?? "Servico"}
+                          {a.veiculos?.placa ?? a.veiculos?.modelo ?? "Veículo"} · {a.servicos?.nome ?? "Serviço"}
                         </p>
                       </div>
                       <Badge variant="secondary" className="w-fit">{STATUS_LABEL[a.status] ?? a.status}</Badge>
@@ -138,9 +145,10 @@ function Dashboard() {
 
           <Card>
             <CardContent className="p-4">
-              <SectionTitle icon={Play} title="Veiculos em Atendimento" action={<Link to="/fila">Abrir fila</Link>} />
+              <SectionTitle icon={Play} title="Veículos em Atendimento" action={<Link to="/fila">Abrir fila</Link>} />
               {data.veiculosEmAtendimento.length === 0 ? (
-                <EmptyLine>Nenhum veiculo em atendimento agora.</EmptyLine>
+                <EmptyLine>Nenhum veículo em atendimento agora.</EmptyLine>
+
               ) : (
                 <div className="divide-y">
                   {data.veiculosEmAtendimento.map((o: any) => (
