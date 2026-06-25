@@ -250,18 +250,22 @@ function EmptyLine({ children }: { children: React.ReactNode }) {
   return <p className="py-6 text-center text-sm text-muted-foreground">{children}</p>;
 }
 
-function Kpi({ icon: Icon, label, value, tone, to }: { icon: any; label: string; value: string; tone?: "success" | "warning"; to?: string }) {
+function Kpi({ icon: Icon, label, value, tone, to, trend }: { icon: any; label: string; value: string; tone?: "success" | "warning"; to?: string; trend?: number }) {
   const cls = tone === "success" ? "text-success" : tone === "warning" ? "text-warning" : "";
   const content = (
-    <Card className={to ? "h-full transition-colors hover:border-primary/50" : "h-full"}>
-      <CardContent className="flex min-h-[100px] flex-col justify-between p-3 sm:p-4">
-        <div className="flex items-start gap-2 text-xs leading-tight text-muted-foreground"><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></div>
+    <Card className={to ? "h-full transition-premium hover-lift" : "h-full"}>
+      <CardContent className="flex min-h-[110px] flex-col justify-between p-3 sm:p-4">
+        <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-2 text-xs leading-tight text-muted-foreground"><Icon className="h-4 w-4 shrink-0" /><span>{label}</span></div>
+          {typeof trend === "number" && <TrendIndicator value={trend} />}
+        </div>
         <p className={`mt-2 break-words font-display text-xl font-bold tabular-nums sm:text-2xl ${cls}`}>{value}</p>
       </CardContent>
     </Card>
   );
   return to ? <Link to={to as any}>{content}</Link> : content;
 }
+
 
 function tempoEmAtendimento(ordem: any) {
   const ref = ordem.iniciado_em ?? ordem.created_at;
