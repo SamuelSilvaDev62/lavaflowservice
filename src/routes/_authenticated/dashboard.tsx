@@ -5,6 +5,8 @@ import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { TrendIndicator } from "@/components/trend-indicator";
+import { greetingForNow } from "@/lib/design-system";
 import { getAlertasOperacionais, getDashboardOperacional } from "@/lib/lavaflow.functions";
 import { getOnboardingState as getOnboardingStateFn } from "@/lib/onboarding.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
@@ -13,7 +15,9 @@ import { VehicleVisual } from "@/components/vehicle-visual";
 import { brl } from "@/lib/format";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
-import { AlertTriangle, ArrowRight, CalendarDays, Car, CheckCircle2, Clock, DollarSign, ExternalLink, Play } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from "react";
+import { AlertTriangle, ArrowRight, CalendarDays, Car, CheckCircle2, Clock, DollarSign, ExternalLink, Play, Share2, Megaphone } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: () => <RequireRole roles={GESTAO}><Dashboard /></RequireRole>,
@@ -23,15 +27,27 @@ const STATUS_LABEL: Record<string, string> = {
   agendado: "Agendado",
   confirmado: "Confirmado",
   em_andamento: "Em atendimento",
-  concluido: "Concluido",
+  concluido: "Concluído",
   cancelado: "Cancelado",
-  nao_compareceu: "Nao compareceu",
+  nao_compareceu: "Não compareceu",
   aguardando: "Aguardando",
   em_lavagem: "Em lavagem",
-  finalizacao: "Finalizacao",
+  finalizacao: "Finalização",
   pronto: "Pronto",
   entregue: "Entregue",
 };
+
+function useFirstName() {
+  const [name, setName] = useState<string>("");
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      const meta = (data.user?.user_metadata ?? {}) as Record<string, unknown>;
+      const full = (meta.full_name as string) || (meta.name as string) || data.user?.email || "";
+      setName(String(full).split(" ")[0] ?? "");
+    });
+  }, []);
+  return name;
+}
 
 function Dashboard() {
   const fetchOps = useServerFn(getDashboardOperacional);
@@ -40,16 +56,17 @@ function Dashboard() {
   const { data, isLoading } = useQuery({ queryKey: ["dashboard-operacional"], queryFn: () => fetchOps(), refetchInterval: 60_000 });
   const { data: alertasData } = useQuery({ queryKey: ["alertas-operacionais-home"], queryFn: () => fetchAlertas(), refetchInterval: 60_000 });
   const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
+  const firstName = useFirstName();
 
   if (isLoading || !data) {
-    return <div className="space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded-xl bg-muted animate-pulse" />)}</div>;
+    return <div className="space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded-2xl skeleton-shimmer" />)}</div>;
   }
 
   const isEmpty = state && state.counts.clientes === 0 && state.counts.ordens === 0;
   if (isEmpty) {
     return (
       <>
-        <PageHeader title="Operacao do Dia" subtitle="Configure o LavaFlow para acompanhar sua rotina." />
+        <PageHeader title="Painel Executivo" subtitle="Configure o LavaFlow para acompanhar sua rotina." />
         <SetupChecklist />
         <EmptyDashboard />
       </>
@@ -58,14 +75,31 @@ function Dashboard() {
 
   const cards = data.cards;
   const alertas = (alertasData?.alertas ?? data.alertas ?? []).slice(0, 3);
+  const greeting = greetingForNow();
+  const agHoje = Number(cards.agendamentosHoje ?? 0);
+  const fatHoje = Number(cards.previsaoFaturamentoDia ?? 0);
+  const heroLine = agHoje === 0
+    ? "Sua agenda está livre hoje — bom momento para acionar uma campanha."
+    : `${agHoje} ${agHoje === 1 ? "atendimento" : "atendimentos"} previstos · potencial de ${brl(fatHoje)}`;
 
   return (
     <>
-      <PageHeader
-        title="Operacao do Dia"
-        subtitle="Acompanhe os principais numeros e movimentacoes de hoje."
-        actions={<Button asChild><Link to="/agendamentos">Abrir agenda <ArrowRight className="h-4 w-4 ml-1" /></Link></Button>}
-      />
+      <Card className="mb-6 overflow-hidden border-0 bg-gradient-to-br from-card via-card to-accent/30 shadow-[var(--shadow-neo-lg)]">
+        <CardContent className="flex flex-col gap-4 p-6 sm:flex-row sm:items-end sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-widest text-primary">Painel Executivo</p>
+            <h1 className="mt-1 truncate font-display text-2xl font-bold sm:text-3xl">
+              {greeting}{firstName ? `, ${firstName}` : ""}.
+            </h1>
+            <p className="mt-2 text-sm text-muted-foreground">{heroLine}</p>
+          </div>
+          <Button asChild variant="premium" size="lg" className="shrink-0">
+            <Link to="/agendamentos">Abrir agenda <ArrowRight className="h-4 w-4" /></Link>
+          </Button>
+        </CardContent>
+      </Card>
+
+
 
       <SetupChecklist />
 
