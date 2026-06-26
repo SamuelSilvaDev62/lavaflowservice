@@ -2205,6 +2205,7 @@ export const upsertFuncionarioFull = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    assertTenantRole(role, ADMIN_ROLES, "Apenas owner ou admin podem gerenciar funcionarios.");
     const canManageComissoes = ADMIN_ROLES.includes(role);
     const row: any = { ...data, owner_id: ownerId };
     const pin = row.pin;
@@ -3309,10 +3310,10 @@ export const iniciarOs = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
-    const { data: meFunc } = await supabase.from("funcionarios").select("id").eq("owner_id", ownerId).eq("auth_user_id", userId).maybeSingle();
+    const { data: meFuncId } = await supabase.rpc("get_my_funcionario_id");
     await assertPodeIniciarLavagem(supabase, ownerId, data.id);
     const patch: any = { status: "em_lavagem", iniciado_em: new Date().toISOString() };
-    if (meFunc?.id) patch.funcionario_id = meFunc.id;
+    if (meFuncId) patch.funcionario_id = meFuncId;
     const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", ownerId);
     if (error) throw error;
     return { ok: true };
@@ -3660,8 +3661,8 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
     // Se já tem funcionario no agendamento, usa; senão tenta o usuário logado (colaborador)
     let funcionario_id: string | null = ag.funcionario_id ?? null;
     if (!funcionario_id) {
-      const { data: meFunc } = await supabase.from("funcionarios").select("id").eq("owner_id", ownerId).eq("auth_user_id", userId).maybeSingle();
-      if (meFunc?.id) funcionario_id = meFunc.id;
+      const { data: meFuncId } = await supabase.rpc("get_my_funcionario_id");
+      if (meFuncId) funcionario_id = meFuncId as string;
     }
     const { data: os, error: e2 } = await supabase.from("ordens_servico").insert({
       owner_id: ownerId,

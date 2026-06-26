@@ -142,6 +142,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "agendamentos_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "agendamentos_ordem_id_fkey"
             columns: ["ordem_id"]
             isOneToOne: false
@@ -538,6 +545,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "comissoes_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "comissoes_ordem_id_fkey"
             columns: ["ordem_id"]
             isOneToOne: true
@@ -590,6 +604,13 @@ export type Database = {
             columns: ["funcionario_id"]
             isOneToOne: false
             referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comissoes_servico_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
             referencedColumns: ["id"]
           },
           {
@@ -704,6 +725,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "equipe_auditoria_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "equipe_auditoria_ordem_id_fkey"
             columns: ["ordem_id"]
             isOneToOne: false
@@ -748,6 +776,13 @@ export type Database = {
             referencedRelation: "funcionarios"
             referencedColumns: ["id"]
           },
+          {
+            foreignKeyName: "equipe_pin_attempts_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
+            referencedColumns: ["id"]
+          },
         ]
       }
       equipe_sessoes: {
@@ -790,6 +825,13 @@ export type Database = {
             columns: ["funcionario_id"]
             isOneToOne: false
             referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "equipe_sessoes_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
             referencedColumns: ["id"]
           },
         ]
@@ -1052,6 +1094,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "ordens_servico_checklist_inicial_funcionario_id_fkey"
+            columns: ["checklist_inicial_funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "ordens_servico_cliente_id_fkey"
             columns: ["cliente_id"]
             isOneToOne: false
@@ -1063,6 +1112,13 @@ export type Database = {
             columns: ["funcionario_id"]
             isOneToOne: false
             referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ordens_servico_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
             referencedColumns: ["id"]
           },
           {
@@ -1121,6 +1177,13 @@ export type Database = {
             columns: ["funcionario_id"]
             isOneToOne: false
             referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "os_checklists_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
             referencedColumns: ["id"]
           },
           {
@@ -1200,6 +1263,13 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "os_upsell_oportunidades_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "os_upsell_oportunidades_ordem_id_fkey"
             columns: ["ordem_id"]
             isOneToOne: false
@@ -1255,6 +1325,13 @@ export type Database = {
             columns: ["funcionario_id"]
             isOneToOne: false
             referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "pagamentos_comissao_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
             referencedColumns: ["id"]
           },
         ]
@@ -1426,6 +1503,13 @@ export type Database = {
             columns: ["funcionario_id"]
             isOneToOne: false
             referencedRelation: "funcionarios"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "receita_influenciada_funcionario_id_fkey"
+            columns: ["funcionario_id"]
+            isOneToOne: false
+            referencedRelation: "funcionarios_self"
             referencedColumns: ["id"]
           },
           {
@@ -1629,7 +1713,66 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      funcionarios_self: {
+        Row: {
+          ativo: boolean | null
+          avatar_url: string | null
+          cargo: string | null
+          dias_disponiveis: number[] | null
+          email: string | null
+          especialidades: string[] | null
+          horario_fim: string | null
+          horario_inicio: string | null
+          id: string | null
+          nome: string | null
+          owner_id: string | null
+          perm_finalizar_atendimento: boolean | null
+          perm_iniciar_atendimento: boolean | null
+          perm_realizar_checklist: boolean | null
+          perm_ver_apenas_atribuidos: boolean | null
+          perm_ver_todos_veiculos: boolean | null
+          telefone: string | null
+        }
+        Insert: {
+          ativo?: boolean | null
+          avatar_url?: string | null
+          cargo?: string | null
+          dias_disponiveis?: number[] | null
+          email?: string | null
+          especialidades?: string[] | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
+          id?: string | null
+          nome?: string | null
+          owner_id?: string | null
+          perm_finalizar_atendimento?: boolean | null
+          perm_iniciar_atendimento?: boolean | null
+          perm_realizar_checklist?: boolean | null
+          perm_ver_apenas_atribuidos?: boolean | null
+          perm_ver_todos_veiculos?: boolean | null
+          telefone?: string | null
+        }
+        Update: {
+          ativo?: boolean | null
+          avatar_url?: string | null
+          cargo?: string | null
+          dias_disponiveis?: number[] | null
+          email?: string | null
+          especialidades?: string[] | null
+          horario_fim?: string | null
+          horario_inicio?: string | null
+          id?: string | null
+          nome?: string | null
+          owner_id?: string | null
+          perm_finalizar_atendimento?: boolean | null
+          perm_iniciar_atendimento?: boolean | null
+          perm_realizar_checklist?: boolean | null
+          perm_ver_apenas_atribuidos?: boolean | null
+          perm_ver_todos_veiculos?: boolean | null
+          telefone?: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       current_owner_id: { Args: never; Returns: string }
@@ -1664,6 +1807,7 @@ export type Database = {
           whatsapp: string
         }[]
       }
+      get_my_funcionario_id: { Args: never; Returns: string }
       get_ocupacao_dia: {
         Args: { _data: string; _owner: string }
         Returns: {
@@ -1674,9 +1818,9 @@ export type Database = {
       get_servicos_publicos: {
         Args: { _owner: string }
         Returns: {
-          categoria: string | null
-          descricao: string | null
-          foto_url: string | null
+          categoria: string
+          descricao: string
+          foto_url: string
           id: string
           nome: string
           pontos_gerados: number

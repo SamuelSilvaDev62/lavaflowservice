@@ -36,31 +36,31 @@ type NavItem = { to: string; label: string; icon: any; tour?: string; roles: App
 type NavGroup = { label: string; items: NavItem[] };
 
 const groupsAll: NavGroup[] = [
-  { label: "Operacao", items: [
-    { to: "/dashboard", label: "Operacao do Dia", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
-    { to: "/agendamentos", label: "Agenda", icon: CalendarDays, roles: OPERACIONAL },
-    { to: "/fila", label: "Fila", icon: ListChecks, roles: OPERACIONAL },
-    { to: "/ordens", label: "Ordens de Servico", icon: ClipboardList, roles: OPERACIONAL },
+  { label: "Operação", items: [
+    { to: "/dashboard", label: "Painel Executivo", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
+    { to: "/agendamentos", label: "Central de Agendamentos", icon: CalendarDays, roles: OPERACIONAL },
+    { to: "/fila", label: "Fila Operacional", icon: ListChecks, roles: OPERACIONAL },
+    { to: "/ordens", label: "Ordens de Serviço", icon: ClipboardList, roles: OPERACIONAL },
   ]},
   { label: "Relacionamento", items: [
-    { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes", roles: OPERACIONAL },
+    { to: "/clientes", label: "Hub de Clientes", icon: Users, tour: "clientes", roles: OPERACIONAL },
     { to: "/campanhas", label: "Campanhas", icon: Megaphone, roles: GESTAO },
     { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: GESTAO },
     { to: "/fidelidade", label: "Fidelidade", icon: Award, roles: ADMINS },
   ]},
-  { label: "Gestao", items: [
+  { label: "Gestão", items: [
     { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },
     { to: "/crescimento", label: "Centro de Crescimento", icon: Rocket, roles: GESTAO },
-    { to: "/inteligencia", label: "Inteligencia", icon: BrainCircuit, roles: GESTAO },
-    { to: "/relatorios", label: "Relatorios", icon: BarChart3, roles: GESTAO },
-    { to: "/assistente", label: "Consultor IA", icon: Bot, tour: "assistente", roles: GESTAO },
-    { to: "/midia", label: "Midia", icon: ImageIcon, roles: ADMINS },
-    { to: "/configuracoes", label: "Configuracoes", icon: Settings, roles: ADMINS },
+    { to: "/inteligencia", label: "Inteligência", icon: BrainCircuit, roles: GESTAO },
+    { to: "/relatorios", label: "Insights Operacionais", icon: BarChart3, roles: GESTAO },
+    { to: "/assistente", label: "Consultor Inteligente", icon: Bot, tour: "assistente", roles: GESTAO },
+    { to: "/midia", label: "Mídia", icon: ImageIcon, roles: ADMINS },
+    { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
   ]},
 ];
 
 const colabGroups: NavGroup[] = [
-  { label: "Operacao", items: [
+  { label: "Operação", items: [
     { to: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, roles: ["lavador", "colaborador"] },
   ]},
 ];
