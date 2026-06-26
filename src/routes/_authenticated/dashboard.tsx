@@ -9,15 +9,18 @@ import { TrendIndicator } from "@/components/trend-indicator";
 import { greetingForNow } from "@/lib/design-system";
 import { getAlertasOperacionais, getDashboardOperacional } from "@/lib/lavaflow.functions";
 import { getOnboardingState as getOnboardingStateFn } from "@/lib/onboarding.functions";
+import { listIntelligenceOverview } from "@/lib/inteligencia.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
 import { VehicleVisual } from "@/components/vehicle-visual";
+import { InsightCard, type InsightTone } from "@/components/ui/insight-card";
 import { brl } from "@/lib/format";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarDays, Car, CheckCircle2, Clock, DollarSign, ExternalLink, Play, Share2, Megaphone } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, BrainCircuit, CalendarDays, Car, CheckCircle2, Clock, DollarSign, ExternalLink, Lightbulb, Megaphone, Play, Share2, Sparkles, Target, TrendingDown, TrendingUp, Users } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: () => <RequireRole roles={GESTAO}><Dashboard /></RequireRole>,
