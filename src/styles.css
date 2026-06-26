@@ -293,3 +293,44 @@
   animation: lf-shimmer 1.6s linear infinite;
 }
 
+/* Staggered entrance for cards — set --i on each child */
+@keyframes lf-stagger-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.list-stagger > * {
+  opacity: 0;
+  animation: lf-stagger-in 320ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+  animation-delay: calc(var(--i, 0) * 60ms);
+}
+@media (prefers-reduced-motion: reduce) {
+  .list-stagger > * { animation: none; opacity: 1; }
+}
+
+/* Soft chip palette unified across modules */
+@utility chip-soft-info {
+  background: color-mix(in oklab, var(--muted) 60%, transparent);
+  color: var(--muted-foreground);
+  border: 1px solid color-mix(in oklab, var(--border) 80%, transparent);
+}
+@utility chip-soft-opportunity {
+  background: color-mix(in oklab, var(--primary) 12%, transparent);
+  color: var(--primary);
+  border: 1px solid color-mix(in oklab, var(--primary) 22%, transparent);
+}
+@utility chip-soft-warning {
+  background: color-mix(in oklab, var(--warning) 15%, transparent);
+  color: color-mix(in oklab, var(--warning) 80%, black 20%);
+  border: 1px solid color-mix(in oklab, var(--warning) 30%, transparent);
+}
+@utility chip-soft-critical {
+  background: color-mix(in oklab, var(--destructive) 12%, transparent);
+  color: var(--destructive);
+  border: 1px solid color-mix(in oklab, var(--destructive) 22%, transparent);
+}
+@utility chip-soft-success {
+  background: color-mix(in oklab, var(--success) 14%, transparent);
+  color: color-mix(in oklab, var(--success) 85%, black 15%);
+  border: 1px solid color-mix(in oklab, var(--success) 25%, transparent);
+}
+
