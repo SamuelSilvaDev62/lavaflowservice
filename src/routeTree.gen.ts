@@ -25,6 +25,7 @@ import { Route as AuthenticatedOrdensRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedOportunidadesRouteImport } from './routes/_authenticated/oportunidades'
 import { Route as AuthenticatedMidiaRouteImport } from './routes/_authenticated/midia'
 import { Route as AuthenticatedMeuTrabalhoRouteImport } from './routes/_authenticated/meu-trabalho'
+import { Route as AuthenticatedInteligenciaRouteImport } from './routes/_authenticated/inteligencia'
 import { Route as AuthenticatedFilaRouteImport } from './routes/_authenticated/fila'
 import { Route as AuthenticatedFidelidadeRouteImport } from './routes/_authenticated/fidelidade'
 import { Route as AuthenticatedEquipeRouteImport } from './routes/_authenticated/equipe'
@@ -120,6 +121,12 @@ const AuthenticatedMeuTrabalhoRoute =
     path: '/meu-trabalho',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const AuthenticatedInteligenciaRoute =
+  AuthenticatedInteligenciaRouteImport.update({
+    id: '/inteligencia',
+    path: '/inteligencia',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedFilaRoute = AuthenticatedFilaRouteImport.update({
   id: '/fila',
   path: '/fila',
@@ -209,6 +216,7 @@ export interface FileRoutesByFullPath {
   '/equipe': typeof AuthenticatedEquipeRoute
   '/fidelidade': typeof AuthenticatedFidelidadeRoute
   '/fila': typeof AuthenticatedFilaRoute
+  '/inteligencia': typeof AuthenticatedInteligenciaRoute
   '/meu-trabalho': typeof AuthenticatedMeuTrabalhoRoute
   '/midia': typeof AuthenticatedMidiaRoute
   '/oportunidades': typeof AuthenticatedOportunidadesRoute
@@ -239,6 +247,7 @@ export interface FileRoutesByTo {
   '/equipe': typeof AuthenticatedEquipeRoute
   '/fidelidade': typeof AuthenticatedFidelidadeRoute
   '/fila': typeof AuthenticatedFilaRoute
+  '/inteligencia': typeof AuthenticatedInteligenciaRoute
   '/meu-trabalho': typeof AuthenticatedMeuTrabalhoRoute
   '/midia': typeof AuthenticatedMidiaRoute
   '/oportunidades': typeof AuthenticatedOportunidadesRoute
@@ -271,6 +280,7 @@ export interface FileRoutesById {
   '/_authenticated/equipe': typeof AuthenticatedEquipeRoute
   '/_authenticated/fidelidade': typeof AuthenticatedFidelidadeRoute
   '/_authenticated/fila': typeof AuthenticatedFilaRoute
+  '/_authenticated/inteligencia': typeof AuthenticatedInteligenciaRoute
   '/_authenticated/meu-trabalho': typeof AuthenticatedMeuTrabalhoRoute
   '/_authenticated/midia': typeof AuthenticatedMidiaRoute
   '/_authenticated/oportunidades': typeof AuthenticatedOportunidadesRoute
@@ -303,6 +313,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/fidelidade'
     | '/fila'
+    | '/inteligencia'
     | '/meu-trabalho'
     | '/midia'
     | '/oportunidades'
@@ -333,6 +344,7 @@ export interface FileRouteTypes {
     | '/equipe'
     | '/fidelidade'
     | '/fila'
+    | '/inteligencia'
     | '/meu-trabalho'
     | '/midia'
     | '/oportunidades'
@@ -364,6 +376,7 @@ export interface FileRouteTypes {
     | '/_authenticated/equipe'
     | '/_authenticated/fidelidade'
     | '/_authenticated/fila'
+    | '/_authenticated/inteligencia'
     | '/_authenticated/meu-trabalho'
     | '/_authenticated/midia'
     | '/_authenticated/oportunidades'
@@ -506,6 +519,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeuTrabalhoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/inteligencia': {
+      id: '/_authenticated/inteligencia'
+      path: '/inteligencia'
+      fullPath: '/inteligencia'
+      preLoaderRoute: typeof AuthenticatedInteligenciaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/fila': {
       id: '/_authenticated/fila'
       path: '/fila'
@@ -611,6 +631,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedEquipeRoute: typeof AuthenticatedEquipeRoute
   AuthenticatedFidelidadeRoute: typeof AuthenticatedFidelidadeRoute
   AuthenticatedFilaRoute: typeof AuthenticatedFilaRoute
+  AuthenticatedInteligenciaRoute: typeof AuthenticatedInteligenciaRoute
   AuthenticatedMeuTrabalhoRoute: typeof AuthenticatedMeuTrabalhoRoute
   AuthenticatedMidiaRoute: typeof AuthenticatedMidiaRoute
   AuthenticatedOportunidadesRoute: typeof AuthenticatedOportunidadesRoute
@@ -632,6 +653,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedEquipeRoute: AuthenticatedEquipeRoute,
   AuthenticatedFidelidadeRoute: AuthenticatedFidelidadeRoute,
   AuthenticatedFilaRoute: AuthenticatedFilaRoute,
+  AuthenticatedInteligenciaRoute: AuthenticatedInteligenciaRoute,
   AuthenticatedMeuTrabalhoRoute: AuthenticatedMeuTrabalhoRoute,
   AuthenticatedMidiaRoute: AuthenticatedMidiaRoute,
   AuthenticatedOportunidadesRoute: AuthenticatedOportunidadesRoute,

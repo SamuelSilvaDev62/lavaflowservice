@@ -3718,9 +3718,10 @@ export const getEmpresaPublica = createServerFn({ method: "GET" })
     const { data: emp } = await supabaseAdmin.rpc("get_empresa_by_slug", { _slug: data.slug });
     const empresa = (emp ?? [])[0];
     if (!empresa) throw new Error("Empresa não encontrada");
-    const [{ data: servicos }, { data: cfg }] = await Promise.all([
+    const [{ data: servicos }, { data: cfg }, { data: recompensas }] = await Promise.all([
       supabaseAdmin.rpc("get_servicos_publicos", { _owner: empresa.owner_id }),
       supabaseAdmin.rpc("get_agenda_config_publica", { _owner: empresa.owner_id }),
+      supabaseAdmin.from("recompensas").select("id, nome, custo_pontos, ativo").eq("owner_id", empresa.owner_id).eq("ativo", true).order("custo_pontos"),
     ]);
     await supabaseAdmin.from("public_page_events").insert({
       owner_id: empresa.owner_id,
@@ -3731,7 +3732,77 @@ export const getEmpresaPublica = createServerFn({ method: "GET" })
     return {
       empresa,
       servicos: servicos ?? [],
+      recompensas: recompensas ?? [],
       config: (cfg ?? [])[0] ?? { hora_inicio: "08:00", hora_fim: "18:00", dias_semana: [1,2,3,4,5,6], intervalo_min: 30, capacidade_simultanea: 1 },
+    };
+  });
+
+export const getClientePublico = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({
+    slug: z.string().min(1).max(80),
+    telefone: z.string().min(8).max(20),
+  }).parse(d))
+  .handler(async ({ data }) => {
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: emp } = await supabaseAdmin.rpc("get_empresa_by_slug", { _slug: data.slug });
+    const empresa = (emp ?? [])[0];
+    if (!empresa) throw new Error("Empresa nao encontrada");
+    const owner_id = empresa.owner_id;
+    const digits = data.telefone.replace(/\D/g, "");
+
+    const { data: clientes } = await supabaseAdmin
+      .from("clientes")
+      .select("id, nome, telefone, whatsapp, pontos_saldo")
+      .eq("owner_id", owner_id)
+      .or(`telefone.ilike.%${digits}%,whatsapp.ilike.%${digits}%`)
+      .limit(5);
+
+    const cliente = (clientes ?? []).find((row: any) => {
+      const tel = String(row.telefone ?? row.whatsapp ?? "").replace(/\D/g, "");
+      return tel.endsWith(digits.slice(-8));
+    }) ?? clientes?.[0];
+
+    if (!cliente) return { cliente: null, agendamentos: [], historico: [], veiculos: [], recompensas: [], resgates: [], avaliacoes: [] };
+
+    const [{ data: agendamentos }, { data: historico }, { data: veiculos }, { data: recompensas }, { data: movimentos }] = await Promise.all([
+      supabaseAdmin.from("agendamentos")
+        .select("id, data_agendada, hora_agendada, status, servicos:servico_id(nome)")
+        .eq("owner_id", owner_id).eq("cliente_id", cliente.id)
+        .gte("data_agendada", localDateIso())
+        .order("data_agendada", { ascending: true })
+        .order("hora_agendada", { ascending: true })
+        .limit(5),
+      supabaseAdmin.from("ordens_servico")
+        .select("id, valor, status, created_at, servicos:servico_id(nome)")
+        .eq("owner_id", owner_id).eq("cliente_id", cliente.id)
+        .order("created_at", { ascending: false })
+        .limit(5),
+      supabaseAdmin.from("veiculos")
+        .select("id, placa, marca, modelo, cor, vehicle_year")
+        .eq("owner_id", owner_id).eq("cliente_id", cliente.id)
+        .limit(5),
+      supabaseAdmin.from("recompensas")
+        .select("id, nome, custo_pontos, ativo")
+        .eq("owner_id", owner_id).eq("ativo", true)
+        .order("custo_pontos"),
+      supabaseAdmin.from("pontos_movimentos")
+        .select("id, pontos, tipo, criado_em")
+        .eq("owner_id", owner_id).eq("cliente_id", cliente.id)
+        .order("criado_em", { ascending: false })
+        .limit(5),
+    ]);
+
+    const totalServicos = historico?.length ?? 0;
+    const economiaEstimada = Math.round(Number(cliente.pontos_saldo ?? 0) * 0.5);
+
+    return {
+      cliente: { ...cliente, total_servicos: totalServicos, economia_estimada: economiaEstimada },
+      agendamentos: agendamentos ?? [],
+      historico: historico ?? [],
+      veiculos: veiculos ?? [],
+      recompensas: recompensas ?? [],
+      resgates: (movimentos ?? []).filter((m: any) => m.tipo === "debito"),
+      avaliacoes: [],
     };
   });
 

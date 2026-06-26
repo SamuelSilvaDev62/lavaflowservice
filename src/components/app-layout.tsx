@@ -5,6 +5,7 @@ import {
   Award,
   BarChart3,
   Bot,
+  BrainCircuit,
   Briefcase,
   CalendarDays,
   Car,
@@ -50,6 +51,7 @@ const groupsAll: NavGroup[] = [
   { label: "Gestao", items: [
     { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },
     { to: "/crescimento", label: "Centro de Crescimento", icon: Rocket, roles: GESTAO },
+    { to: "/inteligencia", label: "Inteligencia", icon: BrainCircuit, roles: GESTAO },
     { to: "/relatorios", label: "Relatorios", icon: BarChart3, roles: GESTAO },
     { to: "/assistente", label: "Consultor IA", icon: Bot, tour: "assistente", roles: GESTAO },
     { to: "/midia", label: "Midia", icon: ImageIcon, roles: ADMINS },
