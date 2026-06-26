@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { PageHeader } from "@/components/app-layout";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
@@ -18,27 +18,25 @@ import { brl } from "@/lib/format";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Textarea } from "@/components/ui/textarea";
+import { InsightCard, type InsightTone } from "@/components/ui/insight-card";
+import { SectionSummary, type SectionSummaryItem } from "@/components/ui/section-summary";
 import {
+  AlertTriangle,
   BarChart3,
   BrainCircuit,
   CheckCircle2,
-  Gauge,
   Lightbulb,
   Loader2,
   Megaphone,
   RefreshCw,
-  Settings,
   Sparkles,
   Target,
   TrendingDown,
-  WalletCards,
-  X,
+  TrendingUp,
+  Users,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -46,39 +44,53 @@ export const Route = createFileRoute("/_authenticated/inteligencia")({
   component: () => <RequireRole roles={GESTAO}><Page /></RequireRole>,
 });
 
-const severityLabel: Record<string, string> = {
-  info: "Informacao",
-  warning: "Atencao",
-  critical: "Critico",
-  opportunity: "Oportunidade",
+const severityTone: Record<string, InsightTone> = {
+  info: "info",
+  warning: "warning",
+  critical: "critical",
+  opportunity: "opportunity",
 };
 
-const severityClass: Record<string, string> = {
-  info: "bg-muted text-muted-foreground border-border",
-  warning: "bg-warning/10 text-warning-foreground border-warning/30",
-  critical: "bg-destructive/10 text-destructive border-destructive/20",
-  opportunity: "bg-primary/10 text-primary border-primary/20",
+const severityLabel: Record<string, string> = {
+  info: "Informação",
+  warning: "Atenção",
+  critical: "Crítico",
+  opportunity: "Oportunidade",
 };
 
 const moduleLabel: Record<string, string> = {
   marketing: "Marketing",
   financeiro: "Financeiro",
-  operacao: "Operacao",
+  operacao: "Operação",
   clientes: "Clientes",
   agenda: "Agenda",
-  relatorios: "Relatorios",
+  relatorios: "Relatórios",
   assistente: "Assistente",
 };
 
-type SettingsState = {
-  ai_enabled: boolean;
-  monthly_token_limit: number;
-  monthly_task_limit: number;
-  auto_insights_enabled: boolean;
-  auto_execute_enabled: boolean;
-  preferred_tone: string;
-  business_context_text: string;
+const moduleIcon: Record<string, any> = {
+  marketing: Megaphone,
+  financeiro: TrendingDown,
+  operacao: Target,
+  clientes: Users,
+  agenda: Sparkles,
+  relatorios: BarChart3,
+  assistente: BrainCircuit,
 };
+
+type IntensityLevel = "leve" | "equilibrado" | "intenso";
+
+const intensityMap: Record<IntensityLevel, { tokens: number; tasks: number }> = {
+  leve: { tokens: 80_000, tasks: 120 },
+  equilibrado: { tokens: 200_000, tasks: 300 },
+  intenso: { tokens: 500_000, tasks: 800 },
+};
+
+function detectIntensity(tokens: number): IntensityLevel {
+  if (tokens <= 100_000) return "leve";
+  if (tokens >= 400_000) return "intenso";
+  return "equilibrado";
+}
 
 function Page() {
   const qc = useQueryClient();
@@ -93,32 +105,21 @@ function Page() {
   const [campaignResult, setCampaignResult] = useState<any>(null);
   const [diagnosisResult, setDiagnosisResult] = useState<any>(null);
   const [summaryResult, setSummaryResult] = useState<any>(null);
-  const [settings, setSettings] = useState<SettingsState>({
-    ai_enabled: true,
-    monthly_token_limit: 200000,
-    monthly_task_limit: 300,
-    auto_insights_enabled: true,
-    auto_execute_enabled: false,
-    preferred_tone: "profissional",
-    business_context_text: "{}",
-  });
+  const [aiEnabled, setAiEnabled] = useState(true);
+  const [autoInsights, setAutoInsights] = useState(true);
+  const [intensity, setIntensity] = useState<IntensityLevel>("equilibrado");
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["inteligencia-overview"],
     queryFn: () => overviewFn(),
+    staleTime: 30_000,
   });
 
   useEffect(() => {
     if (!data?.settings) return;
-    setSettings({
-      ai_enabled: Boolean(data.settings.ai_enabled),
-      monthly_token_limit: Number(data.settings.monthly_token_limit ?? 200000),
-      monthly_task_limit: Number(data.settings.monthly_task_limit ?? 300),
-      auto_insights_enabled: Boolean(data.settings.auto_insights_enabled),
-      auto_execute_enabled: Boolean(data.settings.auto_execute_enabled),
-      preferred_tone: String(data.settings.preferred_tone ?? "profissional"),
-      business_context_text: JSON.stringify(data.settings.business_context ?? {}, null, 2),
-    });
+    setAiEnabled(Boolean(data.settings.ai_enabled));
+    setAutoInsights(Boolean(data.settings.auto_insights_enabled));
+    setIntensity(detectIntensity(Number(data.settings.monthly_token_limit ?? 200000)));
   }, [data?.settings]);
 
   const refreshInsights = useMutation({
@@ -133,7 +134,7 @@ function Page() {
   const dismissInsight = useMutation({
     mutationFn: (id: string) => dismissFn({ data: { id } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["inteligencia-overview"] }),
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao ignorar oportunidade"),
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao dispensar oportunidade"),
   });
 
   const generateCampaign = useMutation({
@@ -144,7 +145,7 @@ function Page() {
       qc.invalidateQueries({ queryKey: ["campanhas"] });
       toast.success("Campanha preparada");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao gerar campanha"),
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao criar campanha"),
   });
 
   const generateDiagnosis = useMutation({
@@ -152,9 +153,9 @@ function Page() {
     onSuccess: (res) => {
       setDiagnosisResult(res);
       qc.invalidateQueries({ queryKey: ["inteligencia-overview"] });
-      toast.success("Diagnostico gerado");
+      toast.success("Análise pronta");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao gerar diagnostico"),
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao analisar faturamento"),
   });
 
   const generateSummary = useMutation({
@@ -162,51 +163,54 @@ function Page() {
     onSuccess: (res) => {
       setSummaryResult(res);
       qc.invalidateQueries({ queryKey: ["inteligencia-overview"] });
-      toast.success("Resumo diario gerado");
+      toast.success("Resumo do dia gerado");
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro ao gerar resumo"),
   });
 
   const saveSettings = useMutation({
     mutationFn: () => {
-      let context: Record<string, any> = {};
-      try {
-        context = JSON.parse(settings.business_context_text || "{}");
-      } catch {
-        throw new Error("Contexto do negocio precisa ser um JSON valido.");
-      }
+      const map = intensityMap[intensity];
       return settingsFn({
         data: {
-          ai_enabled: settings.ai_enabled,
-          monthly_token_limit: Number(settings.monthly_token_limit),
-          monthly_task_limit: Number(settings.monthly_task_limit),
-          auto_insights_enabled: settings.auto_insights_enabled,
-          auto_execute_enabled: settings.auto_execute_enabled,
-          preferred_tone: settings.preferred_tone,
-          business_context: context,
+          ai_enabled: aiEnabled,
+          monthly_token_limit: map.tokens,
+          monthly_task_limit: map.tasks,
+          auto_insights_enabled: autoInsights,
+          auto_execute_enabled: false,
+          preferred_tone: data?.settings?.preferred_tone ?? "profissional",
+          business_context: data?.settings?.business_context ?? {},
         },
       });
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["inteligencia-overview"] });
-      toast.success("Configuracoes salvas");
+      toast.success("Preferências salvas");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar configuracoes"),
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao salvar preferências"),
   });
 
-  const usagePercent = data?.usage?.monthlyTokenLimit
-    ? Math.min(100, Math.round((Number(data.usage.totalTokens ?? 0) / Number(data.usage.monthlyTokenLimit)) * 100))
-    : 0;
+  // Build "Hoje" summary from open insights
+  const todayItems = useMemo<SectionSummaryItem[]>(() => {
+    if (!data?.insights?.length) {
+      return [{ label: "Nenhum ponto crítico hoje — a operação está fluindo.", tone: "success", icon: CheckCircle2 }];
+    }
+    return data.insights.slice(0, 5).map((insight: any) => ({
+      label: insight.title,
+      tone: insight.severity === "critical" || insight.severity === "warning" ? "warning" : "info",
+      icon: insight.severity === "opportunity" ? TrendingUp : AlertTriangle,
+    }));
+  }, [data?.insights]);
 
   return (
     <>
       <PageHeader
-        title="Inteligencia"
-        subtitle="Oportunidades, campanhas e analises geradas a partir dos dados do negocio."
+        title="Inteligência"
+        subtitle="O que está acontecendo, o que tem potencial e onde agir hoje."
         actions={
-          <Button onClick={() => refreshInsights.mutate()} disabled={refreshInsights.isPending}>
+          <Button onClick={() => refreshInsights.mutate()} disabled={refreshInsights.isPending} variant="premium">
             {refreshInsights.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <RefreshCw className="mr-2 h-4 w-4" />}
-            Atualizar oportunidades
+            Atualizar análises
           </Button>
         }
       />
@@ -214,254 +218,269 @@ function Page() {
       {error && (
         <Card className="border-destructive/30 bg-destructive/5">
           <CardContent className="p-5 text-sm text-destructive">
-            Nao foi possivel carregar o modulo de inteligencia. Verifique se a migration nova ja foi aplicada no Supabase.
+            Não foi possível carregar a Inteligência agora. Tente novamente em instantes.
           </CardContent>
         </Card>
       )}
 
       {isLoading ? (
-        <div className="grid gap-3 md:grid-cols-4">
-          {[1, 2, 3, 4].map((i) => <div key={i} className="h-28 rounded-xl bg-muted animate-pulse" />)}
+        <div className="grid gap-3 md:grid-cols-3">
+          {[1, 2, 3].map((i) => <div key={i} className="h-40 rounded-2xl skeleton-shimmer" />)}
         </div>
       ) : data ? (
-        <div className="space-y-5">
-          <section className="grid gap-3 md:grid-cols-4">
-            <MetricCard icon={Lightbulb} label="Oportunidades abertas" value={data.insights.length} />
-            <MetricCard icon={Sparkles} label="Acoes no mes" value={data.usage.totalTasks} />
-            <MetricCard icon={Gauge} label="Creditos usados" value={`${usagePercent}%`} />
-            <MetricCard icon={Settings} label="Modo automatico" value={data.settings.auto_execute_enabled ? "Ligado" : "Desligado"} />
-          </section>
-
-          <Tabs defaultValue="oportunidades" className="space-y-4">
-            <TabsList className="h-auto flex-wrap justify-start">
-              <TabsTrigger value="oportunidades">Oportunidades</TabsTrigger>
-              <TabsTrigger value="campanhas">Campanhas</TabsTrigger>
-              <TabsTrigger value="analises">Analises</TabsTrigger>
-              <TabsTrigger value="uso">Uso</TabsTrigger>
-              <TabsTrigger value="configuracoes">Configuracoes</TabsTrigger>
-            </TabsList>
-
-            <TabsContent value="oportunidades" className="space-y-3">
-              {data.insights.length === 0 ? (
-                <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhuma oportunidade aberta. Clique em atualizar para rodar as regras de negocio.</CardContent></Card>
-              ) : (
-                <div className="grid gap-3 lg:grid-cols-2">
-                  {data.insights.map((insight: any) => (
-                    <Card key={insight.id}>
-                      <CardContent className="p-4">
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline" className={severityClass[insight.severity] ?? severityClass.info}>
-                                {severityLabel[insight.severity] ?? insight.severity}
-                              </Badge>
-                              <Badge variant="secondary">{moduleLabel[insight.module] ?? insight.module}</Badge>
-                            </div>
-                            <h3 className="mt-3 font-display text-lg font-semibold">{insight.title}</h3>
-                            <p className="mt-1 text-sm text-muted-foreground">{insight.description}</p>
-                            {insight.metric_key && (
-                              <p className="mt-2 text-xs text-muted-foreground">
-                                Indicador: {insight.metric_key} {insight.metric_value != null ? `= ${Number(insight.metric_value).toLocaleString("pt-BR")}` : ""}
-                              </p>
-                            )}
-                          </div>
-                          <Button size="icon" variant="ghost" onClick={() => dismissInsight.mutate(insight.id)} title="Ignorar">
-                            <X className="h-4 w-4" />
-                          </Button>
-                        </div>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                          {insight.action_type === "generate_inactive_clients_campaign" || insight.module === "clientes" ? (
-                            <Button size="sm" onClick={() => generateCampaign.mutate()} disabled={generateCampaign.isPending}>
-                              <Megaphone className="mr-2 h-4 w-4" />Gerar campanha
-                            </Button>
-                          ) : null}
-                          {insight.action_type === "generate_revenue_diagnosis" || insight.module === "financeiro" ? (
-                            <Button size="sm" variant="outline" onClick={() => generateDiagnosis.mutate()} disabled={generateDiagnosis.isPending}>
-                              <BarChart3 className="mr-2 h-4 w-4" />Analisar
-                            </Button>
-                          ) : null}
-                          {insight.action_type === "generate_daily_summary" ? (
-                            <Button size="sm" variant="outline" onClick={() => generateSummary.mutate()} disabled={generateSummary.isPending}>
-                              <BrainCircuit className="mr-2 h-4 w-4" />Gerar resumo
-                            </Button>
-                          ) : null}
-                        </div>
-                      </CardContent>
-                    </Card>
-                  ))}
-                </div>
+        <Tabs defaultValue="hoje" className="space-y-5">
+          <TabsList className="h-auto flex-wrap justify-start">
+            <TabsTrigger value="hoje">Hoje</TabsTrigger>
+            <TabsTrigger value="oportunidades">
+              Oportunidades
+              {data.insights.length > 0 && (
+                <Badge variant="secondary" className="ml-2 h-5">{data.insights.length}</Badge>
               )}
-            </TabsContent>
+            </TabsTrigger>
+            <TabsTrigger value="analises">Análises</TabsTrigger>
+            <TabsTrigger value="modo">Modo Inteligência</TabsTrigger>
+          </TabsList>
 
-            <TabsContent value="campanhas" className="space-y-3">
+          {/* HOJE */}
+          <TabsContent value="hoje" className="space-y-4">
+            <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
+              <SectionSummary
+                eyebrow="Hoje encontramos"
+                title="O que precisa da sua atenção"
+                items={todayItems}
+                cta={{
+                  label: "Gerar resumo completo",
+                  onClick: () => generateSummary.mutate(),
+                  pending: generateSummary.isPending,
+                }}
+              />
+
+              <div className="grid gap-3">
+                <QuickStat icon={Lightbulb} label="Oportunidades abertas" value={String(data.insights.length)} />
+                <QuickStat icon={Sparkles} label="Análises este mês" value={String(data.usage.totalTasks)} />
+                <QuickStat
+                  icon={Target}
+                  label="Inteligência"
+                  value={data.settings.ai_enabled ? "Ativa" : "Pausada"}
+                  tone={data.settings.ai_enabled ? "success" : "muted"}
+                />
+              </div>
+            </div>
+
+            {summaryResult && (
+              <GeneratedCard
+                title={summaryResult.summary?.headline ?? "Resumo do dia"}
+                subtitle="Visão consolidada da operação"
+                body={summaryResult.summary?.summary}
+                footer={(summaryResult.summary?.tomorrowSuggestions ?? []).join(" · ")}
+              />
+            )}
+          </TabsContent>
+
+          {/* OPORTUNIDADES */}
+          <TabsContent value="oportunidades" className="space-y-4">
+            {data.insights.length === 0 ? (
               <Card>
-                <CardContent className="grid gap-4 p-5 md:grid-cols-[1fr_auto] md:items-center">
-                  <div>
-                    <h2 className="font-display text-xl font-semibold">Campanha para clientes inativos</h2>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                      Calcula o publico por SQL e prepara uma campanha em rascunho, sem envio automatico.
-                    </p>
+                <CardContent className="flex flex-col items-center gap-3 p-10 text-center">
+                  <div className="grid h-14 w-14 place-content-center rounded-2xl bg-primary/10 text-primary">
+                    <Sparkles className="h-6 w-6" />
                   </div>
-                  <Button onClick={() => generateCampaign.mutate()} disabled={generateCampaign.isPending}>
-                    {generateCampaign.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Megaphone className="mr-2 h-4 w-4" />}
-                    Preparar campanha
-                  </Button>
+                  <h3 className="font-display text-lg font-semibold">Tudo certo por aqui</h3>
+                  <p className="text-sm text-muted-foreground">
+                    Não encontramos oportunidades urgentes. Clique em <strong>Atualizar análises</strong> para uma nova varredura.
+                  </p>
                 </CardContent>
               </Card>
-              {campaignResult && (
-                <GeneratedCard
-                  title={campaignResult.output?.campaignTitle ?? campaignResult.campanha?.nome}
-                  subtitle={`${campaignResult.audience?.total ?? 0} cliente(s) no publico`}
-                  body={campaignResult.output?.whatsappMessage ?? campaignResult.campanha?.mensagem}
-                  footer={`Impacto estimado: ${brl(Number(campaignResult.audience?.estimatedImpact ?? 0))}${campaignResult.cached ? " · reutilizado" : ""}`}
-                />
-              )}
-              <RecentTasks tasks={data.tasks.filter((task: any) => String(task.task_type).includes("campaign"))} />
-            </TabsContent>
+            ) : (
+              <div className="grid gap-4 lg:grid-cols-2 list-stagger">
+                {data.insights.map((insight: any, i: number) => {
+                  const tone = severityTone[insight.severity] ?? "opportunity";
+                  const Icon = moduleIcon[insight.module] ?? Sparkles;
+                  const impact = insight.metric_value && insight.metric_key?.toLowerCase().includes("receita")
+                    ? brl(Number(insight.metric_value))
+                    : insight.metric_value
+                      ? Number(insight.metric_value).toLocaleString("pt-BR")
+                      : undefined;
+                  const isCampaign = insight.action_type === "generate_inactive_clients_campaign" || insight.module === "clientes";
+                  const isFinance = insight.action_type === "generate_revenue_diagnosis" || insight.module === "financeiro";
+                  return (
+                    <div key={insight.id} style={{ ["--i" as any]: i }}>
+                      <InsightCard
+                        icon={Icon}
+                        tone={tone}
+                        toneLabel={severityLabel[insight.severity] ?? "Oportunidade"}
+                        category={moduleLabel[insight.module] ?? insight.module}
+                        title={insight.title}
+                        description={insight.description}
+                        impact={impact}
+                        primaryAction={
+                          isCampaign
+                            ? { label: "Criar campanha", onClick: () => generateCampaign.mutate(), pending: generateCampaign.isPending, icon: Megaphone }
+                            : isFinance
+                            ? { label: "Analisar faturamento", onClick: () => generateDiagnosis.mutate(), pending: generateDiagnosis.isPending, icon: BarChart3 }
+                            : { label: "Gerar resumo", onClick: () => generateSummary.mutate(), pending: generateSummary.isPending, icon: BrainCircuit }
+                        }
+                        secondaryAction={{ label: "Dispensar", onClick: () => dismissInsight.mutate(insight.id) }}
+                      />
+                    </div>
+                  );
+                })}
+              </div>
+            )}
 
-            <TabsContent value="analises" className="space-y-3">
-              <div className="grid gap-3 md:grid-cols-2">
-                <ActionCard
+            {campaignResult && (
+              <GeneratedCard
+                title={campaignResult.output?.campaignTitle ?? campaignResult.campanha?.nome ?? "Campanha preparada"}
+                subtitle={`${campaignResult.audience?.total ?? 0} cliente(s) no público · Potencial ${brl(Number(campaignResult.audience?.estimatedImpact ?? 0))}`}
+                body={campaignResult.output?.whatsappMessage ?? campaignResult.campanha?.mensagem}
+              />
+            )}
+          </TabsContent>
+
+          {/* ANÁLISES */}
+          <TabsContent value="analises" className="space-y-4">
+            <div className="grid gap-4 md:grid-cols-2 list-stagger">
+              <div style={{ ["--i" as any]: 0 }}>
+                <SpecialistCard
                   icon={TrendingDown}
                   title="Analisar faturamento"
-                  description="Compara receita, ticket, servicos e clientes para gerar um diagnostico simples."
-                  actionLabel="Gerar diagnostico"
+                  description="Compare receita, ticket médio e mix de serviços. Receba um diagnóstico com ações sugeridas."
+                  cta="Analisar agora"
                   pending={generateDiagnosis.isPending}
                   onClick={() => generateDiagnosis.mutate()}
                 />
-                <ActionCard
-                  icon={Target}
-                  title="Gerar resumo diario"
-                  description="Resume operacao, pontos positivos, atencoes e sugestoes para o proximo dia."
-                  actionLabel="Gerar resumo"
+              </div>
+              <div style={{ ["--i" as any]: 1 }}>
+                <SpecialistCard
+                  icon={Users}
+                  title="Recuperar clientes"
+                  description="Identifica quem não retorna há mais de 60 dias e prepara uma campanha personalizada por WhatsApp."
+                  cta="Criar campanha"
+                  pending={generateCampaign.isPending}
+                  onClick={() => generateCampaign.mutate()}
+                />
+              </div>
+              <div style={{ ["--i" as any]: 2 }}>
+                <SpecialistCard
+                  icon={BrainCircuit}
+                  title="Resumo do dia"
+                  description="Síntese da operação com pontos positivos, atenções e sugestões para amanhã."
+                  cta="Gerar resumo"
                   pending={generateSummary.isPending}
                   onClick={() => generateSummary.mutate()}
                 />
               </div>
-              {diagnosisResult && (
-                <GeneratedCard
-                  title="Diagnostico de faturamento"
-                  subtitle={`Receita atual: ${brl(Number(diagnosisResult.metrics?.currentRevenue ?? 0))}`}
-                  body={diagnosisResult.diagnosis?.summary ?? "Diagnostico gerado."}
-                  footer={(diagnosisResult.diagnosis?.recommendedActions ?? []).join(" · ")}
-                />
-              )}
-              {summaryResult && (
-                <GeneratedCard
-                  title={summaryResult.summary?.headline ?? "Resumo diario"}
-                  subtitle="Operacao do dia"
-                  body={summaryResult.summary?.summary ?? "Resumo gerado."}
-                  footer={(summaryResult.summary?.tomorrowSuggestions ?? []).join(" · ")}
-                />
-              )}
-              <RecentTasks tasks={data.tasks.filter((task: any) => !String(task.task_type).includes("campaign"))} />
-            </TabsContent>
+            </div>
 
-            <TabsContent value="uso" className="space-y-4">
-              <Card>
-                <CardContent className="p-5">
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h2 className="font-display text-xl font-semibold">Uso mensal</h2>
-                      <p className="text-sm text-muted-foreground">Acompanhamento para controlar custo e evitar abuso.</p>
-                    </div>
-                    <Badge variant="outline">{data.usage.totalTasks} tarefa(s)</Badge>
-                  </div>
-                  <div className="mt-4 space-y-2">
-                    <Progress value={usagePercent} />
-                    <p className="text-sm text-muted-foreground">
-                      {Number(data.usage.totalTokens ?? 0).toLocaleString("pt-BR")} de {Number(data.usage.monthlyTokenLimit ?? 0).toLocaleString("pt-BR")} creditos usados.
-                    </p>
-                  </div>
-                  <div className="mt-4 grid gap-3 sm:grid-cols-3">
-                    <MiniUsage label="Custo estimado" value={brl(Number(data.usage.estimatedCost ?? 0))} />
-                    <MiniUsage label="Limite de tarefas" value={data.usage.monthlyTaskLimit} />
-                    <MiniUsage label="Modulos ativos" value={data.usage.byModule.length} />
-                  </div>
-                </CardContent>
-              </Card>
-              <div className="grid gap-3 md:grid-cols-2">
-                {data.usage.byModule.map((row: any) => (
-                  <Card key={row.module}>
-                    <CardContent className="p-4">
-                      <p className="font-semibold">{moduleLabel[row.module] ?? row.module}</p>
-                      <p className="mt-1 text-sm text-muted-foreground">{row.tasks} tarefa(s) · {Number(row.tokens ?? 0).toLocaleString("pt-BR")} creditos</p>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </TabsContent>
+            {diagnosisResult && (
+              <GeneratedCard
+                title="Análise de faturamento"
+                subtitle={`Receita atual: ${brl(Number(diagnosisResult.metrics?.currentRevenue ?? 0))}`}
+                body={diagnosisResult.diagnosis?.summary ?? "Análise concluída."}
+                footer={(diagnosisResult.diagnosis?.recommendedActions ?? []).join(" · ")}
+              />
+            )}
+          </TabsContent>
 
-            <TabsContent value="configuracoes">
-              <Card>
-                <CardContent className="space-y-5 p-5">
-                  <div className="grid gap-4 md:grid-cols-2">
-                    <ToggleRow label="Inteligencia ativa" checked={settings.ai_enabled} onCheckedChange={(v) => setSettings({ ...settings, ai_enabled: v })} />
-                    <ToggleRow label="Gerar oportunidades automaticamente" checked={settings.auto_insights_enabled} onCheckedChange={(v) => setSettings({ ...settings, auto_insights_enabled: v })} />
-                    <ToggleRow label="Execucao automatica" checked={settings.auto_execute_enabled} onCheckedChange={(v) => setSettings({ ...settings, auto_execute_enabled: v })} />
+          {/* MODO INTELIGÊNCIA */}
+          <TabsContent value="modo" className="space-y-4">
+            <Card>
+              <CardContent className="space-y-6 p-6">
+                <div>
+                  <h3 className="font-display text-xl font-semibold">Modo Inteligência</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    Defina quanto a inteligência deve trabalhar no seu negócio. Mais intensidade = mais análises automáticas.
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-between rounded-2xl bg-muted/40 p-4">
+                  <div>
+                    <Label className="font-semibold">Inteligência ativa</Label>
+                    <p className="text-xs text-muted-foreground">Liga e desliga as análises e oportunidades automáticas.</p>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-3">
-                    <Field label="Tom de comunicacao">
-                      <Input value={settings.preferred_tone} onChange={(e) => setSettings({ ...settings, preferred_tone: e.target.value })} />
-                    </Field>
-                    <Field label="Creditos mensais">
-                      <Input type="number" value={settings.monthly_token_limit} onChange={(e) => setSettings({ ...settings, monthly_token_limit: Number(e.target.value) })} />
-                    </Field>
-                    <Field label="Tarefas mensais">
-                      <Input type="number" value={settings.monthly_task_limit} onChange={(e) => setSettings({ ...settings, monthly_task_limit: Number(e.target.value) })} />
-                    </Field>
+                  <Switch checked={aiEnabled} onCheckedChange={setAiEnabled} />
+                </div>
+
+                <div className="flex items-center justify-between rounded-2xl bg-muted/40 p-4">
+                  <div>
+                    <Label className="font-semibold">Oportunidades automáticas</Label>
+                    <p className="text-xs text-muted-foreground">Identificamos pontos de atenção sem que você precise pedir.</p>
                   </div>
-                  <Field label="DNA do negocio">
-                    <Textarea rows={8} className="font-mono text-xs" value={settings.business_context_text} onChange={(e) => setSettings({ ...settings, business_context_text: e.target.value })} />
-                  </Field>
-                  <Button onClick={() => saveSettings.mutate()} disabled={saveSettings.isPending}>
-                    {saveSettings.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
-                    Salvar configuracoes
-                  </Button>
-                </CardContent>
-              </Card>
-            </TabsContent>
-          </Tabs>
-        </div>
+                  <Switch checked={autoInsights} onCheckedChange={setAutoInsights} />
+                </div>
+
+                <div>
+                  <Label className="font-semibold">Intensidade</Label>
+                  <p className="mb-3 text-xs text-muted-foreground">Quanto mais intenso, mais análises por mês.</p>
+                  <div className="grid gap-2 sm:grid-cols-3">
+                    {(["leve", "equilibrado", "intenso"] as IntensityLevel[]).map((lvl) => (
+                      <button
+                        key={lvl}
+                        type="button"
+                        onClick={() => setIntensity(lvl)}
+                        className={`rounded-2xl border p-4 text-left transition-premium hover-lift ${
+                          intensity === lvl
+                            ? "border-primary bg-primary/5 shadow-[var(--shadow-neo-inset)]"
+                            : "border-border bg-card"
+                        }`}
+                      >
+                        <p className="font-display font-semibold capitalize">{lvl}</p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          {lvl === "leve" && "Análises essenciais apenas."}
+                          {lvl === "equilibrado" && "Análises frequentes e oportunidades."}
+                          {lvl === "intenso" && "Vigilância contínua e respostas rápidas."}
+                        </p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <Button onClick={() => saveSettings.mutate()} disabled={saveSettings.isPending}>
+                  {saveSettings.isPending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <CheckCircle2 className="mr-2 h-4 w-4" />}
+                  Salvar preferências
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       ) : null}
     </>
   );
 }
 
-function MetricCard({ icon: Icon, label, value }: { icon: any; label: string; value: string | number }) {
+function QuickStat({ icon: Icon, label, value, tone }: { icon: any; label: string; value: string; tone?: "success" | "muted" }) {
+  const valueClass = tone === "success" ? "text-success" : tone === "muted" ? "text-muted-foreground" : "";
   return (
     <Card>
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-xs text-muted-foreground">{label}</p>
-            <p className="mt-1 font-display text-2xl font-bold">{value}</p>
-          </div>
-          <div className="grid h-10 w-10 place-content-center rounded-lg bg-primary/10 text-primary">
-            <Icon className="h-5 w-5" />
-          </div>
+      <CardContent className="flex items-center gap-3 p-4">
+        <div className="grid h-11 w-11 shrink-0 place-content-center rounded-2xl bg-primary/10 text-primary">
+          <Icon className="h-5 w-5" />
+        </div>
+        <div className="min-w-0">
+          <p className="text-xs uppercase tracking-wider text-muted-foreground">{label}</p>
+          <p className={`font-display text-2xl font-bold tabular-nums ${valueClass}`}>{value}</p>
         </div>
       </CardContent>
     </Card>
   );
 }
 
-function ActionCard({ icon: Icon, title, description, actionLabel, pending, onClick }: { icon: any; title: string; description: string; actionLabel: string; pending: boolean; onClick: () => void }) {
+function SpecialistCard({ icon: Icon, title, description, cta, pending, onClick }: { icon: any; title: string; description: string; cta: string; pending: boolean; onClick: () => void }) {
   return (
-    <Card>
-      <CardContent className="p-5">
+    <Card className="transition-premium hover-lift h-full">
+      <CardContent className="flex h-full flex-col gap-4 p-5">
         <div className="flex items-start gap-3">
-          <div className="grid h-10 w-10 place-content-center rounded-lg bg-primary/10 text-primary">
+          <div className="grid h-11 w-11 shrink-0 place-content-center rounded-2xl bg-primary/10 text-primary">
             <Icon className="h-5 w-5" />
           </div>
           <div>
             <h3 className="font-display text-lg font-semibold">{title}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{description}</p>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{description}</p>
           </div>
         </div>
-        <Button className="mt-4" onClick={onClick} disabled={pending}>
+        <Button onClick={onClick} disabled={pending} className="mt-auto w-fit">
           {pending ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Sparkles className="mr-2 h-4 w-4" />}
-          {actionLabel}
+          {cta}
         </Button>
       </CardContent>
     </Card>
@@ -470,55 +489,17 @@ function ActionCard({ icon: Icon, title, description, actionLabel, pending, onCl
 
 function GeneratedCard({ title, subtitle, body, footer }: { title: string; subtitle?: string; body?: string; footer?: string }) {
   return (
-    <Card className="border-primary/20">
+    <Card className="border-primary/20 animate-in fade-in slide-in-from-bottom-2 duration-300">
       <CardContent className="p-5">
-        <Badge variant="secondary">Gerado</Badge>
+        <Badge variant="secondary">
+          <Sparkles className="mr-1 h-3 w-3" />
+          Gerado pela Inteligência
+        </Badge>
         <h3 className="mt-3 font-display text-xl font-semibold">{title}</h3>
         {subtitle && <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>}
-        {body && <p className="mt-4 rounded-lg border bg-background p-3 text-sm">{body}</p>}
+        {body && <p className="mt-4 rounded-2xl bg-muted/40 p-4 text-sm leading-relaxed">{body}</p>}
         {footer && <p className="mt-3 text-xs text-muted-foreground">{footer}</p>}
       </CardContent>
     </Card>
   );
-}
-
-function RecentTasks({ tasks }: { tasks: any[] }) {
-  if (!tasks.length) return <Card><CardContent className="p-5 text-sm text-muted-foreground">Nenhuma tarefa recente nesta secao.</CardContent></Card>;
-  return (
-    <div className="space-y-2">
-      {tasks.slice(0, 6).map((task) => (
-        <Card key={task.id}>
-          <CardContent className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-medium">{task.task_type}</p>
-              <p className="text-xs text-muted-foreground">{moduleLabel[task.module] ?? task.module} · {task.status}</p>
-            </div>
-            <Badge variant={task.status === "completed" ? "secondary" : "outline"}>{task.execution_mode ?? "regra"}</Badge>
-          </CardContent>
-        </Card>
-      ))}
-    </div>
-  );
-}
-
-function MiniUsage({ label, value }: { label: string; value: string | number }) {
-  return (
-    <div className="rounded-lg border bg-background p-3">
-      <p className="text-xs text-muted-foreground">{label}</p>
-      <p className="mt-1 font-display text-xl font-semibold">{value}</p>
-    </div>
-  );
-}
-
-function ToggleRow({ label, checked, onCheckedChange }: { label: string; checked: boolean; onCheckedChange: (value: boolean) => void }) {
-  return (
-    <div className="flex items-center justify-between gap-3 rounded-lg border bg-background p-3">
-      <Label>{label}</Label>
-      <Switch checked={checked} onCheckedChange={onCheckedChange} />
-    </div>
-  );
-}
-
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
-  return <div className="space-y-2"><Label>{label}</Label>{children}</div>;
 }
