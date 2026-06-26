@@ -9,15 +9,18 @@ import { TrendIndicator } from "@/components/trend-indicator";
 import { greetingForNow } from "@/lib/design-system";
 import { getAlertasOperacionais, getDashboardOperacional } from "@/lib/lavaflow.functions";
 import { getOnboardingState as getOnboardingStateFn } from "@/lib/onboarding.functions";
+import { listIntelligenceOverview } from "@/lib/inteligencia.functions";
 import { SetupChecklist } from "@/components/setup-checklist";
 import { EmptyDashboard } from "@/components/empty-dashboard";
 import { VehicleVisual } from "@/components/vehicle-visual";
+import { InsightCard, type InsightTone } from "@/components/ui/insight-card";
 import { brl } from "@/lib/format";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarDays, Car, CheckCircle2, Clock, DollarSign, ExternalLink, Play, Share2, Megaphone } from "lucide-react";
+import { AlertTriangle, ArrowRight, BarChart3, BrainCircuit, CalendarDays, Car, CheckCircle2, Clock, DollarSign, ExternalLink, Lightbulb, Megaphone, Play, Share2, Sparkles, Target, TrendingDown, TrendingUp, Users } from "lucide-react";
+
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
   component: () => <RequireRole roles={GESTAO}><Dashboard /></RequireRole>,
@@ -53,10 +56,13 @@ function Dashboard() {
   const fetchOps = useServerFn(getDashboardOperacional);
   const fetchAlertas = useServerFn(getAlertasOperacionais);
   const fetchState = useServerFn(getOnboardingStateFn);
-  const { data, isLoading } = useQuery({ queryKey: ["dashboard-operacional"], queryFn: () => fetchOps(), refetchInterval: 60_000 });
-  const { data: alertasData } = useQuery({ queryKey: ["alertas-operacionais-home"], queryFn: () => fetchAlertas(), refetchInterval: 60_000 });
+  const fetchInsights = useServerFn(listIntelligenceOverview);
+  const { data, isLoading } = useQuery({ queryKey: ["dashboard-operacional"], queryFn: () => fetchOps(), refetchInterval: 60_000, staleTime: 30_000 });
+  const { data: alertasData } = useQuery({ queryKey: ["alertas-operacionais-home"], queryFn: () => fetchAlertas(), refetchInterval: 60_000, staleTime: 30_000 });
   const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
+  const { data: intelData } = useQuery({ queryKey: ["dashboard-oportunidades"], queryFn: () => fetchInsights(), staleTime: 60_000, retry: false });
   const firstName = useFirstName();
+
 
   if (isLoading || !data) {
     return <div className="space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded-2xl skeleton-shimmer" />)}</div>;
@@ -98,10 +104,10 @@ function Dashboard() {
           </Button>
         </CardContent>
       </Card>
-
-
+      <OpportunitiesBand insights={intelData?.insights ?? []} />
 
       <SetupChecklist />
+
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi icon={CalendarDays} label="Agendamentos de hoje" value={String(cards.agendamentosHoje ?? 0)} to="/agendamentos" trend={(cards as any).trend?.agendamentos} />
@@ -276,3 +282,72 @@ function tempoEmAtendimento(ordem: any) {
   const m = mins % 60;
   return m ? `${h}h ${m}min` : `${h}h`;
 }
+
+const severityToneMap: Record<string, InsightTone> = {
+  opportunity: "opportunity",
+  warning: "warning",
+  critical: "critical",
+  info: "info",
+};
+
+const severityLabelMap: Record<string, string> = {
+  opportunity: "Oportunidade",
+  warning: "Atenção",
+  critical: "Crítico",
+  info: "Informação",
+};
+
+const moduleIconMap: Record<string, any> = {
+  marketing: Megaphone,
+  financeiro: TrendingDown,
+  operacao: Target,
+  clientes: Users,
+  agenda: Sparkles,
+  relatorios: BarChart3,
+  assistente: BrainCircuit,
+};
+
+function OpportunitiesBand({ insights }: { insights: any[] }) {
+  if (!insights || insights.length === 0) return null;
+  const top = insights.slice(0, 3);
+  return (
+    <section className="mb-6">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 font-display font-semibold">
+          <Lightbulb className="h-4 w-4 text-primary" />
+          Oportunidades de hoje
+        </h2>
+        <Button asChild variant="ghost" size="sm" className="px-2 text-xs">
+          <Link to="/inteligencia">Ver todas <ArrowRight className="ml-1 h-3 w-3" /></Link>
+        </Button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 list-stagger">
+        {top.map((insight: any, i: number) => {
+          const tone = severityToneMap[insight.severity] ?? "opportunity";
+          const Icon = moduleIconMap[insight.module] ?? TrendingUp;
+          const impact = insight.metric_value && String(insight.metric_key ?? "").toLowerCase().includes("receita")
+            ? brl(Number(insight.metric_value))
+            : undefined;
+          return (
+            <div key={insight.id} style={{ ["--i" as any]: i }}>
+              <InsightCard
+                icon={Icon}
+                tone={tone}
+                toneLabel={severityLabelMap[insight.severity] ?? "Oportunidade"}
+                title={insight.title}
+                description={insight.description}
+                impact={impact}
+                primaryAction={{
+                  label: "Ver detalhes",
+                  onClick: () => { window.location.href = "/inteligencia"; },
+                  icon: ArrowRight,
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+

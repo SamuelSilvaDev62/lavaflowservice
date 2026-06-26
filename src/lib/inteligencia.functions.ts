@@ -393,13 +393,13 @@ export const listIntelligenceOverview = createServerFn({ method: "GET" })
         estimatedCost: roundMoney(usageRows.reduce((sum: number, row: any) => sum + Number(row.estimated_cost ?? 0), 0)),
         monthlyTokenLimit: Number(settings.monthly_token_limit ?? 0),
         monthlyTaskLimit: Number(settings.monthly_task_limit ?? 0),
-        byModule: Object.values(usageRows.reduce((acc: Record<string, any>, row: any) => {
+        byModule: Object.values(usageRows.reduce((acc: Record<string, { module: string; tasks: number; tokens: number }>, row: any) => {
           const key = row.module ?? "outros";
           acc[key] ??= { module: key, tasks: 0, tokens: 0 };
           acc[key].tasks += 1;
           acc[key].tokens += Number(row.total_tokens ?? 0);
           return acc;
-        }, {})),
+        }, {})) as Array<{ module: string; tasks: number; tokens: number }>,
       },
     };
   });

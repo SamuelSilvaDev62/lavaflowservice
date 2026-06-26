@@ -7,9 +7,9 @@ import { GESTAO } from "@/lib/rbac";
 import { getCampanhas, criarCampanhaInteligente, marcarCampanhaAlvoEnviado, processarConversoesCampanhas } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
-import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { CampaignCard } from "@/components/ui/campaign-card";
 import { MessageCircle, Megaphone, RefreshCw, Sparkles, Users } from "lucide-react";
 import { toast } from "sonner";
 
@@ -21,8 +21,15 @@ const tipoLabel: Record<string, string> = {
   inativos: "Clientes inativos",
   fidelidade: "Fidelidade",
   assinatura: "Assinaturas",
-  baixa_ocupacao: "Baixa ocupacao",
-  aniversario: "Aniversario",
+  baixa_ocupacao: "Baixa ocupação",
+  aniversario: "Aniversário",
+};
+
+const statusTone: Record<string, "active" | "draft" | "done" | "paused"> = {
+  ativa: "active",
+  rascunho: "draft",
+  concluida: "done",
+  pausada: "paused",
 };
 
 function Page() {
@@ -42,16 +49,16 @@ function Page() {
   const enviarMut = useMutation({
     mutationFn: (id: string) => marcar({ data: { id } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["campanhas"] }),
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao marcar envio"),
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao registrar envio"),
   });
   const processarMut = useMutation({
     mutationFn: () => processar(),
     onSuccess: (res: any) => {
       qc.invalidateQueries({ queryKey: ["campanhas"] });
       qc.invalidateQueries({ queryKey: ["receita-influenciada"] });
-      toast.success(`${res.convertidos} conversao(oes) encontradas`);
+      toast.success(`${res.convertidos} conversão(ões) encontradas`);
     },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar conversoes"),
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar conversões"),
   });
 
   function msgFor(template: string, alvo: any) {
@@ -61,50 +68,51 @@ function Page() {
   return (
     <>
       <PageHeader
-        title="Campanhas Inteligentes"
-        subtitle="Transforme oportunidades do Consultor IA em acoes de WhatsApp rastreaveis."
+        title="Campanhas"
+        subtitle="Transforme oportunidades em conversas — cada campanha vira receita rastreável."
         actions={
           <Button variant="outline" onClick={() => processarMut.mutate()} disabled={processarMut.isPending}>
-            <RefreshCw className="mr-1 h-4 w-4" />Atualizar conversoes
+            <RefreshCw className="mr-1 h-4 w-4" />Atualizar conversões
           </Button>
         }
       />
 
-      {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
+      {isLoading && (
+        <div className="space-y-3">
+          {[1, 2, 3].map((i) => <div key={i} className="h-40 rounded-2xl skeleton-shimmer" />)}
+        </div>
+      )}
 
       {data && (
-        <div className="space-y-5">
+        <div className="space-y-6">
           <section>
             <div className="mb-3 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              <h2 className="font-display font-semibold">Sugestoes automaticas</h2>
+              <h2 className="font-display font-semibold">Sugeridas para você</h2>
             </div>
             {data.sugestoes.length === 0 ? (
-              <Card><CardContent className="p-6 text-sm text-muted-foreground">Ainda nao ha uma campanha recomendada com dados suficientes.</CardContent></Card>
+              <Card><CardContent className="p-6 text-sm text-muted-foreground">Ainda não há uma campanha recomendada com dados suficientes.</CardContent></Card>
             ) : (
-              <div className="grid gap-3 lg:grid-cols-2">
-                {data.sugestoes.map((s: any) => (
-                  <Card key={s.tipo} className="border-primary/20">
-                    <CardContent className="p-4">
-                      <div className="flex items-start justify-between gap-3">
-                        <div>
-                          <Badge variant="secondary">{tipoLabel[s.tipo] ?? s.tipo}</Badge>
-                          <h3 className="mt-2 font-display font-semibold">{s.titulo}</h3>
-                          <p className="mt-1 text-sm text-muted-foreground">{s.descricao}</p>
-                        </div>
-                        <div className="text-right">
-                          <p className="text-xs text-muted-foreground">Potencial</p>
-                          <p className="font-display font-bold text-success">{brl(s.impactoEstimado)}</p>
-                        </div>
-                      </div>
-                      <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
-                        <span className="inline-flex items-center gap-1 text-xs text-muted-foreground"><Users className="h-3.5 w-3.5" />{s.alvos.length} alvo(s)</span>
-                        <Button size="sm" onClick={() => criarMut.mutate(s)} disabled={criarMut.isPending}>
+              <div className="grid gap-4 lg:grid-cols-2 list-stagger">
+                {data.sugestoes.map((s: any, i: number) => (
+                  <div key={s.tipo} style={{ ["--i" as any]: i }}>
+                    <CampaignCard
+                      title={s.titulo}
+                      objective={tipoLabel[s.tipo] ?? s.tipo}
+                      audienceLabel={`${s.alvos.length} cliente(s)`}
+                      status="Sugerida"
+                      statusTone="draft"
+                      channels={["whatsapp"]}
+                      metric={{ label: "Potencial", value: brl(s.impactoEstimado) }}
+                      actions={
+                        <Button size="sm" onClick={() => criarMut.mutate(s)} disabled={criarMut.isPending} variant="premium">
                           <Megaphone className="mr-1 h-4 w-4" />Criar campanha
                         </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
+                      }
+                    >
+                      <p className="text-sm leading-relaxed text-muted-foreground">{s.descricao}</p>
+                    </CampaignCard>
+                  </div>
                 ))}
               </div>
             )}
@@ -113,57 +121,54 @@ function Page() {
           <section>
             <div className="mb-3 flex items-center gap-2">
               <Megaphone className="h-4 w-4 text-primary" />
-              <h2 className="font-display font-semibold">Campanhas criadas</h2>
+              <h2 className="font-display font-semibold">Suas campanhas</h2>
             </div>
             {(data.campanhas ?? []).length === 0 ? (
               <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhuma campanha criada ainda.</CardContent></Card>
             ) : (
-              <div className="space-y-3">
-                {data.campanhas.map((c: any) => (
-                  <Card key={c.id}>
-                    <CardContent className="p-4">
-                      {(() => {
-                        const enviados = c.alvos.filter((a: any) => ["enviado", "convertido"].includes(a.status)).length;
-                        const convertidos = c.alvos.filter((a: any) => a.status === "convertido").length;
-                        const conversao = enviados ? convertidos / enviados : 0;
-                        return (
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <h3 className="font-display font-semibold">{c.nome}</h3>
-                            <Badge variant="outline">{tipoLabel[c.tipo] ?? c.tipo}</Badge>
-                            <Badge variant="secondary">{c.status}</Badge>
-                          </div>
-                          <p className="mt-1 text-sm text-muted-foreground">{c.mensagem}</p>
+              <div className="space-y-4 list-stagger">
+                {data.campanhas.map((c: any, i: number) => {
+                  const enviados = c.alvos.filter((a: any) => ["enviado", "convertido"].includes(a.status)).length;
+                  const convertidos = c.alvos.filter((a: any) => a.status === "convertido").length;
+                  const conversao = enviados ? convertidos / enviados : 0;
+                  const date = c.created_at ? new Date(c.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : undefined;
+                  return (
+                    <div key={c.id} style={{ ["--i" as any]: i }}>
+                      <CampaignCard
+                        title={c.nome}
+                        objective={tipoLabel[c.tipo] ?? c.tipo}
+                        audienceLabel={`${c.alvos.length} alvo(s)`}
+                        status={c.status}
+                        statusTone={statusTone[c.status] ?? "draft"}
+                        date={date}
+                        channels={["whatsapp"]}
+                        metric={{ label: "Receita influenciada", value: brl(c.receitaInfluenciada ?? 0) }}
+                      >
+                        <p className="text-sm leading-relaxed text-muted-foreground">{c.mensagem}</p>
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                          <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" />{convertidos} conv. · {Math.round(conversao * 100)}%</span>
                         </div>
-                        <div className="text-left sm:text-right">
-                          <p className="text-sm font-medium">{c.alvos.length} alvo(s)</p>
-                          <p className="text-xs text-muted-foreground">{convertidos} conv. · {Math.round(conversao * 100)}%</p>
-                          <p className="text-xs font-semibold text-success">{brl(c.receitaInfluenciada ?? 0)}</p>
-                        </div>
-                      </div>
-                        );
-                      })()}
-                      <div className="mt-3 divide-y rounded-md border">
-                        {c.alvos.slice(0, 12).map((a: any) => (
-                          <div key={a.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                              <p className="text-sm font-medium">{a.nome ?? "Cliente"}</p>
-                              <p className="text-xs text-muted-foreground">{a.telefone ?? "sem telefone"} · {a.status}</p>
+                        <div className="divide-y rounded-2xl border bg-card">
+                          {c.alvos.slice(0, 12).map((a: any) => (
+                            <div key={a.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+                              <div className="min-w-0">
+                                <p className="truncate text-sm font-medium">{a.nome ?? "Cliente"}</p>
+                                <p className="truncate text-xs text-muted-foreground">{a.telefone ?? "sem telefone"} · {a.status}</p>
+                              </div>
+                              {a.telefone && (
+                                <Button asChild size="sm" variant={a.status === "enviado" ? "outline" : "default"} onClick={() => enviarMut.mutate(a.id)}>
+                                  <a href={waLink(a.telefone, msgFor(c.mensagem, a))} target="_blank" rel="noreferrer">
+                                    <MessageCircle className="mr-1 h-4 w-4" />Enviar
+                                  </a>
+                                </Button>
+                              )}
                             </div>
-                            {a.telefone && (
-                              <Button asChild size="sm" variant={a.status === "enviado" ? "outline" : "default"} onClick={() => enviarMut.mutate(a.id)}>
-                                <a href={waLink(a.telefone, msgFor(c.mensagem, a))} target="_blank" rel="noreferrer">
-                                  <MessageCircle className="mr-1 h-4 w-4" />Enviar
-                                </a>
-                              </Button>
-                            )}
-                          </div>
-                        ))}
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
+                          ))}
+                        </div>
+                      </CampaignCard>
+                    </div>
+                  );
+                })}
               </div>
             )}
           </section>
