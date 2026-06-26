@@ -56,10 +56,13 @@ function Dashboard() {
   const fetchOps = useServerFn(getDashboardOperacional);
   const fetchAlertas = useServerFn(getAlertasOperacionais);
   const fetchState = useServerFn(getOnboardingStateFn);
-  const { data, isLoading } = useQuery({ queryKey: ["dashboard-operacional"], queryFn: () => fetchOps(), refetchInterval: 60_000 });
-  const { data: alertasData } = useQuery({ queryKey: ["alertas-operacionais-home"], queryFn: () => fetchAlertas(), refetchInterval: 60_000 });
+  const fetchInsights = useServerFn(listIntelligenceOverview);
+  const { data, isLoading } = useQuery({ queryKey: ["dashboard-operacional"], queryFn: () => fetchOps(), refetchInterval: 60_000, staleTime: 30_000 });
+  const { data: alertasData } = useQuery({ queryKey: ["alertas-operacionais-home"], queryFn: () => fetchAlertas(), refetchInterval: 60_000, staleTime: 30_000 });
   const { data: state } = useQuery({ queryKey: ["onboarding-state"], queryFn: () => fetchState() });
+  const { data: intelData } = useQuery({ queryKey: ["dashboard-oportunidades"], queryFn: () => fetchInsights(), staleTime: 60_000, retry: false });
   const firstName = useFirstName();
+
 
   if (isLoading || !data) {
     return <div className="space-y-4">{[1, 2, 3, 4].map((i) => <div key={i} className="h-24 rounded-2xl skeleton-shimmer" />)}</div>;
