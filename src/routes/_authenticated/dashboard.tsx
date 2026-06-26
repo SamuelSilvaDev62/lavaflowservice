@@ -282,3 +282,72 @@ function tempoEmAtendimento(ordem: any) {
   const m = mins % 60;
   return m ? `${h}h ${m}min` : `${h}h`;
 }
+
+const severityToneMap: Record<string, InsightTone> = {
+  opportunity: "opportunity",
+  warning: "warning",
+  critical: "critical",
+  info: "info",
+};
+
+const severityLabelMap: Record<string, string> = {
+  opportunity: "Oportunidade",
+  warning: "Atenção",
+  critical: "Crítico",
+  info: "Informação",
+};
+
+const moduleIconMap: Record<string, any> = {
+  marketing: Megaphone,
+  financeiro: TrendingDown,
+  operacao: Target,
+  clientes: Users,
+  agenda: Sparkles,
+  relatorios: BarChart3,
+  assistente: BrainCircuit,
+};
+
+function OpportunitiesBand({ insights }: { insights: any[] }) {
+  if (!insights || insights.length === 0) return null;
+  const top = insights.slice(0, 3);
+  return (
+    <section className="mb-6">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <h2 className="flex items-center gap-2 font-display font-semibold">
+          <Lightbulb className="h-4 w-4 text-primary" />
+          Oportunidades de hoje
+        </h2>
+        <Button asChild variant="ghost" size="sm" className="px-2 text-xs">
+          <Link to="/inteligencia">Ver todas <ArrowRight className="ml-1 h-3 w-3" /></Link>
+        </Button>
+      </div>
+      <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3 list-stagger">
+        {top.map((insight: any, i: number) => {
+          const tone = severityToneMap[insight.severity] ?? "opportunity";
+          const Icon = moduleIconMap[insight.module] ?? TrendingUp;
+          const impact = insight.metric_value && String(insight.metric_key ?? "").toLowerCase().includes("receita")
+            ? brl(Number(insight.metric_value))
+            : undefined;
+          return (
+            <div key={insight.id} style={{ ["--i" as any]: i }}>
+              <InsightCard
+                icon={Icon}
+                tone={tone}
+                toneLabel={severityLabelMap[insight.severity] ?? "Oportunidade"}
+                title={insight.title}
+                description={insight.description}
+                impact={impact}
+                primaryAction={{
+                  label: "Ver detalhes",
+                  onClick: () => { window.location.href = "/inteligencia"; },
+                  icon: ArrowRight,
+                }}
+              />
+            </div>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
