@@ -104,10 +104,10 @@ function Dashboard() {
           </Button>
         </CardContent>
       </Card>
-
-
+      <OpportunitiesBand insights={intelData?.insights ?? []} />
 
       <SetupChecklist />
+
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi icon={CalendarDays} label="Agendamentos de hoje" value={String(cards.agendamentosHoje ?? 0)} to="/agendamentos" trend={(cards as any).trend?.agendamentos} />
