@@ -113,7 +113,7 @@ function Page() {
   const empresa: any = data?.empresa;
   const selectedServico = servicos.find((s) => s.id === servicoId);
 
-  const diasSemana = data?.agendaConfig?.dias_semana ?? [1, 2, 3, 4, 5, 6];
+  const diasSemana = (data?.config?.dias_semana as number[] | undefined) ?? [1, 2, 3, 4, 5, 6];
 
   const mut = useMutation({
     mutationFn: () =>
