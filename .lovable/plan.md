@@ -1,120 +1,175 @@
-# Plano — Auditoria & Refinamento Premium v3
+# Plano — Copiloto Contextual + Redesign Booking Público
 
-Escopo focado em **frontend, UX/UI, microinterações, consistência visual e linguagem humanizada**. Sem mexer em RLS, schema do banco ou contratos do Flow Engine — apenas a camada de apresentação acima deles.
-
-## Princípios
-
-1. **Esconder a complexidade técnica.** Nada de "workflow", "agent", "token", "LLM", "pipeline", "OpenSquad" na UI.
-2. **Linguagem orientada a benefício** ("Criar campanha", "Analisar faturamento", "Gerar resumo").
-3. **Cartões inteligentes** no lugar de tabelas frias para insights e campanhas.
-4. **Microinterações discretas** padronizadas com os tokens já criados em `design-system.ts` (duration-fast/base/slow, transition-premium, hover-lift, press-scale).
-5. **Lucide only**, animações com mesmo timing, sem libs novas.
+Dois eixos independentes que podem ser entregues juntos. Foco em frontend; backend só onde a lógica de slots realmente exige correção.
 
 ---
 
-## Etapa 1 — Auditoria & Fundação Visual
+## Parte A — Copiloto Operacional Contextual
 
-**Novo:** `src/components/ui/insight-card.tsx`, `src/components/ui/campaign-card.tsx`, `src/components/ui/section-summary.tsx`, `src/components/ui/stat-tile.tsx`.
+Assistente flutuante que lê a rota atual e oferece 2-4 ações de alto valor. Sem expor "agent/workflow/LLM" na UI.
 
-`src/styles.css` ganha utilitários:
-- `.card-premium` (neomorphism leve consistente: shadow-sm + ring sutil + hover-lift).
-- `.chip-soft` (estados info/warning/critical/opportunity unificados).
-- `.list-stagger > *` (entrada `fade-in` com delay incremental via CSS variable `--i`).
-- `.skeleton-shimmer` já existe → aplicar de forma sistemática.
+### Componente
 
-**Auditoria executada agora** (substituições):
-- Remover overflow horizontal em tabelas densas (`agendamentos.tsx`, `ordens.tsx`, `equipe.tsx`, `clientes/index.tsx`) → adotar layout cartão <768px (já há `useMobile`); reaproveitar `CampaignCard`/`StatTile` quando aplicável.
-- Padronizar headers de página: `PageHeader` recebe `eyebrow`, `actions`, `description` opcionais (refator leve no componente existente em `app-layout.tsx`).
-- Normalizar PT-BR (acentos) nos textos das telas remanescentes (varredura em todas as rotas de `_authenticated/`).
+- Novo `src/components/copilot/contextual-copilot.tsx`: FAB no canto inferior direito (acima do menu mobile), abre um popover com:
+  - Cabeçalho "Copiloto" + descrição curta do contexto ("Você está na Agenda de hoje").
+  - Lista de ações sugeridas (chips/cards) com ícone + label + atalho.
+  - Footer "Abrir Consultor Inteligente" → `/inteligencia`.
+- Novo `src/lib/copilot/registry.ts`: mapa `route → CopilotAction[]`. Cada ação tem `id`, `label`, `icon`, `tone`, `run(ctx)` que abre dialog/navega/mutate.
+- Hook `useCopilotContext()` lê `useRouterState({ select: s => s.location.pathname })` + dados leves via `useQuery` (já cacheados) e retorna ações.
 
-## Etapa 2 — Módulo Inteligência humanizado
+### Mount
 
-**Reescrever `src/routes/_authenticated/inteligencia.tsx`** mantendo as chamadas a `inteligencia.functions.ts` (sem mexer em backend).
+- Em `src/routes/_authenticated/route.tsx` (dentro do layout, fora do `<Outlet/>`).
 
-Estrutura nova (3 abas suaves, sem cara de painel técnico):
-- **Hoje** → `SectionSummary` com 3-5 bullets ("Agenda com baixa ocupação", "Ticket médio caiu", "Potencial de upsell") + CTA "Ver análise". Substitui o bloco de "Resumo diário".
-- **Oportunidades** → grid de `InsightCard` (ícone temático, título curto, descrição em 1 frase, badge de impacto "+R$ 2.300", CTA primário "Gerar campanha" / secundário "Dispensar").
-- **Especialistas** → cards de "Análises" (faturamento, retenção, ocupação), cada um com botão "Analisar agora" — esconde a noção de agent/workflow.
+### Ações por rota (v1)
 
-**Renomes de UI (sem mudar slugs):**
-- "Configurações da IA" → **"Modo Inteligência"** (toggle Ligado/Desligado + intensidade leve/equilibrado/intenso, sem mostrar tokens/limites brutos; usa um slider que mapeia internamente para `monthly_token_limit`).
-- "Executar workflow" → **"Criar campanha"**.
-- "Rodar agente de faturamento" → **"Analisar faturamento"**.
-- "Pipeline" → **"Gerar resumo"**.
+| Rota | Ações |
+|---|---|
+| `/dashboard` | "Ver agenda de hoje", "Reagendar no-shows", "Cobrar OS pendentes" |
+| `/agendamentos` | "Reagendar selecionado", "Marcar como concluído", "Confirmar via WhatsApp", "Bloquear horário" |
+| `/ordens` | "Avançar status", "Adicionar upsell sugerido", "Marcar entregue" |
+| `/clientes` | "Enviar oferta de retorno", "Marcar VIP" |
+| `/equipe` | "Marcar pagamento de comissão", "Ver ranking do mês" |
+| `/inteligencia` | "Criar campanha a partir do top insight" |
 
-**Campanhas (`campanhas.tsx`):** lista vira grid de `CampaignCard` com: objetivo (badge), público (chip), status (chip animado), data, canais (ícones), ações `Ver` / `Duplicar` / `Pausar`.
+### Atalhos reais
 
-## Etapa 3 — Microinterações
+- **Reagendar OS**: usa server fn `atualizarAgendamento` (existente) — dialog rápido com date/time pickers reaproveitando os novos slots do redesign.
+- **Atualizar status OS**: usa `atualizarStatusOS` (existente) — dropdown de status no copiloto, mutate + invalidate query.
+- **No-shows**: filtra agendamentos `status=nao_compareceu` últimos 7d e abre lista com botão "Reagendar para amanhã".
 
-- Entrada de listas: `.list-stagger` (fade-in + translate-y 8px, 60ms entre itens, máx 8 itens animados).
-- Skeletons substituem spinners genéricos em Dashboard, Inteligência, Campanhas, Ordens, Equipe.
-- Toast de sucesso ganha ícone `CheckCircle2` + leve `scale-in` (config no `sonner.tsx`).
-- Hover em cards: `hover-lift` (translate-y -2px + shadow). Press: `press-scale` (scale 0.98).
-- Transições de rota: fade-in 200ms no `<Outlet />` do `_authenticated/route.tsx`.
+Sem novas server functions; só wrappers de UI.
 
-## Etapa 4 — Home (Painel Executivo) priorizada
+### Persistência leve
 
-Reordenar o `dashboard.tsx` na ordem de decisão do dono do lava-rápido:
+- LocalStorage `copilot:dismissed:{actionId}` para esconder ações dispensadas por 24h.
+- LocalStorage `copilot:open` para lembrar estado.
+
+---
+
+## Parte B — Redesign Booking Público (`/agendar/$slug`)
+
+Reescrita do fluxo priorizando velocidade (<60s) e clareza, mobile-first.
+
+### Nova estrutura — 4 etapas + resumo fixo
 
 ```text
-[Hero saudação + contexto do dia]
-[Faixa Oportunidades de Hoje]  ← novo, puxa top 3 de InsightCards
-[Agenda de hoje + Ordens em andamento] (2 col desktop, stack mobile)
-[KPIs faturamento com TrendIndicator]
-[Atalhos: Clientes • Equipe • Insights completos]
+[Hero compacto da empresa]
+[Stepper: Serviço → Data → Horário → Confirmar]
+[Conteúdo da etapa atual]
+[Resumo sticky (mobile: bottom bar) com CTA]
 ```
 
-A "Faixa Oportunidades" usa `listIntelligenceOverview` (já existe) com `limit: 3` — se vazio, esconde. Empty state com CTA "Configurar Modo Inteligência".
+Stepper reusa `src/components/booking-stepper.tsx` (já existe).
 
-## Etapa 5 — Consistência & Reuso
+### Etapa 1 — Hero
 
-- Consolidar 3 variações de empty state em `EmptyState` único (já existe `empty-state.tsx`, `empty-dashboard.tsx`) — manter um, deletar duplicado.
-- `PageHeader` único usado por todas as rotas autenticadas (já é, mas auditar props inconsistentes).
-- Ícones Lucide auditados — remover qualquer SVG inline remanescente.
+- Logo, nome, badge avaliação (se houver), endereço, horário hoje, CTA "Agendar" (rolagem ou scroll).
+- Remove `PremiumPageBody` da rota principal. Recompensas/portal viram tab/aba secundária acessada por link "Sou cliente" no header.
 
-## Etapa 6 — Linguagem orientada a benefício (varredura global)
+### Etapa 2 — Serviços
 
-Substituições textuais (find/replace controlado):
-| ❌ | ✔ |
-|---|---|
-| Executar workflow | Criar campanha |
-| Rodar agente | Analisar |
-| Pipeline | Resumo |
-| Token / LLM / Model | (remover da UI) |
-| Configurações da IA | Modo Inteligência |
+- Grid de `ServiceCard` (já existe, lazy load) — imagem, nome, preço, duração, pontos. Sem descrição longa.
+- Único CTA "Selecionar". Ao selecionar: card expande mostrando descrição + upsell sugerido inline; demais cards colapsam.
+- Categorias viram chips horizontais com scroll-snap (mobile).
 
-## Etapa 7 — Acessibilidade & Performance
+### Etapa 3 — Data
 
-- `min-h-11` em todos os CTAs primários mobile (já feito em `button.tsx`, auditar usos custom).
-- `React.memo` em `InsightCard`, `CampaignCard`, `ServiceCard` (já memo), `StatTile`.
-- `useQuery` com `staleTime: 30_000` onde hoje refetch é a cada 60s sem necessidade (Dashboard, Inteligência).
-- Prefetch via `router.preload` nos links principais da sidebar.
+- Calendário Shadcn `<Calendar mode="single">` com `disabled` para dias fora de `agenda_config.dias_semana` e dias passados.
+- Prefetch dos slots dos próximos 7 dias úteis para troca instantânea (`useQueries`).
 
-## Etapa 8 — 3 Oportunidades estratégicas (entregues no relatório, não implementadas)
+### Etapa 4 — Horário (redesign profundo)
 
-1. **Copiloto Operacional contextual** — assistente flutuante que lê a rota atual e oferece ações específicas (ex.: em `/agendamentos` sugere "Reagendar no-shows da semana"). Reaproveita Flow Engine sem expor o termo.
-2. **Radar de Retenção** — painel que prevê risco de churn por cliente usando histórico de OS, com ação 1-clique "Enviar oferta de retorno". Usa segment-templates do flow-engine.
-3. **Score Lava-Rápido** — índice composto (ocupação, ticket médio, retenção, NPS) com benchmarking anônimo vs. outros tenants. Vira diferencial comercial e gancho de upsell.
+- Novo componente `src/components/booking/time-slot-picker.tsx`.
+- Esconde indisponíveis (não risca — remove). Esconde passados (compara com `now()` em America/Sao_Paulo).
+- Agrupa por período: Manhã (<12h), Tarde (12-18h), Noite (≥18h), com header ícone + label.
+- Botões grandes (`min-h-12`), grid 3 col mobile / 4 col desktop.
+- Marca "⭐ Recomendado" no próximo horário livre ≥ now()+30min.
+- Mostra "1h" embaixo do hora se o serviço tem `tempo_estimado_min`.
+
+### Resumo + Confirmação
+
+- Card sticky (desktop: lateral; mobile: bottom drawer sempre visível após selecionar serviço).
+- Mostra serviço, data, hora, duração, valor, pontos.
+- Campos cliente (nome + WhatsApp + veículo + obs) numa última etapa "Confirmar".
+- CTA único: "Confirmar agendamento".
+
+### Microinterações
+
+- Reusar `list-stagger`, `hover-lift`, `press-scale`, `scale-in` já no `styles.css`.
+- Transição entre etapas: fade + slide-x suave.
+- Skeleton no time-slot picker enquanto carrega.
 
 ---
 
-## Entregáveis
+## Parte C — Correção da sincronização de horários
 
-- ~6 componentes novos (`InsightCard`, `CampaignCard`, `SectionSummary`, `StatTile`, refactor `PageHeader`, unificação `EmptyState`).
-- Reescrita de `inteligencia.tsx` e `campanhas.tsx`.
-- Refator do `dashboard.tsx` (reordenação + faixa de oportunidades).
-- Ajustes em `styles.css` (utilitários), `sonner.tsx` (ícones), `_authenticated/route.tsx` (fade-in).
-- Varredura PT-BR + linguagem benefício em todas as rotas autenticadas.
-- Relatório final em chat com: problemas corrigidos, decisões de design substituídas com justificativa, 3 oportunidades estratégicas.
+Auditoria + fix em `getHorariosDisponiveis` e `solicitarAgendamentoPublico`.
 
-## Fora de escopo (não tocar)
+### Problemas identificados
 
-- Backend, RLS, migrations, edge functions.
-- Contratos do Flow Engine / OpenSquad adapter.
-- Auth, Storage policies, tipos gerados Supabase.
+1. `getHorariosDisponiveis` não filtra horários passados — exibe slots `08:00` mesmo às 14h.
+2. Comparação `new Date(data + "T12:00:00").getDay()` força meio-dia local do server (UTC), o que em datas de DST ou perto da meia-noite pode mudar o dia da semana. O lava-rápido opera em America/Sao_Paulo (sem DST atual, mas a lógica precisa ser explícita).
+3. `solicitarAgendamentoPublico` não revalida capacidade no momento do insert (race condition: dois clientes pegam o mesmo slot).
+4. Frontend não invalida `["slots"]` após sucesso — slot recém-tomado continua aparecendo para outros.
 
-## Riscos & mitigação
+### Correções backend
 
-- Renomes podem confundir power-users → manter slugs de rota, só mudar labels.
-- Reescrita da Inteligência é a maior superfície → manter as mesmas server functions; só camada visual muda.
-- Animações em listas longas → cap em 8 itens animados, resto entra sem stagger.
+- `getHorariosDisponiveis`:
+  - Aceitar opcional `tz` (default `America/Sao_Paulo`).
+  - Computar `agora` em SP via `Intl.DateTimeFormat("en-CA", { timeZone })`.
+  - Se `data === hoje_local`, filtrar `slot.hora <= agora + 15min`.
+  - Calcular `dia_da_semana` via componentes (year/month/day) sem `Date` com fuso, evitando off-by-one.
+  - Retornar `{ slots, timezone, agora_local }` para debug.
+- `solicitarAgendamentoPublico`: dentro da transação, revalidar `get_ocupacao_dia(owner, data)[hora] < capacidade` antes do insert. Se falhar, retornar 409 com mensagem amigável.
+- Adicionar `data-funcionario_id` opcional ao trigger de capacidade (já existe; só validar reuso).
+
+### Correções frontend
+
+- `onSuccess` da mutation chama `queryClient.invalidateQueries({ queryKey: ["slots", slug] })`.
+- Polling leve (`refetchInterval: 30_000`) na tela de horários apenas quando aba está visível (`refetchIntervalInBackground: false`).
+- Realtime opcional v2 — fora deste escopo.
+
+### Sem DST no Brasil hoje
+
+Lógica usa `Intl` (DST-safe) então uma futura volta do horário de verão não quebra.
+
+---
+
+## Arquivos
+
+**Novos**
+- `src/components/copilot/contextual-copilot.tsx`
+- `src/components/copilot/copilot-fab.tsx`
+- `src/lib/copilot/registry.ts`
+- `src/lib/copilot/use-copilot-context.ts`
+- `src/components/booking/time-slot-picker.tsx`
+- `src/components/booking/booking-summary.tsx`
+- `src/components/booking/booking-calendar.tsx`
+- `src/components/booking/customer-form-step.tsx`
+
+**Editados**
+- `src/routes/agendar.$slug.tsx` — reescrita do fluxo (mantém SEO/head, mantém server fns existentes).
+- `src/routes/_authenticated/route.tsx` — mount do Copiloto.
+- `src/lib/lavaflow.functions.ts` — fix em `getHorariosDisponiveis` + revalidação em `solicitarAgendamentoPublico`.
+
+**Não tocar**
+- RLS, migrations, tipos gerados, `client.server.ts`.
+
+---
+
+## Fora de escopo
+- Edição da reserva pelo cliente após enviar.
+- Notificações push.
+- Realtime nos slots (apenas polling).
+- Copiloto com IA generativa — v1 é regras determinísticas.
+
+## Riscos
+- Race condition em slots: mitigado por revalidação no insert + invalidate no client.
+- Layout sticky no mobile pode brigar com teclado virtual — usar `dvh` e testar.
+- Quebra de copy/links que páginas externas usam — manter slug e rota intactos.
+
+## Entregáveis finais
+- Booking público em 4 etapas, sub-60s, mobile-first.
+- Copiloto contextual em 6+ rotas com atalhos reais para reagendar e mudar status.
+- Relatório curto no chat listando: bugs de timezone encontrados, correções aplicadas, métricas alvo (taps até confirmar, slots exibidos vs reais).
