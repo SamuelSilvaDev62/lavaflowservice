@@ -3808,9 +3808,10 @@ export const getClientePublico = createServerFn({ method: "POST" })
   });
 
 export const getHorariosDisponiveis = createServerFn({ method: "GET" })
-  .inputValidator((d: { slug: string; data: string }) => z.object({
+  .inputValidator((d: { slug: string; data: string; tz?: string }) => z.object({
     slug: z.string().min(1).max(80),
     data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    tz: z.string().max(60).optional(),
   }).parse(d))
   .handler(async ({ data }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -3822,8 +3823,26 @@ export const getHorariosDisponiveis = createServerFn({ method: "GET" })
       supabaseAdmin.rpc("get_ocupacao_dia", { _owner: empresa.owner_id, _data: data.data }),
     ]);
     const cfg = (cfgRows ?? [])[0] ?? { hora_inicio: "08:00", hora_fim: "18:00", dias_semana: [1,2,3,4,5,6], intervalo_min: 30, capacidade_simultanea: 1 };
-    const dia = new Date(data.data + "T12:00:00").getDay();
-    if (!cfg.dias_semana.includes(dia)) return { slots: [] };
+    const tz = data.tz || "America/Sao_Paulo";
+
+    // DST-safe: usa Intl com o fuso local da empresa para evitar off-by-one.
+    const fmtParts = (d: Date) => {
+      const parts = new Intl.DateTimeFormat("en-CA", {
+        timeZone: tz, year: "numeric", month: "2-digit", day: "2-digit",
+        hour: "2-digit", minute: "2-digit", weekday: "short", hour12: false,
+      }).formatToParts(d);
+      const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+      return { ymd: `${get("year")}-${get("month")}-${get("day")}`, hm: `${get("hour")}:${get("minute")}`, wd: get("weekday") };
+    };
+    const wdMap: Record<string, number> = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+    const dia = wdMap[fmtParts(new Date(data.data + "T12:00:00Z")).wd] ?? new Date(data.data + "T12:00:00").getDay();
+    if (!cfg.dias_semana.includes(dia)) return { slots: [], timezone: tz, agora: null as string | null };
+
+    const agora = fmtParts(new Date());
+    const isHoje = agora.ymd === data.data;
+    const [aH, aM] = agora.hm.split(":").map(Number);
+    const agoraMin = (aH || 0) * 60 + (aM || 0) + 15; // 15min buffer
+
     const ocupMap = new Map<string, number>();
     (ocup ?? []).forEach((o: any) => ocupMap.set(o.hora_agendada.slice(0,5), Number(o.qtd)));
     const [hI, mI] = cfg.hora_inicio.split(":").map(Number);
@@ -3834,10 +3853,11 @@ export const getHorariosDisponiveis = createServerFn({ method: "GET" })
     while (mins < fim) {
       const h = String(Math.floor(mins/60)).padStart(2,"0") + ":" + String(mins%60).padStart(2,"0");
       const usado = ocupMap.get(h) ?? 0;
-      slots.push({ hora: h, disponivel: usado < cfg.capacidade_simultanea });
+      const passado = isHoje && mins < agoraMin;
+      if (!passado) slots.push({ hora: h, disponivel: usado < cfg.capacidade_simultanea });
       mins += cfg.intervalo_min;
     }
-    return { slots };
+    return { slots, timezone: tz, agora: isHoje ? agora.hm : null };
   });
 
 export const solicitarAgendamentoPublico = createServerFn({ method: "POST" })
