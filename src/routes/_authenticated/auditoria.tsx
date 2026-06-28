@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -18,7 +18,8 @@ import {
   getAuditEvents, getAuditActors, getAuditSummary, type AuditEvent,
 } from "@/lib/auditoria.functions";
 import { dateTimeBr, brl, num } from "@/lib/format";
-import { Bot, ShieldCheck, Filter, RotateCcw, ChevronRight } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { Bot, ShieldCheck, Filter, RotateCcw, ChevronRight, Radio } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/auditoria")({
   component: Guarded,
