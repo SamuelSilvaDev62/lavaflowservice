@@ -41,8 +41,12 @@ export async function resolveOwnerScope(supabase: SupabaseLike, userId: string) 
     .slice()
     .sort((a: any, b: any) => (rolePriority[a.role] ?? 9) - (rolePriority[b.role] ?? 9))[0];
 
-  return { ownerId: role?.owner_id ?? userId, role: role?.role ?? "owner" };
+  // SECURITY: do not fall back to treating an un-roled user as their own tenant owner.
+  // Callers must handle a null role as "no access".
+  if (!role) return { ownerId: null as string | null, role: null as string | null };
+  return { ownerId: role.owner_id as string, role: role.role as string };
 }
+
 
 export async function buildBusinessContext(supabase: SupabaseLike, ownerId: string, period = "30d") {
   const range = rangeForPeriod(period);
