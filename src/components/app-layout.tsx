@@ -18,6 +18,7 @@ import {
   Menu,
   Rocket,
   Settings,
+  ShieldCheck,
   Image as ImageIcon,
   Users,
   UsersRound,

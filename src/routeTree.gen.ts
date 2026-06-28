@@ -33,6 +33,7 @@ import { Route as AuthenticatedDashboardRouteImport } from './routes/_authentica
 import { Route as AuthenticatedCrescimentoRouteImport } from './routes/_authenticated/crescimento'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCampanhasRouteImport } from './routes/_authenticated/campanhas'
+import { Route as AuthenticatedAuditoriaRouteImport } from './routes/_authenticated/auditoria'
 import { Route as AuthenticatedAssistenteRouteImport } from './routes/_authenticated/assistente'
 import { Route as AuthenticatedAssinaturasRouteImport } from './routes/_authenticated/assinaturas'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
@@ -164,6 +165,11 @@ const AuthenticatedCampanhasRoute = AuthenticatedCampanhasRouteImport.update({
   path: '/campanhas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAuditoriaRoute = AuthenticatedAuditoriaRouteImport.update({
+  id: '/auditoria',
+  path: '/auditoria',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAssistenteRoute = AuthenticatedAssistenteRouteImport.update({
   id: '/assistente',
   path: '/assistente',
@@ -209,6 +215,7 @@ export interface FileRoutesByFullPath {
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
   '/assistente': typeof AuthenticatedAssistenteRoute
+  '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/crescimento': typeof AuthenticatedCrescimentoRoute
@@ -240,6 +247,7 @@ export interface FileRoutesByTo {
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
   '/assistente': typeof AuthenticatedAssistenteRoute
+  '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/crescimento': typeof AuthenticatedCrescimentoRoute
@@ -273,6 +281,7 @@ export interface FileRoutesById {
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/_authenticated/assinaturas': typeof AuthenticatedAssinaturasRoute
   '/_authenticated/assistente': typeof AuthenticatedAssistenteRoute
+  '/_authenticated/auditoria': typeof AuthenticatedAuditoriaRoute
   '/_authenticated/campanhas': typeof AuthenticatedCampanhasRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/crescimento': typeof AuthenticatedCrescimentoRoute
@@ -306,6 +315,7 @@ export interface FileRouteTypes {
     | '/agendamentos'
     | '/assinaturas'
     | '/assistente'
+    | '/auditoria'
     | '/campanhas'
     | '/configuracoes'
     | '/crescimento'
@@ -337,6 +347,7 @@ export interface FileRouteTypes {
     | '/agendamentos'
     | '/assinaturas'
     | '/assistente'
+    | '/auditoria'
     | '/campanhas'
     | '/configuracoes'
     | '/crescimento'
@@ -369,6 +380,7 @@ export interface FileRouteTypes {
     | '/_authenticated/agendamentos'
     | '/_authenticated/assinaturas'
     | '/_authenticated/assistente'
+    | '/_authenticated/auditoria'
     | '/_authenticated/campanhas'
     | '/_authenticated/configuracoes'
     | '/_authenticated/crescimento'
@@ -575,6 +587,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCampanhasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/auditoria': {
+      id: '/_authenticated/auditoria'
+      path: '/auditoria'
+      fullPath: '/auditoria'
+      preLoaderRoute: typeof AuthenticatedAuditoriaRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/assistente': {
       id: '/_authenticated/assistente'
       path: '/assistente'
@@ -624,6 +643,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendamentosRoute: typeof AuthenticatedAgendamentosRoute
   AuthenticatedAssinaturasRoute: typeof AuthenticatedAssinaturasRoute
   AuthenticatedAssistenteRoute: typeof AuthenticatedAssistenteRoute
+  AuthenticatedAuditoriaRoute: typeof AuthenticatedAuditoriaRoute
   AuthenticatedCampanhasRoute: typeof AuthenticatedCampanhasRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedCrescimentoRoute: typeof AuthenticatedCrescimentoRoute
@@ -646,6 +666,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAgendamentosRoute: AuthenticatedAgendamentosRoute,
   AuthenticatedAssinaturasRoute: AuthenticatedAssinaturasRoute,
   AuthenticatedAssistenteRoute: AuthenticatedAssistenteRoute,
+  AuthenticatedAuditoriaRoute: AuthenticatedAuditoriaRoute,
   AuthenticatedCampanhasRoute: AuthenticatedCampanhasRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedCrescimentoRoute: AuthenticatedCrescimentoRoute,
