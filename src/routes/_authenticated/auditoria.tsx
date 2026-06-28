@@ -77,10 +77,52 @@ function Page() {
     }),
   });
 
+  const queryClient = useQueryClient();
+  const [liveCount, setLiveCount] = useState(0);
+  const [pulse, setPulse] = useState(false);
+  const pulseTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Realtime: refetch when new audit/AI events arrive matching current filters
+  useEffect(() => {
+    const onInsert = (payload: { new: Record<string, any>; table: string }) => {
+      const row = payload.new ?? {};
+      const ts = row.created_at as string | undefined;
+      if (!ts) return;
+      if (ts < fromISO || ts > toISO) return;
+      if (userId !== "all" && row.user_id !== userId) return;
+      const rowSource = payload.table === "ai_usage_logs" ? "ai" : "equipe";
+      if (source !== "all" && source !== rowSource) return;
+
+      setLiveCount((c) => c + 1);
+      setPulse(true);
+      if (pulseTimer.current) clearTimeout(pulseTimer.current);
+      pulseTimer.current = setTimeout(() => setPulse(false), 1500);
+
+      queryClient.invalidateQueries({ queryKey: ["audit-events"] });
+      queryClient.invalidateQueries({ queryKey: ["audit-summary"] });
+      queryClient.invalidateQueries({ queryKey: ["audit-actors"] });
+    };
+
+    const channel = supabase
+      .channel("auditoria-live")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "equipe_auditoria" }, onInsert)
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "ai_usage_logs" }, onInsert)
+      .subscribe();
+
+    return () => {
+      if (pulseTimer.current) clearTimeout(pulseTimer.current);
+      supabase.removeChannel(channel);
+    };
+  }, [queryClient, fromISO, toISO, userId, source]);
+
+  // Reset the "new events" counter whenever the user changes filters or pages
+  useEffect(() => { setLiveCount(0); }, [fromISO, toISO, userId, source, offset]);
+
   function reset() {
     const d = defaultRange();
     setFromDate(d.from); setToDate(d.to);
     setUserId("all"); setSource("all"); setOffset(0);
+    setLiveCount(0);
   }
 
   return (
@@ -89,6 +131,19 @@ function Page() {
         title="Auditoria"
         subtitle="Eventos de segurança, ações da equipe e uso do Consultor IA — restrito a Proprietário e Administrador."
       />
+
+      <div className="flex items-center gap-2 -mt-2">
+        <Badge variant="outline" className="gap-1.5">
+          <span className={`inline-block h-2 w-2 rounded-full bg-emerald-500 ${pulse ? "animate-ping" : ""}`} />
+          <Radio className="h-3 w-3" /> Ao vivo
+        </Badge>
+        {liveCount > 0 && (
+          <Badge className="cursor-pointer" onClick={() => { setOffset(0); setLiveCount(0); }}>
+            {num(liveCount)} {liveCount === 1 ? "novo evento" : "novos eventos"} — clique para ver
+          </Badge>
+        )}
+      </div>
+
 
       {/* KPIs */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
