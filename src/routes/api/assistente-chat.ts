@@ -37,23 +37,29 @@ async function createAuthedSupabase(request: Request) {
 
   const userId = userData.user.id;
   const { ownerId, role } = await resolveOwnerScope(supabase, userId);
-  if (!["owner", "admin", "gerente"].includes(role)) {
+  // SECURITY: users without an assigned role on a tenant get no access (no self-tenant fallback).
+  if (!ownerId || !role || !["owner", "admin", "gerente"].includes(role)) {
     return { error: new Response("Forbidden", { status: 403 }) };
   }
 
-  return { supabase, userId, ownerId, role };
+  return { supabase, userId, ownerId: ownerId as string, role: role as string };
 }
 
-async function checkRateLimit(supabase: any, ownerId: string) {
+async function checkRateLimit(_supabase: any, ownerId: string) {
+  // SECURITY: count via service-role client so RLS on ai_usage_logs cannot mask usage
+  // (the SELECT policy requires owner/admin role; counting through the user client
+  // would silently return 0 for non-owner/admin callers and bypass the limit).
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const hourAgo = new Date(Date.now() - 60 * 60_000).toISOString();
   const dayAgo = new Date(Date.now() - 24 * 60 * 60_000).toISOString();
   const [{ count: hourly }, { count: daily }] = await Promise.all([
-    supabase.from("ai_usage_logs").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).gte("created_at", hourAgo),
-    supabase.from("ai_usage_logs").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).gte("created_at", dayAgo),
+    supabaseAdmin.from("ai_usage_logs").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).gte("created_at", hourAgo),
+    supabaseAdmin.from("ai_usage_logs").select("id", { count: "exact", head: true }).eq("owner_id", ownerId).gte("created_at", dayAgo),
   ]);
 
   return Number(hourly ?? 0) < 30 && Number(daily ?? 0) < 300;
 }
+
 
 async function logUsage(supabase: any, input: {
   ownerId: string;
