@@ -18,6 +18,7 @@ import {
   Menu,
   Rocket,
   Settings,
+  ShieldCheck,
   Image as ImageIcon,
   Users,
   UsersRound,
@@ -56,6 +57,7 @@ const groupsAll: NavGroup[] = [
     { to: "/relatorios", label: "Insights Operacionais", icon: BarChart3, roles: GESTAO },
     { to: "/assistente", label: "Consultor Inteligente", icon: Bot, tour: "assistente", roles: GESTAO },
     { to: "/midia", label: "Mídia", icon: ImageIcon, roles: ADMINS },
+    { to: "/auditoria", label: "Auditoria", icon: ShieldCheck, roles: ADMINS },
     { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
   ]},
 ];
