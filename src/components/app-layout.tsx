@@ -126,11 +126,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
             Lava<span className="text-primary">Flow</span>
           </Link>
         </div>
-        {role && (
-          <div className="px-6 pb-3">
-            <span className="inline-block text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-sidebar-accent/70 text-sidebar-accent-foreground font-semibold">
-              {ROLE_LABELS[role]}
-            </span>
+        {(role || mvp) && (
+          <div className="px-6 pb-3 flex flex-wrap gap-2">
+            {role && (
+              <span className="inline-block text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-sidebar-accent/70 text-sidebar-accent-foreground font-semibold">
+                {ROLE_LABELS[role]}
+              </span>
+            )}
+            {mvp && (
+              <span className="inline-block text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-primary/15 text-primary font-semibold">
+                Modo MVP
+              </span>
+            )}
           </div>
         )}
         <nav className="px-4 py-3 space-y-6 overflow-y-auto h-[calc(100dvh-10rem)]">
