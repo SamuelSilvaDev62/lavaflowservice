@@ -21,6 +21,11 @@ export const Route = createFileRoute("/_authenticated")({
     if (isColab && !location.pathname.startsWith("/meu-trabalho")) {
       throw redirect({ to: "/meu-trabalho" });
     }
+    // Modo MVP: bloqueia rotas fora do escopo enxuto
+    if (!isColab && isMvpMode()) {
+      const allowed = Array.from(MVP_ALLOWED_ROUTES).some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
+      if (!allowed) throw redirect({ to: "/dashboard" });
+    }
     return { user: data.user, isColab };
   },
   component: () => (
