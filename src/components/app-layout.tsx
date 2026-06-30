@@ -79,10 +79,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
   useEffect(() => setOpen(false), [pathname]);
 
   const colab = isColaborador(role);
+  const mvp = isMvpMode();
   const groups: NavGroup[] = colab
     ? colabGroups
     : groupsAll
-        .map((g) => ({ ...g, items: g.items.filter((it) => !role || it.roles.includes(role)) }))
+        .map((g) => ({
+          ...g,
+          items: g.items.filter(
+            (it) =>
+              (!role || it.roles.includes(role)) &&
+              (!mvp || MVP_ALLOWED_ROUTES.has(it.to)),
+          ),
+        }))
         .filter((g) => g.items.length > 0);
 
   async function signOut() {
