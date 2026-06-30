@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/app-layout";
 import { ContextualCopilot } from "@/components/copilot/contextual-copilot";
+import { isMvpMode, MVP_ALLOWED_ROUTES } from "@/lib/mvp-mode";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
