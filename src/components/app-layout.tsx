@@ -32,6 +32,7 @@ import { GuidedTour } from "@/components/guided-tour";
 import { OperationalAlerts } from "@/components/operational-alerts";
 import { useRole } from "@/hooks/use-role";
 import { ADMINS, GESTAO, OPERACIONAL, isColaborador, type AppRole, ROLE_LABELS } from "@/lib/rbac";
+import { isMvpMode, setMvpMode, MVP_ALLOWED_ROUTES } from "@/lib/mvp-mode";
 
 type NavItem = { to: string; label: string; icon: any; tour?: string; roles: AppRole[] };
 type NavGroup = { label: string; items: NavItem[] };
@@ -78,10 +79,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
   useEffect(() => setOpen(false), [pathname]);
 
   const colab = isColaborador(role);
+  const mvp = isMvpMode();
   const groups: NavGroup[] = colab
     ? colabGroups
     : groupsAll
-        .map((g) => ({ ...g, items: g.items.filter((it) => !role || it.roles.includes(role)) }))
+        .map((g) => ({
+          ...g,
+          items: g.items.filter(
+            (it) =>
+              (!role || it.roles.includes(role)) &&
+              (!mvp || MVP_ALLOWED_ROUTES.has(it.to)),
+          ),
+        }))
         .filter((g) => g.items.length > 0);
 
   async function signOut() {
@@ -117,11 +126,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
             Lava<span className="text-primary">Flow</span>
           </Link>
         </div>
-        {role && (
-          <div className="px-6 pb-3">
-            <span className="inline-block text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-sidebar-accent/70 text-sidebar-accent-foreground font-semibold">
-              {ROLE_LABELS[role]}
-            </span>
+        {(role || mvp) && (
+          <div className="px-6 pb-3 flex flex-wrap gap-2">
+            {role && (
+              <span className="inline-block text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-sidebar-accent/70 text-sidebar-accent-foreground font-semibold">
+                {ROLE_LABELS[role]}
+              </span>
+            )}
+            {mvp && (
+              <span className="inline-block text-[10px] uppercase tracking-widest px-2.5 py-1 rounded-full bg-primary/15 text-primary font-semibold">
+                Modo MVP
+              </span>
+            )}
           </div>
         )}
         <nav className="px-4 py-3 space-y-6 overflow-y-auto h-[calc(100dvh-10rem)]">
@@ -151,7 +167,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           ))}
         </nav>
-        <div className="absolute bottom-0 inset-x-0 p-4">
+        <div className="absolute bottom-0 inset-x-0 p-4 space-y-2">
+          <button
+            onClick={() => setMvpMode(!mvp)}
+            className="w-full text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors py-1"
+            title="Alternar entre modo MVP enxuto e modo completo"
+          >
+            {mvp ? "Sair do modo MVP" : "Ativar modo MVP"}
+          </button>
           <Button variant="outline" size="sm" onClick={signOut} className="w-full justify-start gap-2">
             <LogOut className="h-4 w-4" /> Sair
           </Button>

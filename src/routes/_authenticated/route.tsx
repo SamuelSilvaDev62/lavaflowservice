@@ -2,6 +2,7 @@ import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/app-layout";
 import { ContextualCopilot } from "@/components/copilot/contextual-copilot";
+import { isMvpMode, MVP_ALLOWED_ROUTES } from "@/lib/mvp-mode";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -19,6 +20,11 @@ export const Route = createFileRoute("/_authenticated")({
       && list.every((r) => r === "lavador" || r === "colaborador");
     if (isColab && !location.pathname.startsWith("/meu-trabalho")) {
       throw redirect({ to: "/meu-trabalho" });
+    }
+    // Modo MVP: bloqueia rotas fora do escopo enxuto
+    if (!isColab && isMvpMode()) {
+      const allowed = Array.from(MVP_ALLOWED_ROUTES).some((p) => location.pathname === p || location.pathname.startsWith(p + "/"));
+      if (!allowed) throw redirect({ to: "/dashboard" });
     }
     return { user: data.user, isColab };
   },
