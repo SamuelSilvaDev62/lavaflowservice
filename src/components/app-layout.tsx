@@ -167,7 +167,14 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           ))}
         </nav>
-        <div className="absolute bottom-0 inset-x-0 p-4">
+        <div className="absolute bottom-0 inset-x-0 p-4 space-y-2">
+          <button
+            onClick={() => setMvpMode(!mvp)}
+            className="w-full text-[10px] uppercase tracking-widest text-muted-foreground hover:text-foreground transition-colors py-1"
+            title="Alternar entre modo MVP enxuto e modo completo"
+          >
+            {mvp ? "Sair do modo MVP" : "Ativar modo MVP"}
+          </button>
           <Button variant="outline" size="sm" onClick={signOut} className="w-full justify-start gap-2">
             <LogOut className="h-4 w-4" /> Sair
           </Button>
