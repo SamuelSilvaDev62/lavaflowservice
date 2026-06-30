@@ -20,10 +20,16 @@ import { GESTAO } from "@/lib/rbac";
 import { supabase } from "@/integrations/supabase/client";
 import { useEffect, useState } from "react";
 import { AlertTriangle, ArrowRight, BarChart3, BrainCircuit, CalendarDays, Car, CheckCircle2, Clock, DollarSign, ExternalLink, Lightbulb, Megaphone, Play, Share2, Sparkles, Target, TrendingDown, TrendingUp, Users } from "lucide-react";
+import { isMvpMode } from "@/lib/mvp-mode";
+import { MvpDashboard } from "@/components/dashboard/mvp-dashboard";
 
 
 export const Route = createFileRoute("/_authenticated/dashboard")({
-  component: () => <RequireRole roles={GESTAO}><Dashboard /></RequireRole>,
+  component: () => (
+    <RequireRole roles={GESTAO}>
+      {isMvpMode() ? <MvpDashboard /> : <Dashboard />}
+    </RequireRole>
+  ),
 });
 
 const STATUS_LABEL: Record<string, string> = {
