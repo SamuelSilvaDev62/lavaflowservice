@@ -32,6 +32,7 @@ import { GuidedTour } from "@/components/guided-tour";
 import { OperationalAlerts } from "@/components/operational-alerts";
 import { useRole } from "@/hooks/use-role";
 import { ADMINS, GESTAO, OPERACIONAL, isColaborador, type AppRole, ROLE_LABELS } from "@/lib/rbac";
+import { isMvpMode, setMvpMode, MVP_ALLOWED_ROUTES } from "@/lib/mvp-mode";
 
 type NavItem = { to: string; label: string; icon: any; tour?: string; roles: AppRole[] };
 type NavGroup = { label: string; items: NavItem[] };
