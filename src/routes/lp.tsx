@@ -8,15 +8,13 @@ import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/
 import {
   Car, TrendingUp, Sparkles, MessageCircle, Award, Repeat, Users,
   Check, X, ArrowRight, Star, Zap, BarChart3, Trophy, Clock, DollarSign,
-  Instagram, Phone, ChevronRight, Bot, Smartphone,
+  Instagram, Phone, ChevronRight, Smartphone,
 } from "lucide-react";
 import dashboardAsset from "@/assets/landing/app-dashboard.webp.asset.json";
-import assistantAsset from "@/assets/landing/app-assistant.webp.asset.json";
 import kanbanAsset from "@/assets/landing/app-kanban.webp.asset.json";
 
 const SHOTS = {
-  dashboard: { url: dashboardAsset.url, alt: "Painel executivo do LavaFlow com receita, score de saúde e oportunidades" },
-  assistant: { url: assistantAsset.url, alt: "Assistente LavaFlow apresentando insights e recomendações automáticas" },
+  dashboard: { url: dashboardAsset.url, alt: "Painel executivo do LavaFlow com receita e oportunidades" },
   kanban: { url: kanbanAsset.url, alt: "Kanban de fila de atendimento do LavaFlow com veículos por etapa" },
 } as const;
 
@@ -54,7 +52,6 @@ function Landing() {
       <Benefits />
       <MockupShowcase />
       <ProblemSolution />
-      <Assistant />
       <TeamSection />
       <Loyalty />
       <Testimonials />
