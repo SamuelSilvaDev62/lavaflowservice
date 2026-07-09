@@ -84,7 +84,7 @@ function Page() {
         <EmptyState
           icon={ClipboardList}
           title="Registre sua primeira lavagem"
-          description="Cada ordem alimenta seu painel, métricas, fidelidade e o assistente — é o coração do LavaFlow."
+          description="Cada ordem alimenta seu painel, métricas e o programa de fidelidade — é o coração do LavaFlow."
           highlight="Registrar todas as OS revela exatamente quanto você fatura por dia"
           ctas={[{ label: "Criar primeira OS", onClick: () => setOpen(true) }]}
         />
