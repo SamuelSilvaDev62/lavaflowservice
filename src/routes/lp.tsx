@@ -235,7 +235,6 @@ function Benefits() {
 function MockupShowcase() {
   const slides = [
     { k: "dashboard" as const, t: "Painel Executivo", d: "Indicadores em tempo real, receita por período e ticket médio." },
-    { k: "assistant" as const, t: "Assistente LavaFlow", d: "Inteligência que aponta exatamente onde está sua próxima venda." },
     { k: "kanban" as const, t: "Kanban Operacional", d: "Veja cada veículo na esteira de produção em um toque." },
   ];
   const [i, setI] = useState(0);
@@ -258,7 +257,7 @@ function MockupShowcase() {
                 <button key={sl.k} onClick={() => setI(idx)} className={`w-full text-left p-5 rounded-2xl border transition-all ${idx === i ? "bg-card shadow-lg border-primary/30" : "bg-card/40 hover:bg-card"}`}>
                   <div className="flex items-center gap-3">
                     <div className={`h-10 w-10 rounded-xl grid place-content-center ${idx === i ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                      {sl.k === "dashboard" ? <BarChart3 className="h-5 w-5" /> : sl.k === "assistant" ? <Bot className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+                      {sl.k === "dashboard" ? <BarChart3 className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
                     </div>
                     <div className="flex-1">
                       <p className="font-display font-semibold">{sl.t}</p>
@@ -308,30 +307,8 @@ function ProblemSolution() {
   );
 }
 
-/* ---------------- ASSISTANT ---------------- */
-function Assistant() {
-  const ex = ["Clientes inativos", "Oportunidades de upsell", "Queda de faturamento", "Clientes elegíveis para assinatura", "Melhor dia para promoções"];
-  return (
-    <section className="relative overflow-hidden bg-foreground text-background">
-      <div className="absolute inset-0 -z-0">
-        <div className="absolute top-0 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/30 blur-[120px]" />
-      </div>
-      <div className="relative max-w-6xl mx-auto px-4 py-20 lg:py-28 grid lg:grid-cols-2 gap-12 items-center">
-        <div>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-semibold uppercase tracking-wider mb-6">
-            <Bot className="h-3 w-3" /> Assistente LavaFlow
-          </span>
-          <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Seu consultor de crescimento integrado.</h2>
-          <p className="mt-5 opacity-80">O Assistente LavaFlow analisa automaticamente sua operação e identifica oportunidades para aumentar o faturamento.</p>
-          <ul className="mt-6 space-y-2">
-            {ex.map((e) => (<li key={e} className="flex items-center gap-2 text-sm"><Zap className="h-4 w-4 text-primary" />{e}</li>))}
-          </ul>
-        </div>
-        <div className="flex justify-center"><PhoneMockup variant="assistant" /></div>
-      </div>
-    </section>
-  );
-}
+
+
 
 /* ---------------- TEAM ---------------- */
 function TeamSection() {
