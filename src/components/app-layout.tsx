@@ -51,10 +51,6 @@ const groupsAll: NavGroup[] = [
     { to: "/midia", label: "Mídia", icon: ImageIcon, roles: ADMINS },
     { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
   ]},
-    { to: "/midia", label: "Mídia", icon: ImageIcon, roles: ADMINS },
-    { to: "/auditoria", label: "Auditoria", icon: ShieldCheck, roles: ADMINS },
-    { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
-  ]},
 ];
 
 const colabGroups: NavGroup[] = [
