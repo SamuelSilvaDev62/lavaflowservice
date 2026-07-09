@@ -4,8 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Award,
   BarChart3,
-  Bot,
-  BrainCircuit,
   Briefcase,
   CalendarDays,
   Car,
@@ -16,9 +14,7 @@ import {
   ListChecks,
   LogOut,
   Menu,
-  Rocket,
   Settings,
-  ShieldCheck,
   Image as ImageIcon,
   Users,
   UsersRound,
@@ -32,7 +28,6 @@ import { GuidedTour } from "@/components/guided-tour";
 import { OperationalAlerts } from "@/components/operational-alerts";
 import { useRole } from "@/hooks/use-role";
 import { ADMINS, GESTAO, OPERACIONAL, isColaborador, type AppRole, ROLE_LABELS } from "@/lib/rbac";
-import { isMvpMode, setMvpMode, MVP_ALLOWED_ROUTES } from "@/lib/mvp-mode";
 
 type NavItem = { to: string; label: string; icon: any; tour?: string; roles: AppRole[] };
 type NavGroup = { label: string; items: NavItem[] };
@@ -52,11 +47,10 @@ const groupsAll: NavGroup[] = [
   ]},
   { label: "Gestão", items: [
     { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },
-    { to: "/crescimento", label: "Centro de Crescimento", icon: Rocket, roles: GESTAO },
-    { to: "/inteligencia", label: "Inteligência", icon: BrainCircuit, roles: GESTAO },
-
     { to: "/relatorios", label: "Insights Operacionais", icon: BarChart3, roles: GESTAO },
-    { to: "/assistente", label: "Consultor Inteligente", icon: Bot, tour: "assistente", roles: GESTAO },
+    { to: "/midia", label: "Mídia", icon: ImageIcon, roles: ADMINS },
+    { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
+  ]},
     { to: "/midia", label: "Mídia", icon: ImageIcon, roles: ADMINS },
     { to: "/auditoria", label: "Auditoria", icon: ShieldCheck, roles: ADMINS },
     { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
