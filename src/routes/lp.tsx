@@ -134,7 +134,7 @@ function Hero() {
 }
 
 /* ---------- Reusable phone mockup ---------- */
-function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dashboard" | "assistant" | "kanban"; eager?: boolean }) {
+function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dashboard" | "kanban"; eager?: boolean }) {
   const shot = SHOTS[variant];
   return (
     <div className="relative">
@@ -153,10 +153,10 @@ function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dash
       <div className="hidden sm:block absolute -right-6 bottom-16 z-20 animate-fade-in">
         <Card className="shadow-xl border-primary/10">
           <CardContent className="p-3 flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary/15 text-primary grid place-content-center"><Bot className="h-4 w-4" /></div>
+            <div className="h-8 w-8 rounded-lg bg-primary/15 text-primary grid place-content-center"><Sparkles className="h-4 w-4" /></div>
             <div>
-              <p className="text-[10px] text-muted-foreground">Assistente</p>
-              <p className="font-medium text-xs">12 oportunidades</p>
+              <p className="text-[10px] text-muted-foreground">Oportunidades</p>
+              <p className="font-medium text-xs">12 hoje</p>
             </div>
           </CardContent>
         </Card>
