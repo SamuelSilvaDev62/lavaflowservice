@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Car, TrendingUp, Sparkles, MessageCircle, Award, Repeat, Users,
-  Check, X, ArrowRight, Star, Zap, BarChart3, Trophy, Clock, DollarSign,
+  Check, X, ArrowRight, Star, BarChart3, Trophy, Clock, DollarSign,
   Instagram, Phone, ChevronRight, Smartphone,
 } from "lucide-react";
 import dashboardAsset from "@/assets/landing/app-dashboard.webp.asset.json";
