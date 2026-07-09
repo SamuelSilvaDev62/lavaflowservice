@@ -51,19 +51,6 @@ function Page() {
             <Kpi icon={Users} label="Retencao 90d" value={pct(data.cards.retencao, 0)} tone={data.cards.retencao >= 0.45 ? "success" : "warning"} />
           </div>
 
-          <Card className="border-primary/30 bg-primary/5">
-            <CardContent className="p-4">
-              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
-                <div>
-                  <h2 className="font-display font-semibold flex items-center gap-2"><Sparkles className="h-4 w-4 text-primary" />Resumo do consultor</h2>
-                  <p className="text-sm text-muted-foreground mt-1">
-                    Score de saude {data.cards.scoreSaude}/100. Existe {brl(data.cards.receitaRecuperavel)} em receita recuperavel e {brl(data.cards.potencialAssinaturas)} de potencial em assinaturas.
-                  </p>
-                </div>
-                <Button asChild><Link to="/assistente">Pedir plano de acao</Link></Button>
-              </div>
-            </CardContent>
-          </Card>
 
           <Card className="border-success/30 bg-success/5">
             <CardContent className="p-4">

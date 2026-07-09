@@ -176,7 +176,7 @@ function origemReceitaLabel(origem: string) {
     CLIENTE_RECUPERADO: "Cliente recuperado",
     FIDELIDADE: "Fidelidade",
     UPSELL_CHECKLIST: "Upsell Checklist",
-    CONSULTOR_IA: "Consultor IA",
+    CONSULTOR_IA: "Consultor",
     CAMPANHA: "Campanha",
     ANIVERSARIO: "Aniversario",
     LEVA_ETRAZ: "Leva e Traz",
