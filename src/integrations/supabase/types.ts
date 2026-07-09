@@ -171,87 +171,6 @@ export type Database = {
           },
         ]
       }
-      ai_recommendations: {
-        Row: {
-          created_at: string
-          description: string
-          dismissed_at: string | null
-          estimated_impact: number
-          executed_at: string | null
-          id: string
-          owner_id: string
-          payload: Json
-          priority: string
-          status: string
-          title: string
-          type: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          description: string
-          dismissed_at?: string | null
-          estimated_impact?: number
-          executed_at?: string | null
-          id?: string
-          owner_id: string
-          payload?: Json
-          priority: string
-          status?: string
-          title: string
-          type: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          description?: string
-          dismissed_at?: string | null
-          estimated_impact?: number
-          executed_at?: string | null
-          id?: string
-          owner_id?: string
-          payload?: Json
-          priority?: string
-          status?: string
-          title?: string
-          type?: string
-          user_id?: string
-        }
-        Relationships: []
-      }
-      ai_usage_logs: {
-        Row: {
-          created_at: string
-          estimated_cost: number
-          id: string
-          owner_id: string
-          route: string
-          tokens_input: number
-          tokens_output: number
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          estimated_cost?: number
-          id?: string
-          owner_id: string
-          route: string
-          tokens_input?: number
-          tokens_output?: number
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          estimated_cost?: number
-          id?: string
-          owner_id?: string
-          route?: string
-          tokens_input?: number
-          tokens_output?: number
-          user_id?: string
-        }
-        Relationships: []
-      }
       assinaturas_clientes: {
         Row: {
           cliente_id: string
@@ -1590,48 +1509,6 @@ export type Database = {
           pontos_gerados?: number
           preco_padrao?: number
           tempo_estimado_min?: number
-        }
-        Relationships: []
-      }
-      tenant_ai_settings: {
-        Row: {
-          ai_enabled: boolean
-          auto_execute_enabled: boolean
-          auto_insights_enabled: boolean
-          business_context: Json
-          created_at: string
-          id: string
-          monthly_task_limit: number
-          monthly_token_limit: number
-          preferred_tone: string
-          tenant_id: string
-          updated_at: string
-        }
-        Insert: {
-          ai_enabled?: boolean
-          auto_execute_enabled?: boolean
-          auto_insights_enabled?: boolean
-          business_context?: Json
-          created_at?: string
-          id?: string
-          monthly_task_limit?: number
-          monthly_token_limit?: number
-          preferred_tone?: string
-          tenant_id: string
-          updated_at?: string
-        }
-        Update: {
-          ai_enabled?: boolean
-          auto_execute_enabled?: boolean
-          auto_insights_enabled?: boolean
-          business_context?: Json
-          created_at?: string
-          id?: string
-          monthly_task_limit?: number
-          monthly_token_limit?: number
-          preferred_tone?: string
-          tenant_id?: string
-          updated_at?: string
         }
         Relationships: []
       }

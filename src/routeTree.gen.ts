@@ -18,23 +18,18 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlanoSlugRouteImport } from './routes/plano.$slug'
 import { Route as EquipeSlugRouteImport } from './routes/equipe.$slug'
-import { Route as ApiAssistenteChatRouteImport } from './routes/api/assistente-chat'
 import { Route as AgendarSlugRouteImport } from './routes/agendar.$slug'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedOrdensRouteImport } from './routes/_authenticated/ordens'
 import { Route as AuthenticatedOportunidadesRouteImport } from './routes/_authenticated/oportunidades'
 import { Route as AuthenticatedMidiaRouteImport } from './routes/_authenticated/midia'
 import { Route as AuthenticatedMeuTrabalhoRouteImport } from './routes/_authenticated/meu-trabalho'
-import { Route as AuthenticatedInteligenciaRouteImport } from './routes/_authenticated/inteligencia'
 import { Route as AuthenticatedFilaRouteImport } from './routes/_authenticated/fila'
 import { Route as AuthenticatedFidelidadeRouteImport } from './routes/_authenticated/fidelidade'
 import { Route as AuthenticatedEquipeRouteImport } from './routes/_authenticated/equipe'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
-import { Route as AuthenticatedCrescimentoRouteImport } from './routes/_authenticated/crescimento'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCampanhasRouteImport } from './routes/_authenticated/campanhas'
-import { Route as AuthenticatedAuditoriaRouteImport } from './routes/_authenticated/auditoria'
-import { Route as AuthenticatedAssistenteRouteImport } from './routes/_authenticated/assistente'
 import { Route as AuthenticatedAssinaturasRouteImport } from './routes/_authenticated/assinaturas'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes/index'
@@ -85,11 +80,6 @@ const EquipeSlugRoute = EquipeSlugRouteImport.update({
   path: '/equipe/$slug',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ApiAssistenteChatRoute = ApiAssistenteChatRouteImport.update({
-  id: '/api/assistente-chat',
-  path: '/api/assistente-chat',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const AgendarSlugRoute = AgendarSlugRouteImport.update({
   id: '/agendar/$slug',
   path: '/agendar/$slug',
@@ -122,12 +112,6 @@ const AuthenticatedMeuTrabalhoRoute =
     path: '/meu-trabalho',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
-const AuthenticatedInteligenciaRoute =
-  AuthenticatedInteligenciaRouteImport.update({
-    id: '/inteligencia',
-    path: '/inteligencia',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedFilaRoute = AuthenticatedFilaRouteImport.update({
   id: '/fila',
   path: '/fila',
@@ -148,12 +132,6 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
-const AuthenticatedCrescimentoRoute =
-  AuthenticatedCrescimentoRouteImport.update({
-    id: '/crescimento',
-    path: '/crescimento',
-    getParentRoute: () => AuthenticatedRouteRoute,
-  } as any)
 const AuthenticatedConfiguracoesRoute =
   AuthenticatedConfiguracoesRouteImport.update({
     id: '/configuracoes',
@@ -163,16 +141,6 @@ const AuthenticatedConfiguracoesRoute =
 const AuthenticatedCampanhasRoute = AuthenticatedCampanhasRouteImport.update({
   id: '/campanhas',
   path: '/campanhas',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedAuditoriaRoute = AuthenticatedAuditoriaRouteImport.update({
-  id: '/auditoria',
-  path: '/auditoria',
-  getParentRoute: () => AuthenticatedRouteRoute,
-} as any)
-const AuthenticatedAssistenteRoute = AuthenticatedAssistenteRouteImport.update({
-  id: '/assistente',
-  path: '/assistente',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedAssinaturasRoute =
@@ -214,23 +182,18 @@ export interface FileRoutesByFullPath {
   '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
-  '/assistente': typeof AuthenticatedAssistenteRoute
-  '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/crescimento': typeof AuthenticatedCrescimentoRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/equipe': typeof AuthenticatedEquipeRoute
   '/fidelidade': typeof AuthenticatedFidelidadeRoute
   '/fila': typeof AuthenticatedFilaRoute
-  '/inteligencia': typeof AuthenticatedInteligenciaRoute
   '/meu-trabalho': typeof AuthenticatedMeuTrabalhoRoute
   '/midia': typeof AuthenticatedMidiaRoute
   '/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/ordens': typeof AuthenticatedOrdensRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
-  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
@@ -246,23 +209,18 @@ export interface FileRoutesByTo {
   '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
-  '/assistente': typeof AuthenticatedAssistenteRoute
-  '/auditoria': typeof AuthenticatedAuditoriaRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/crescimento': typeof AuthenticatedCrescimentoRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/equipe': typeof AuthenticatedEquipeRoute
   '/fidelidade': typeof AuthenticatedFidelidadeRoute
   '/fila': typeof AuthenticatedFilaRoute
-  '/inteligencia': typeof AuthenticatedInteligenciaRoute
   '/meu-trabalho': typeof AuthenticatedMeuTrabalhoRoute
   '/midia': typeof AuthenticatedMidiaRoute
   '/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/ordens': typeof AuthenticatedOrdensRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
-  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
@@ -280,23 +238,18 @@ export interface FileRoutesById {
   '/trust': typeof TrustRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/_authenticated/assinaturas': typeof AuthenticatedAssinaturasRoute
-  '/_authenticated/assistente': typeof AuthenticatedAssistenteRoute
-  '/_authenticated/auditoria': typeof AuthenticatedAuditoriaRoute
   '/_authenticated/campanhas': typeof AuthenticatedCampanhasRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
-  '/_authenticated/crescimento': typeof AuthenticatedCrescimentoRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/equipe': typeof AuthenticatedEquipeRoute
   '/_authenticated/fidelidade': typeof AuthenticatedFidelidadeRoute
   '/_authenticated/fila': typeof AuthenticatedFilaRoute
-  '/_authenticated/inteligencia': typeof AuthenticatedInteligenciaRoute
   '/_authenticated/meu-trabalho': typeof AuthenticatedMeuTrabalhoRoute
   '/_authenticated/midia': typeof AuthenticatedMidiaRoute
   '/_authenticated/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/_authenticated/ordens': typeof AuthenticatedOrdensRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
-  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
@@ -314,23 +267,18 @@ export interface FileRouteTypes {
     | '/trust'
     | '/agendamentos'
     | '/assinaturas'
-    | '/assistente'
-    | '/auditoria'
     | '/campanhas'
     | '/configuracoes'
-    | '/crescimento'
     | '/dashboard'
     | '/equipe'
     | '/fidelidade'
     | '/fila'
-    | '/inteligencia'
     | '/meu-trabalho'
     | '/midia'
     | '/oportunidades'
     | '/ordens'
     | '/relatorios'
     | '/agendar/$slug'
-    | '/api/assistente-chat'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/clientes/$id'
@@ -346,23 +294,18 @@ export interface FileRouteTypes {
     | '/trust'
     | '/agendamentos'
     | '/assinaturas'
-    | '/assistente'
-    | '/auditoria'
     | '/campanhas'
     | '/configuracoes'
-    | '/crescimento'
     | '/dashboard'
     | '/equipe'
     | '/fidelidade'
     | '/fila'
-    | '/inteligencia'
     | '/meu-trabalho'
     | '/midia'
     | '/oportunidades'
     | '/ordens'
     | '/relatorios'
     | '/agendar/$slug'
-    | '/api/assistente-chat'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/clientes/$id'
@@ -379,23 +322,18 @@ export interface FileRouteTypes {
     | '/trust'
     | '/_authenticated/agendamentos'
     | '/_authenticated/assinaturas'
-    | '/_authenticated/assistente'
-    | '/_authenticated/auditoria'
     | '/_authenticated/campanhas'
     | '/_authenticated/configuracoes'
-    | '/_authenticated/crescimento'
     | '/_authenticated/dashboard'
     | '/_authenticated/equipe'
     | '/_authenticated/fidelidade'
     | '/_authenticated/fila'
-    | '/_authenticated/inteligencia'
     | '/_authenticated/meu-trabalho'
     | '/_authenticated/midia'
     | '/_authenticated/oportunidades'
     | '/_authenticated/ordens'
     | '/_authenticated/relatorios'
     | '/agendar/$slug'
-    | '/api/assistente-chat'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/_authenticated/clientes/$id'
@@ -412,7 +350,6 @@ export interface RootRouteChildren {
   PoliticaDePrivacidadeRoute: typeof PoliticaDePrivacidadeRoute
   TrustRoute: typeof TrustRoute
   AgendarSlugRoute: typeof AgendarSlugRoute
-  ApiAssistenteChatRoute: typeof ApiAssistenteChatRoute
   EquipeSlugRoute: typeof EquipeSlugRoute
   PlanoSlugRoute: typeof PlanoSlugRoute
 }
@@ -482,13 +419,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EquipeSlugRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/api/assistente-chat': {
-      id: '/api/assistente-chat'
-      path: '/api/assistente-chat'
-      fullPath: '/api/assistente-chat'
-      preLoaderRoute: typeof ApiAssistenteChatRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/agendar/$slug': {
       id: '/agendar/$slug'
       path: '/agendar/$slug'
@@ -531,13 +461,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedMeuTrabalhoRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/inteligencia': {
-      id: '/_authenticated/inteligencia'
-      path: '/inteligencia'
-      fullPath: '/inteligencia'
-      preLoaderRoute: typeof AuthenticatedInteligenciaRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/fila': {
       id: '/_authenticated/fila'
       path: '/fila'
@@ -566,13 +489,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
-    '/_authenticated/crescimento': {
-      id: '/_authenticated/crescimento'
-      path: '/crescimento'
-      fullPath: '/crescimento'
-      preLoaderRoute: typeof AuthenticatedCrescimentoRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
     '/_authenticated/configuracoes': {
       id: '/_authenticated/configuracoes'
       path: '/configuracoes'
@@ -585,20 +501,6 @@ declare module '@tanstack/react-router' {
       path: '/campanhas'
       fullPath: '/campanhas'
       preLoaderRoute: typeof AuthenticatedCampanhasRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/auditoria': {
-      id: '/_authenticated/auditoria'
-      path: '/auditoria'
-      fullPath: '/auditoria'
-      preLoaderRoute: typeof AuthenticatedAuditoriaRouteImport
-      parentRoute: typeof AuthenticatedRouteRoute
-    }
-    '/_authenticated/assistente': {
-      id: '/_authenticated/assistente'
-      path: '/assistente'
-      fullPath: '/assistente'
-      preLoaderRoute: typeof AuthenticatedAssistenteRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/assinaturas': {
@@ -642,16 +544,12 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendamentosRoute: typeof AuthenticatedAgendamentosRoute
   AuthenticatedAssinaturasRoute: typeof AuthenticatedAssinaturasRoute
-  AuthenticatedAssistenteRoute: typeof AuthenticatedAssistenteRoute
-  AuthenticatedAuditoriaRoute: typeof AuthenticatedAuditoriaRoute
   AuthenticatedCampanhasRoute: typeof AuthenticatedCampanhasRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
-  AuthenticatedCrescimentoRoute: typeof AuthenticatedCrescimentoRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEquipeRoute: typeof AuthenticatedEquipeRoute
   AuthenticatedFidelidadeRoute: typeof AuthenticatedFidelidadeRoute
   AuthenticatedFilaRoute: typeof AuthenticatedFilaRoute
-  AuthenticatedInteligenciaRoute: typeof AuthenticatedInteligenciaRoute
   AuthenticatedMeuTrabalhoRoute: typeof AuthenticatedMeuTrabalhoRoute
   AuthenticatedMidiaRoute: typeof AuthenticatedMidiaRoute
   AuthenticatedOportunidadesRoute: typeof AuthenticatedOportunidadesRoute
@@ -665,16 +563,12 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAgendamentosRoute: AuthenticatedAgendamentosRoute,
   AuthenticatedAssinaturasRoute: AuthenticatedAssinaturasRoute,
-  AuthenticatedAssistenteRoute: AuthenticatedAssistenteRoute,
-  AuthenticatedAuditoriaRoute: AuthenticatedAuditoriaRoute,
   AuthenticatedCampanhasRoute: AuthenticatedCampanhasRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
-  AuthenticatedCrescimentoRoute: AuthenticatedCrescimentoRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEquipeRoute: AuthenticatedEquipeRoute,
   AuthenticatedFidelidadeRoute: AuthenticatedFidelidadeRoute,
   AuthenticatedFilaRoute: AuthenticatedFilaRoute,
-  AuthenticatedInteligenciaRoute: AuthenticatedInteligenciaRoute,
   AuthenticatedMeuTrabalhoRoute: AuthenticatedMeuTrabalhoRoute,
   AuthenticatedMidiaRoute: AuthenticatedMidiaRoute,
   AuthenticatedOportunidadesRoute: AuthenticatedOportunidadesRoute,
@@ -697,20 +591,9 @@ const rootRouteChildren: RootRouteChildren = {
   PoliticaDePrivacidadeRoute: PoliticaDePrivacidadeRoute,
   TrustRoute: TrustRoute,
   AgendarSlugRoute: AgendarSlugRoute,
-  ApiAssistenteChatRoute: ApiAssistenteChatRoute,
   EquipeSlugRoute: EquipeSlugRoute,
   PlanoSlugRoute: PlanoSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

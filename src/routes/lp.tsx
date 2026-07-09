@@ -7,16 +7,14 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Car, TrendingUp, Sparkles, MessageCircle, Award, Repeat, Users,
-  Check, X, ArrowRight, Star, Zap, BarChart3, Trophy, Clock, DollarSign,
-  Instagram, Phone, ChevronRight, Bot, Smartphone,
+  Check, X, ArrowRight, Star, BarChart3, Trophy, Clock, DollarSign,
+  Instagram, Phone, ChevronRight, Smartphone,
 } from "lucide-react";
 import dashboardAsset from "@/assets/landing/app-dashboard.webp.asset.json";
-import assistantAsset from "@/assets/landing/app-assistant.webp.asset.json";
 import kanbanAsset from "@/assets/landing/app-kanban.webp.asset.json";
 
 const SHOTS = {
-  dashboard: { url: dashboardAsset.url, alt: "Painel executivo do LavaFlow com receita, score de saúde e oportunidades" },
-  assistant: { url: assistantAsset.url, alt: "Assistente LavaFlow apresentando insights e recomendações automáticas" },
+  dashboard: { url: dashboardAsset.url, alt: "Painel executivo do LavaFlow com receita e oportunidades" },
   kanban: { url: kanbanAsset.url, alt: "Kanban de fila de atendimento do LavaFlow com veículos por etapa" },
 } as const;
 
@@ -54,7 +52,6 @@ function Landing() {
       <Benefits />
       <MockupShowcase />
       <ProblemSolution />
-      <Assistant />
       <TeamSection />
       <Loyalty />
       <Testimonials />
@@ -137,7 +134,7 @@ function Hero() {
 }
 
 /* ---------- Reusable phone mockup ---------- */
-function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dashboard" | "assistant" | "kanban"; eager?: boolean }) {
+function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dashboard" | "kanban"; eager?: boolean }) {
   const shot = SHOTS[variant];
   return (
     <div className="relative">
@@ -156,10 +153,10 @@ function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dash
       <div className="hidden sm:block absolute -right-6 bottom-16 z-20 animate-fade-in">
         <Card className="shadow-xl border-primary/10">
           <CardContent className="p-3 flex items-center gap-2">
-            <div className="h-8 w-8 rounded-lg bg-primary/15 text-primary grid place-content-center"><Bot className="h-4 w-4" /></div>
+            <div className="h-8 w-8 rounded-lg bg-primary/15 text-primary grid place-content-center"><Sparkles className="h-4 w-4" /></div>
             <div>
-              <p className="text-[10px] text-muted-foreground">Assistente</p>
-              <p className="font-medium text-xs">12 oportunidades</p>
+              <p className="text-[10px] text-muted-foreground">Oportunidades</p>
+              <p className="font-medium text-xs">12 hoje</p>
             </div>
           </CardContent>
         </Card>
@@ -238,7 +235,6 @@ function Benefits() {
 function MockupShowcase() {
   const slides = [
     { k: "dashboard" as const, t: "Painel Executivo", d: "Indicadores em tempo real, receita por período e ticket médio." },
-    { k: "assistant" as const, t: "Assistente LavaFlow", d: "Inteligência que aponta exatamente onde está sua próxima venda." },
     { k: "kanban" as const, t: "Kanban Operacional", d: "Veja cada veículo na esteira de produção em um toque." },
   ];
   const [i, setI] = useState(0);
@@ -261,7 +257,7 @@ function MockupShowcase() {
                 <button key={sl.k} onClick={() => setI(idx)} className={`w-full text-left p-5 rounded-2xl border transition-all ${idx === i ? "bg-card shadow-lg border-primary/30" : "bg-card/40 hover:bg-card"}`}>
                   <div className="flex items-center gap-3">
                     <div className={`h-10 w-10 rounded-xl grid place-content-center ${idx === i ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>
-                      {sl.k === "dashboard" ? <BarChart3 className="h-5 w-5" /> : sl.k === "assistant" ? <Bot className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
+                      {sl.k === "dashboard" ? <BarChart3 className="h-5 w-5" /> : <Smartphone className="h-5 w-5" />}
                     </div>
                     <div className="flex-1">
                       <p className="font-display font-semibold">{sl.t}</p>
@@ -311,30 +307,8 @@ function ProblemSolution() {
   );
 }
 
-/* ---------------- ASSISTANT ---------------- */
-function Assistant() {
-  const ex = ["Clientes inativos", "Oportunidades de upsell", "Queda de faturamento", "Clientes elegíveis para assinatura", "Melhor dia para promoções"];
-  return (
-    <section className="relative overflow-hidden bg-foreground text-background">
-      <div className="absolute inset-0 -z-0">
-        <div className="absolute top-0 left-1/4 h-[500px] w-[500px] rounded-full bg-primary/30 blur-[120px]" />
-      </div>
-      <div className="relative max-w-6xl mx-auto px-4 py-20 lg:py-28 grid lg:grid-cols-2 gap-12 items-center">
-        <div>
-          <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-primary/20 text-primary text-xs font-semibold uppercase tracking-wider mb-6">
-            <Bot className="h-3 w-3" /> Assistente LavaFlow
-          </span>
-          <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Seu consultor de crescimento integrado.</h2>
-          <p className="mt-5 opacity-80">O Assistente LavaFlow analisa automaticamente sua operação e identifica oportunidades para aumentar o faturamento.</p>
-          <ul className="mt-6 space-y-2">
-            {ex.map((e) => (<li key={e} className="flex items-center gap-2 text-sm"><Zap className="h-4 w-4 text-primary" />{e}</li>))}
-          </ul>
-        </div>
-        <div className="flex justify-center"><PhoneMockup variant="assistant" /></div>
-      </div>
-    </section>
-  );
-}
+
+
 
 /* ---------------- TEAM ---------------- */
 function TeamSection() {
@@ -457,7 +431,7 @@ function Testimonials() {
 function Pricing() {
   const plans = [
     { n: "Inicial", p: "49,90", d: "Para quem está começando.", f: ["Até 100 clientes", "1 colaborador", "Kanban e ordens", "Cadastro de serviços"], hl: false },
-    { n: "Growth", p: "99,90", d: "Para crescer com previsibilidade.", f: ["Clientes ilimitados", "Até 5 colaboradores", "Assistente LavaFlow", "Programa de fidelidade", "WhatsApp automatizado"], hl: true },
+    { n: "Growth", p: "99,90", d: "Para crescer com previsibilidade.", f: ["Clientes ilimitados", "Até 5 colaboradores", "Insights operacionais", "Programa de fidelidade", "WhatsApp automatizado"], hl: true },
     { n: "Pro", p: "149,90", d: "Para operações em alta escala.", f: ["Tudo do Growth", "Assinaturas mensais", "Relatórios avançados", "Multi-unidades", "Suporte prioritário"], hl: false },
   ];
   return (

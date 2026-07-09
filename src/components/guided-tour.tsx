@@ -27,13 +27,6 @@ const STEPS: DriveStep[] = [
       description: "Gerencie planos mensais e receita recorrente.",
     },
   },
-  {
-    element: '[data-tour="assistente"]',
-    popover: {
-      title: "Consultor IA",
-      description: "Aqui ficam oportunidades, diagnosticos e recomendacoes para aumentar faturamento.",
-    },
-  },
 ];
 
 export function GuidedTour() {

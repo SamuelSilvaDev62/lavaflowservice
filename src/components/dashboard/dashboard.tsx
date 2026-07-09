@@ -29,7 +29,7 @@ function diffMin(hora: string) {
   return Math.round((d.getTime() - Date.now()) / 60000);
 }
 
-export function MvpDashboard() {
+export function Dashboard() {
   const fetchOps = useServerFn(getDashboardOperacional);
   const fetchInativos = useServerFn(getClienteInativos);
   const { data, isLoading } = useQuery({
