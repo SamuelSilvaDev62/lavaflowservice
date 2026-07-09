@@ -431,7 +431,7 @@ function Testimonials() {
 function Pricing() {
   const plans = [
     { n: "Inicial", p: "49,90", d: "Para quem está começando.", f: ["Até 100 clientes", "1 colaborador", "Kanban e ordens", "Cadastro de serviços"], hl: false },
-    { n: "Growth", p: "99,90", d: "Para crescer com previsibilidade.", f: ["Clientes ilimitados", "Até 5 colaboradores", "Assistente LavaFlow", "Programa de fidelidade", "WhatsApp automatizado"], hl: true },
+    { n: "Growth", p: "99,90", d: "Para crescer com previsibilidade.", f: ["Clientes ilimitados", "Até 5 colaboradores", "Insights operacionais", "Programa de fidelidade", "WhatsApp automatizado"], hl: true },
     { n: "Pro", p: "149,90", d: "Para operações em alta escala.", f: ["Tudo do Growth", "Assinaturas mensais", "Relatórios avançados", "Multi-unidades", "Suporte prioritário"], hl: false },
   ];
   return (
