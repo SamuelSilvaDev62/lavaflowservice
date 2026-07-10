@@ -6,9 +6,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/app-layout";
 import { getDashboardOperacional, getClienteInativos } from "@/lib/lavaflow.functions";
-import { brl, onlyDigits } from "@/lib/format";
-import { waLink } from "@/lib/whatsapp";
-import { CalendarDays, Plus, UserPlus, Clock, AlertCircle, MessageCircle, Sparkles, Play, CheckCircle2 } from "lucide-react";
+import { brl } from "@/lib/format";
+import {
+  CalendarDays, Plus, UserPlus, Clock, AlertCircle, Play,
+  TrendingUp, Users, ArrowRight, CheckCircle2,
+} from "lucide-react";
 
 const KANBAN_COLS: { key: string; label: string }[] = [
   { key: "aguardando", label: "Aguardando" },
@@ -16,11 +18,6 @@ const KANBAN_COLS: { key: string; label: string }[] = [
   { key: "finalizacao", label: "Finalização" },
   { key: "pronto", label: "Pronto" },
 ];
-
-function nowHHMM() {
-  const d = new Date();
-  return `${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
-}
 
 function diffMin(hora: string) {
   const [h, m] = hora.slice(0, 5).split(":").map(Number);
@@ -39,24 +36,33 @@ export function Dashboard() {
     staleTime: 30_000,
   });
   const { data: inativosData } = useQuery({
-    queryKey: ["mvp-inativos-30"],
+    queryKey: ["dashboard-inativos-30"],
     queryFn: () => fetchInativos({ data: { dias: 30 } }),
     staleTime: 5 * 60_000,
   });
 
   if (isLoading || !data) {
-    return <div className="space-y-4">{[1, 2, 3].map((i) => <div key={i} className="h-24 rounded-2xl skeleton-shimmer" />)}</div>;
+    return (
+      <div className="space-y-4">
+        {[1, 2, 3].map((i) => <div key={i} className="h-24 rounded-2xl skeleton-shimmer" />)}
+      </div>
+    );
   }
 
-  const now = nowHHMM();
   const agenda = (data.agendaHoje ?? []) as any[];
   const veiculos = (data.veiculosEmAtendimento ?? []) as any[];
-  const inativos = ((inativosData?.inativos ?? []) as any[])
-    .filter((c) => c.telefone)
-    .sort((a, b) => (b.dias_inativo ?? 0) - (a.dias_inativo ?? 0))
-    .slice(0, 3);
+  const cards = data.cards ?? ({} as any);
+  const horariosLivres = Number(cards.horariosLivres ?? 0);
+  const ticketMedio = Number(cards.ticketMedio ?? 0);
+  const potencial = Number(cards.potencialFaturamento ?? 0);
 
-  const horariosLivresEstim = Math.max(0, 8 - agenda.length);
+  // Buckets de reativação a partir dos inativos 30+
+  const inativos = ((inativosData?.inativos ?? []) as any[])
+    .filter((c) => c.ultima_visita); // ignora "999 dias" (nunca voltou)
+  const bucket30 = inativos.filter((c) => c.dias_inativo >= 30 && c.dias_inativo < 60).length;
+  const bucket60 = inativos.filter((c) => c.dias_inativo >= 60 && c.dias_inativo < 90).length;
+  const bucket90 = inativos.filter((c) => c.dias_inativo >= 90).length;
+  const totalReativar = bucket30 + bucket60 + bucket90;
 
   const kanbanCount = KANBAN_COLS.map((c) => ({
     ...c,
@@ -66,8 +72,8 @@ export function Dashboard() {
   return (
     <>
       <PageHeader
-        title="Hoje"
-        subtitle={`${agenda.length} ${agenda.length === 1 ? "agendamento" : "agendamentos"} · ${brl(Number(data.cards?.previsaoFaturamentoDia ?? 0))} previstos`}
+        title="Central do Dia"
+        subtitle={`${agenda.length} ${agenda.length === 1 ? "agendamento" : "agendamentos"} · ${brl(Number(cards.previsaoFaturamentoDia ?? 0))} previstos`}
         actions={
           <div className="flex gap-2">
             <Button asChild variant="premium" size="sm"><Link to="/agendamentos"><Plus className="h-4 w-4" /> Agendamento</Link></Button>
@@ -76,8 +82,33 @@ export function Dashboard() {
         }
       />
 
+      {/* 1. Oportunidade de hoje — hero */}
+      <Card className="mb-4 overflow-hidden border-0 bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg">
+        <CardContent className="p-5">
+          <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-widest opacity-90">
+            <TrendingUp className="h-3.5 w-3.5" /> Oportunidade de hoje
+          </div>
+          {horariosLivres === 0 ? (
+            <>
+              <p className="font-display text-2xl font-bold">Agenda cheia hoje 🎉</p>
+              <p className="mt-1 text-sm opacity-90">Nenhum horário livre. Ótimo trabalho!</p>
+            </>
+          ) : (
+            <>
+              <p className="font-display text-3xl font-bold tabular-nums">{brl(potencial)}</p>
+              <p className="mt-1 text-sm opacity-90">
+                <strong>{horariosLivres}</strong> {horariosLivres === 1 ? "horário livre" : "horários livres"} × ticket médio de <strong>{brl(ticketMedio)}</strong>
+              </p>
+              <Button asChild size="sm" variant="secondary" className="mt-3">
+                <Link to="/agendamentos"><CalendarDays className="h-4 w-4" /> Preencher agenda</Link>
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        {/* Hoje */}
+        {/* 2. Agenda do dia */}
         <Card>
           <CardContent className="p-4">
             <div className="mb-3 flex items-center gap-2">
@@ -88,7 +119,7 @@ export function Dashboard() {
               <p className="py-6 text-center text-sm text-muted-foreground">Nenhum agendamento para hoje.</p>
             ) : (
               <ul className="divide-y">
-                {agenda.slice(0, 8).map((a) => {
+                {agenda.slice(0, 5).map((a) => {
                   const hora = a.hora_agendada?.slice(0, 5) ?? "--:--";
                   const delta = diffMin(hora);
                   const atrasado = delta < -5 && !["concluido", "entregue", "cancelado", "nao_compareceu"].includes(a.status);
@@ -113,12 +144,12 @@ export function Dashboard() {
               </ul>
             )}
             <div className="mt-3 text-right">
-              <Button asChild variant="ghost" size="sm"><Link to="/agendamentos">Ver agenda completa</Link></Button>
+              <Button asChild variant="ghost" size="sm"><Link to="/agendamentos">Ver agenda completa <ArrowRight className="h-3 w-3" /></Link></Button>
             </div>
           </CardContent>
         </Card>
 
-        {/* Em andamento — mini kanban */}
+        {/* 3. Mini kanban */}
         <Card>
           <CardContent className="p-4">
             <div className="mb-3 flex items-center gap-2">
@@ -134,68 +165,51 @@ export function Dashboard() {
               ))}
             </div>
             <div className="mt-3 text-right">
-              <Button asChild variant="ghost" size="sm"><Link to="/fila">Abrir Kanban</Link></Button>
+              <Button asChild variant="ghost" size="sm"><Link to="/fila">Abrir Kanban <ArrowRight className="h-3 w-3" /></Link></Button>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Insights do dia */}
+      {/* 4. Reativação de clientes */}
       <Card className="mt-4">
         <CardContent className="p-4">
           <div className="mb-3 flex items-center gap-2">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <h2 className="font-display font-semibold">Insights do dia</h2>
+            <Users className="h-4 w-4 text-primary" />
+            <h2 className="font-display font-semibold">Reativação de clientes</h2>
           </div>
-
-          <div className="space-y-3">
-            {horariosLivresEstim > 0 && (
-              <div className="flex items-start gap-3 rounded-2xl border bg-card p-3">
-                <CalendarDays className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm">
-                    Você tem <strong>{horariosLivresEstim} horários livres</strong> hoje. Tente preencher para aumentar o faturamento.
-                  </p>
-                </div>
-                <Button asChild size="sm" variant="outline"><Link to="/agendamentos">Abrir agenda</Link></Button>
+          {totalReativar === 0 ? (
+            <div className="flex items-center gap-2 rounded-2xl bg-muted/30 p-3 text-sm text-muted-foreground">
+              <CheckCircle2 className="h-4 w-4 text-success" />
+              Nenhum cliente inativo há mais de 30 dias. Bom trabalho.
+            </div>
+          ) : (
+            <>
+              <div className="grid grid-cols-3 gap-2">
+                <BucketCard label="+30 dias" value={bucket30} tone="warning" />
+                <BucketCard label="+60 dias" value={bucket60} tone="warning" />
+                <BucketCard label="+90 dias" value={bucket90} tone="destructive" />
               </div>
-            )}
-
-            {inativos.length === 0 ? (
-              <div className="rounded-2xl border bg-muted/30 p-3 text-sm text-muted-foreground">
-                Nenhum cliente inativo há mais de 30 dias. Bom trabalho. 👏
+              <div className="mt-3 flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">{totalReativar} clientes precisam de um empurrão.</p>
+                <Button asChild size="sm" variant="premium">
+                  <Link to="/clientes/inativos">Reativar clientes <ArrowRight className="h-3 w-3" /></Link>
+                </Button>
               </div>
-            ) : (
-              inativos.map((c) => {
-                const primeiroNome = (c.nome ?? "").split(" ")[0] || "Cliente";
-                const msg = c.dias_inativo > 60
-                  ? `Olá ${primeiroNome}! Sentimos sua falta! Que tal agendar uma nova lavagem? 🚗✨`
-                  : `Olá ${primeiroNome}! Faz ${c.dias_inativo} dias. Que tal renovar o brilho do seu carro?`;
-                const tel = onlyDigits(c.telefone ?? "");
-                return (
-                  <div key={c.id} className="flex items-start gap-3 rounded-2xl border bg-card p-3">
-                    <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-warning" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm">
-                        Cliente <strong>{c.nome}</strong> não retorna há <strong>{c.dias_inativo} dias</strong>.
-                      </p>
-                    </div>
-                    {tel ? (
-                      <Button asChild size="sm" variant="premium">
-                        <a href={waLink(tel, msg)} target="_blank" rel="noopener noreferrer">
-                          <MessageCircle className="h-4 w-4" /> WhatsApp
-                        </a>
-                      </Button>
-                    ) : (
-                      <Badge variant="outline" className="text-[10px]">Sem telefone</Badge>
-                    )}
-                  </div>
-                );
-              })
-            )}
-          </div>
+            </>
+          )}
         </CardContent>
       </Card>
     </>
+  );
+}
+
+function BucketCard({ label, value, tone }: { label: string; value: number; tone: "warning" | "destructive" }) {
+  const color = tone === "destructive" ? "text-destructive" : "text-warning";
+  return (
+    <div className="rounded-2xl border bg-card p-3 text-center">
+      <p className={`font-display text-2xl font-bold tabular-nums ${color}`}>{value}</p>
+      <p className="mt-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
+    </div>
   );
 }
