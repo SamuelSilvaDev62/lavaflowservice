@@ -202,7 +202,8 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
     const { ownerId } = await getOwnerScope(supabase, userId);
     const hoje = localDateIso();
     const now = new Date();
-    const [{ data: agendamentos }, { data: ordens }, { data: ordensFinalizadas }, { data: funcionarios }] = await Promise.all([
+    const startMonth30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
+    const [{ data: agendamentos }, { data: ordens }, { data: ordensFinalizadas }, { data: funcionarios }, { data: ordensEntregues30 }, { data: agendaCfg }] = await Promise.all([
       supabase.from("agendamentos")
         .select(`id, data_agendada, hora_agendada, status, leva_traz, endereco_retirada, endereco_devolucao,
                  horario_retirada, horario_devolucao, taxa_leva_traz, cliente_id, servico_id, funcionario_id,
@@ -225,7 +226,17 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         .select("id, nome, capacidade_por_horario, ativo")
         .eq("owner_id", ownerId)
         .eq("ativo", true),
+      supabase.from("ordens_servico")
+        .select("valor")
+        .eq("owner_id", ownerId)
+        .eq("status", "entregue")
+        .gte("entregue_em", startMonth30),
+      supabase.from("agenda_config")
+        .select("hora_inicio, hora_fim, intervalo_min, capacidade_simultanea, dias_semana")
+        .eq("owner_id", ownerId)
+        .maybeSingle(),
     ]);
+
 
     const agHoje = agendamentos ?? [];
     const osAbertas = ordens ?? [];
