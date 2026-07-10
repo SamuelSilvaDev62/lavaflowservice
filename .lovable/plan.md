@@ -1,112 +1,61 @@
-# Remoção do Modo MVP + IA e blueprint de reestruturação
+## B.4 — Central do Dia (definitivo) + redesenho da tela do colaborador
 
-Dois blocos: **(A) faxina** — remover o modo MVP e tudo relacionado a IA, promovendo o dashboard enxuto atual como o dashboard único; **(B) blueprint** — reestruturação focada em performance e usabilidade.
-
----
-
-## A) Faxina — remoção de MVP e IA
-
-### A.1 Remover o modo MVP (o dashboard enxuto vira o padrão)
-- Excluir: `src/lib/mvp-mode.ts`, `src/lib/features.ts`.
-- `src/routes/_authenticated/dashboard.tsx`: renderizar `MvpDashboard` diretamente (sem branch `isMvpMode`). Renomear o arquivo do componente para `src/components/dashboard/dashboard.tsx` e o export para `Dashboard` (o "Mvp" no nome perde sentido).
-- `src/components/app-layout.tsx`: remover import/uso de `isMvpMode`, `setMvpMode`, `MVP_ALLOWED_ROUTES`, o filtro de rotas MVP, o badge "Modo MVP" e o botão de toggle no rodapé.
-- `src/routes/_authenticated/route.tsx`: remover o guard de rotas MVP.
-- `.env.example`: remover `VITE_MVP_MODE`.
-
-### A.2 Remover toda a superfície de IA
-Arquivos/rotas a excluir:
-- Rotas: `src/routes/_authenticated/assistente.tsx`, `src/routes/_authenticated/inteligencia.tsx`, `src/routes/_authenticated/crescimento.tsx`, `src/routes/_authenticated/auditoria.tsx`, `src/routes/api/assistente-chat.ts`.
-- Componentes: `src/components/copilot/contextual-copilot.tsx` e a pasta `src/components/copilot/`.
-- Libs: `src/lib/ai/` (inteira), `src/lib/copilot/`, `src/lib/flow-engine/`, `src/lib/ai-gateway.server.ts`, `src/lib/inteligencia.functions.ts`, `src/lib/auditoria.functions.ts`.
-- Assets landing referenciando IA: `src/assets/landing/app-assistant.webp.asset.json` (se referenciado só pelo assistente).
-
-Ajustes em arquivos que sobrevivem:
-- `src/routes/_authenticated/route.tsx`: remover `<ContextualCopilot />` e imports.
-- `src/components/app-layout.tsx`: remover itens de nav "Centro de Crescimento", "Inteligência", "Consultor Inteligente", "Auditoria" (e ícones `Bot`, `BrainCircuit`, `Rocket` se ficarem órfãos).
-- `src/routes/_authenticated/dashboard.tsx`, `src/routes/_authenticated/relatorios.tsx`, `src/routes/_authenticated/ordens.tsx`, `src/components/guided-tour.tsx`: remover chamadas/menções a insights de IA, tour de "assistente" e cards do consultor.
-- `src/routes/__root.tsx` e `src/routes/lp.tsx`: revisar copy que fale de "IA" / "Consultor Inteligente".
-
-Backend/limpeza de dados (migração única):
-- `DROP TABLE` em `ai_recommendations`, `ai_usage_logs`, `tenant_ai_settings` (após confirmar que nenhuma FK vive fora dessas). Manter `equipe_auditoria` (não é IA).
-- Não mexer em `LOVABLE_API_KEY` como secret — apenas parar de usá-lo. Recomendar remoção manual em Settings depois.
-
-Verificações finais:
-- `rg -n "isMvpMode|mvp-mode|hasFeature|features\\.ts|ai-gateway|lavaflow-consultor|ContextualCopilot|flow-engine|inteligencia|assistente" src/` deve voltar vazio.
-- `tsgo` limpo; smoke test nas rotas `/dashboard`, `/agendamentos`, `/fila`, `/ordens`, `/clientes`, `/equipe`, `/configuracoes`.
-
-Rotas finais no `_authenticated`: Painel, Agendamentos, Fila (Kanban), OS, Clientes, Fidelidade, Assinaturas, Campanhas, Equipe, Relatórios, Configurações, Meu Trabalho. (Fidelidade/Assinaturas/Campanhas voltam a ficar visíveis por padrão, já que o filtro MVP some — se quiser mantê-las escondidas, dizer na revisão.)
+Duas frentes independentes: (1) fechar o dashboard como "Central do Dia" com cálculos reais de ticket médio, capacidade e potencial; (2) trocar o layout de `/meu-trabalho` pelo mockup HTML enviado, mantendo dados e ações reais do backend.
 
 ---
 
-## B) Blueprint de reestruturação — alta performance e usabilidade
+### 1) Central do Dia — backend
 
-Objetivo: uma base sólida sem IA, com UX rápida, previsível e mobile-first.
+Editar `getDashboardOperacional` em `src/lib/lavaflow.functions.ts`:
 
-### B.1 Arquitetura de dados e navegação
-- **Rota-raiz do app** = `/dashboard` (Central do Dia). Um único ponto de entrada pós-login.
-- **Agrupar navegação** em 3 áreas mentais:
-  1. *Operação* — Painel, Agenda, Fila, OS, Meu Trabalho.
-  2. *Clientes & Receita* — Clientes, Fidelidade, Assinaturas, Campanhas.
-  3. *Gestão* — Equipe, Relatórios, Configurações.
-- Nav mobile: bottom tab bar com 5 itens da Operação; demais em drawer.
+- Ler em paralelo (além do que já lê hoje):
+  - `ordens_servico` dos últimos 30 dias com `status = 'entregue'` → `ticketMedio = média(valor)`, fallback R$ 50 quando não houver dados.
+  - `agenda_config` do `ownerId` → derivar `capacidadeDia` do dia da semana atual (`hora_inicio`, `hora_fim`, `intervalo_min`, `capacidade_simultanea`, `dias_semana`). Se não configurado, fallback 8.
+- Calcular:
+  - `agendadosAtivos` = agendamentos ativos hoje (já derivado).
+  - `horariosLivres = max(0, capacidadeDia - agendadosAtivos)`.
+  - `potencialFaturamento = horariosLivres * ticketMedio`.
+- Adicionar ao retorno em `cards`: `ticketMedio`, `capacidadeDia`, `horariosLivres`, `potencialFaturamento`.
+- Remover o bloco morto de `clientesInativos = 0 / ticketMedio = 0` (nunca dispara).
 
-### B.2 Padrão de dados (performance)
-- **Loader + TanStack Query** em todas as telas: `ensureQueryData(queryOptions)` no `loader`, `useSuspenseQuery` no componente. Zero `useEffect + fetch`.
-- **Server functions agregadoras**: uma função por tela devolve o payload completo (evitar N+1 no cliente). Ex.: `getDashboard()`, `getFilaBoard()`, `getClienteDetalhe(id)`.
-- **Índices no banco** para queries quentes: `ordens_servico(owner_id, status)`, `agendamentos(owner_id, data_agendada, hora_agendada)`, `clientes(owner_id, ultima_visita)`.
-- **Realtime seletivo** apenas em Fila (`ordens_servico`) e Agenda do dia. Nada de subscribe global.
-- **Cache**: `staleTime` 30–60s para leituras, `refetchInterval` só em telas ao vivo (Fila).
+### 2) Central do Dia — frontend
 
-### B.3 Design system e usabilidade
-- Consolidar tokens em `src/styles.css` (cores, radius, sombras, motion). Remover cores hardcoded remanescentes.
-- Componentes base auditados (Button, Card, Badge, Dialog, Table, EmptyState, Skeleton, PageHeader) com variantes claras.
-- **Padrões de tela** obrigatórios: Skeleton → Data → EmptyState → Error, sempre.
-- **Ação primária única** por tela, no topo (`PageHeader.actions`) e replicada em CTA flutuante mobile.
-- **Toque ≥ 44px**, tipografia display em números-chave, `tabular-nums`.
+`src/components/dashboard/dashboard.tsx`, ordem fixa:
 
-### B.4 Central do Dia (definitiva)
-Ordem fixa: Oportunidade → Agenda → Kanban resumido → Reativação → Ações rápidas. Cálculos:
-- `ticketMedio` = média de `ordens_servico.valor` (status `entregue`, últimos 30d).
-- `capacidadeDia` = derivada de `agenda_config` do dia da semana atual.
-- `horariosLivres = max(0, capacidadeDia - agendadosAtivos)`.
-- `potencial = horariosLivres * ticketMedio`.
-Reativação: agregada em buckets `+30/+60/+90`, nunca lista com "999 dias".
+1. **Oportunidade de hoje** (card hero, gradiente primário): `horariosLivres` livres × `ticketMedio` = **`potencialFaturamento`**. CTA "Preencher agenda" → `/agendamentos`. Se `horariosLivres === 0` → "Agenda cheia hoje 🎉".
+2. **Agenda do dia** (já existe, manter estilo, máximo 5 itens, "Ver agenda completa").
+3. **Mini kanban 2×2** (já existe).
+4. **Reativação em buckets** — consumir `getClienteInativos({dias: 30})` e agrupar em `+30 / +60 / +90` dias (contadores). Nada de lista com "999 dias". CTA "Reativar clientes" → `/clientes/inativos`.
+5. **Ações rápidas** — já no `PageHeader.actions` (Agendamento / Cliente).
 
-### B.5 Fila (Kanban) de alta performance
-- Colunas: Aguardando · Em lavagem · Finalização · Pronto · Entregue (hoje).
-- Drag-and-drop otimista com rollback em erro.
-- Realtime na tabela `ordens_servico` por `owner_id`.
-- Ação de 1 clique: "Iniciar" · "Finalizar" · "Entregar + WhatsApp" (usa `waLink`).
+Remover o card "Insights do dia" atual (mistura oportunidade + reativação de forma desordenada).
 
-### B.6 Clientes
-- Lista virtualizada (react-virtual) com busca por nome/telefone/placa.
-- Detalhe: histórico de OS, veículos, saldo de pontos, botão WhatsApp com template.
-- Segmentos derivados por SQL view: `ativos_30`, `inativos_30_60`, `inativos_60_90`, `inativos_90+`.
+### 3) Tela do colaborador — redesenho conforme HTML anexado
 
-### B.7 WhatsApp (sem IA)
-- Templates fixos em `src/lib/whatsapp.ts` (já existente).
-- CTA "Enviar WhatsApp" em: OS pronta, cliente inativo, aniversariante do mês, pós-serviço (agradecimento).
+Reescrever `src/routes/_authenticated/meu-trabalho.tsx` seguindo o mockup, sem inventar dados novos:
 
-### B.8 Performance técnica
-- Code-splitting por rota (padrão TanStack). Auditar bundle com `vite build --report`.
-- Imagens: `vite-imagetools` para assets estáticos; lazy `loading="lazy"` em listas.
-- Preload da LCP do dashboard via `head().links`.
-- SW/PWA já existe (`src/pwa/register-sw.ts`) — validar cache-first para shell.
+- **Header escuro** (gradiente navy) com avatar (iniciais do nome do funcionário), nome, papel ("Lavador · Turno da manhã" — usar `funcionario.cargo` se existir, senão "Colaborador"), botão "Sair" (signOut). Strip com ponto pulsante e "Turno ativo desde HH:MM" — usar a hora do primeiro `iniciado_em` do dia ou a hora de login (fallback: hora atual da montagem).
+- **Stat strip** compacta (4 colunas): `Atribuídos` (fila total), `Em serviço` (`em_lavagem`), `Concluídos` (hoje), `Próximo` (hora do próximo agendamento atribuído ou "Livre"). Substitui os 4 MetricCards atuais.
+- **Job card hero** para a OS ativa (primeira `em_lavagem`, se não houver, primeira `aguardando`):
+  - Topo: "Cliente · Nome" + título do serviço, badge de status com pulso.
+  - **Flow timer** (faixa navy com pipes animados): "Tempo em atendimento" com minutos desde `iniciado_em` (se `aguardando`, mostrar "Aguardando início"). Chip "✓ Checklist ok" estático por enquanto.
+  - Meta: "Iniciado às HH:MM · Veículo: modelo cor".
+  - **Upsell** (banner dourado) — versão estática institucional ("Ofereça serviços adicionais ao cliente"), sem IA. Botão desabilitado ou ocultável em v1 — confirmar comportamento.
+  - **Ações**: primário "▶ Continuar atendimento" (scrolla/foca card) quando `em_lavagem`, ou "▶ Iniciar" quando `aguardando`; linha secundária: "Avisar recepção" (v1: toast "Recepção notificada") + "Finalizar" (mutação existente `finalizarOs`).
+- **Lista abaixo** dos outros veículos da fila (formato compacto como cards menores, sem hero). Reaproveita `iniciarOs`/`finalizarOs`.
+- **Rodapé demoted**: "⇄ Trocar colaborador" (link para `/auth` ou signOut — confirmar).
 
-### B.9 Qualidade
-- `tsgo` limpo; ESLint sem warnings novos.
-- Smoke test manual documentado em `.lovable/mvp-smoke.md` (renomear para `smoke.md`).
-- Métricas alvo: TTI < 2s em 4G simulada; interação < 100ms; Lighthouse mobile ≥ 90.
+Tokens: usar cores do mockup como classes tailwind arbitrárias apenas dentro deste arquivo (navy `#0E2E33`, teal `#1E8A8C`, flow-blue `#2F6FED`, foam `#F4FAF9`, gold `#DE9C2C`). Não promover a tokens globais nesta rodada.
 
-### B.10 Fora de escopo
-- Qualquer IA/LLM, recomendações automáticas, consultor, insights gerados por modelo.
-- OpenSquad, flow-engine e automações complexas.
+### Fora de escopo
 
----
+- Sem migrações novas.
+- Sem alterar `getMeuTrabalho` (o payload atual já entrega `funcionario`, `fila`, `cards`).
+- Sem IA, sem OpenSquad, sem sugestão dinâmica no upsell.
+- Sem mexer nas outras rotas (fila, clientes, etc.) — isso são ondas B.5/B.6.
 
-## Ordem de execução sugerida
-1. Bloco A.1 (MVP off) — 1 passo, baixo risco.
-2. Bloco A.2 (IA off) — inclui migração de `DROP TABLE`.
-3. Bloco B em ondas: navegação → dashboard definitivo → fila realtime → clientes virtualizado → performance/PWA.
+### Perguntas rápidas
 
-Confirmar antes de executar: (i) manter Fidelidade/Assinaturas/Campanhas visíveis por padrão após remover o filtro MVP? (ii) posso dropar as 3 tabelas de IA na mesma migração?
+1. O botão **"Avisar recepção"** existe como fluxo real? (v1 sugiro apenas um toast; depois viraria notificação.)
+2. **"Trocar colaborador"** deve fazer signOut ou abrir um seletor rápido de usuário?
+3. Upsell na v1: **ocultar** ou **mostrar mensagem estática** ("Ofereça enceramento/higienização") sem CTA funcional?
