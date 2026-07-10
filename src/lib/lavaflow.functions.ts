@@ -269,16 +269,33 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
       .filter((f: any) => f.ocupacao >= f.capacidade)
       .slice(0, 3);
 
-    const clientesInativos = 0;
-    const ticketMedio = 0;
+    // Ticket médio (últimos 30 dias, entregues); fallback 50.
+    const entregues30 = ordensEntregues30 ?? [];
+    const ticketMedio = entregues30.length
+      ? entregues30.reduce((s: number, r: any) => s + Number(r.valor ?? 0), 0) / entregues30.length
+      : 50;
+
+    // Capacidade do dia a partir de agenda_config; fallback 8.
+    const dow = new Date().getDay();
+    let capacidadeDia = 8;
+    if (agendaCfg) {
+      const diasSemana = (agendaCfg.dias_semana ?? []) as number[];
+      if (diasSemana.length === 0 || diasSemana.includes(dow)) {
+        const [hi, mi] = String(agendaCfg.hora_inicio ?? "08:00").split(":").map(Number);
+        const [hf, mf] = String(agendaCfg.hora_fim ?? "18:00").split(":").map(Number);
+        const minutos = Math.max(0, (hf * 60 + (mf || 0)) - (hi * 60 + (mi || 0)));
+        const intervalo = Math.max(15, Number(agendaCfg.intervalo_min ?? 60));
+        const cap = Math.max(1, Number(agendaCfg.capacidade_simultanea ?? 1));
+        capacidadeDia = Math.max(0, Math.floor(minutos / intervalo)) * cap;
+      } else {
+        capacidadeDia = 0;
+      }
+    }
+    const agendadosAtivos = agHoje.filter((a: any) => isActiveStatus(a.status)).length;
+    const horariosLivres = Math.max(0, capacidadeDia - agendadosAtivos);
+    const potencialFaturamento = horariosLivres * ticketMedio;
+
     const alertas = [
-      clientesInativos > 0 ? {
-        tipo: "receita",
-        prioridade: "media",
-        titulo: `${clientesInativos} clientes sem retorno há 60+ dias`,
-        mensagem: `Potencial estimado de recuperação: ${Math.round(clientesInativos * ticketMedio)}`,
-        rota: "/clientes/inativos",
-      } : null,
       levaTrazProximos.length > 0 ? {
         tipo: "leva_traz",
         prioridade: "alta",
@@ -309,12 +326,17 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         servicosPendentes: osAbertas.filter((o: any) => ["aguardando", "pronto"].includes(o.status)).length,
         previsaoFaturamentoDia: previstosAgenda + faturamentoAberto,
         finalizadosHoje: (ordensFinalizadas ?? []).length,
+        ticketMedio,
+        capacidadeDia,
+        horariosLivres,
+        potencialFaturamento,
       },
       agendaHoje: proximos,
       veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao", "pronto"].includes(o.status)).slice(0, 6),
       alertas,
     };
   });
+
 
 export const getMissaoDoDia = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
