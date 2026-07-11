@@ -34,20 +34,21 @@ type NavGroup = { label: string; items: NavItem[] };
 
 const groupsAll: NavGroup[] = [
   { label: "Operação", items: [
-    { to: "/dashboard", label: "Painel Executivo", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
-    { to: "/agendamentos", label: "Central de Agendamentos", icon: CalendarDays, roles: OPERACIONAL },
-    { to: "/fila", label: "Fila Operacional", icon: ListChecks, roles: OPERACIONAL },
-    { to: "/ordens", label: "Ordens de Serviço", icon: ClipboardList, roles: OPERACIONAL },
+    { to: "/dashboard", label: "Painel", icon: LayoutDashboard, tour: "dashboard", roles: GESTAO },
+    { to: "/agendamentos", label: "Agenda", icon: CalendarDays, roles: OPERACIONAL },
+    { to: "/fila", label: "Fila", icon: ListChecks, roles: OPERACIONAL },
+    { to: "/ordens", label: "OS", icon: ClipboardList, roles: OPERACIONAL },
+    { to: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, roles: OPERACIONAL },
   ]},
   { label: "Relacionamento", items: [
-    { to: "/clientes", label: "Hub de Clientes", icon: Users, tour: "clientes", roles: OPERACIONAL },
-    { to: "/campanhas", label: "Campanhas", icon: Megaphone, roles: GESTAO },
-    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: GESTAO },
+    { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes", roles: OPERACIONAL },
     { to: "/fidelidade", label: "Fidelidade", icon: Award, roles: ADMINS },
+    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: GESTAO },
+    { to: "/campanhas", label: "Campanhas", icon: Megaphone, roles: GESTAO },
   ]},
   { label: "Gestão", items: [
     { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },
-    { to: "/relatorios", label: "Insights Operacionais", icon: BarChart3, roles: GESTAO },
+    { to: "/relatorios", label: "Relatórios", icon: BarChart3, roles: GESTAO },
     { to: "/midia", label: "Mídia", icon: ImageIcon, roles: ADMINS },
     { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
   ]},
@@ -58,6 +59,8 @@ const colabGroups: NavGroup[] = [
     { to: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, roles: ["lavador", "colaborador"] },
   ]},
 ];
+
+const BOTTOM_TAB_ROUTES = ["/dashboard", "/agendamentos", "/fila", "/ordens", "/meu-trabalho"] as const;
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
