@@ -1,61 +1,40 @@
-## B.4 — Central do Dia (definitivo) + redesenho da tela do colaborador
+## B.1 — Navegação em 3 áreas + bottom-tab mobile
 
-Duas frentes independentes: (1) fechar o dashboard como "Central do Dia" com cálculos reais de ticket médio, capacidade e potencial; (2) trocar o layout de `/meu-trabalho` pelo mockup HTML enviado, mantendo dados e ações reais do backend.
+Escopo enxuto e restrito a `src/components/app-layout.tsx`. Sem mexer em rotas, RBAC ou telas.
 
----
+### 1) Sidebar (desktop) — 3 grupos definitivos
 
-### 1) Central do Dia — backend
+Renomear labels dos itens para os nomes curtos pedidos, mantendo os `to` atuais:
 
-Editar `getDashboardOperacional` em `src/lib/lavaflow.functions.ts`:
+- **Operação**: Painel (`/dashboard`), Agenda (`/agendamentos`), Fila (`/fila`), OS (`/ordens`), Meu Trabalho (`/meu-trabalho`).
+- **Relacionamento**: Clientes (`/clientes`), Fidelidade (`/fidelidade`), Assinaturas (`/assinaturas`), Campanhas (`/campanhas`).
+- **Gestão**: Equipe (`/equipe`), Relatórios (`/relatorios`), Mídia (`/midia`), Configurações (`/configuracoes`).
 
-- Ler em paralelo (além do que já lê hoje):
-  - `ordens_servico` dos últimos 30 dias com `status = 'entregue'` → `ticketMedio = média(valor)`, fallback R$ 50 quando não houver dados.
-  - `agenda_config` do `ownerId` → derivar `capacidadeDia` do dia da semana atual (`hora_inicio`, `hora_fim`, `intervalo_min`, `capacidade_simultanea`, `dias_semana`). Se não configurado, fallback 8.
-- Calcular:
-  - `agendadosAtivos` = agendamentos ativos hoje (já derivado).
-  - `horariosLivres = max(0, capacidadeDia - agendadosAtivos)`.
-  - `potencialFaturamento = horariosLivres * ticketMedio`.
-- Adicionar ao retorno em `cards`: `ticketMedio`, `capacidadeDia`, `horariosLivres`, `potencialFaturamento`.
-- Remover o bloco morto de `clientesInativos = 0 / ticketMedio = 0` (nunca dispara).
+Regras de visibilidade:
+- "Meu Trabalho" passa a aparecer para todos os papéis operacionais (`OPERACIONAL`) — hoje só o colaborador vê. Colaborador puro continua com o menu reduzido atual (redireciona para `/meu-trabalho`).
+- Fidelidade continua restrita a `ADMINS`; Campanhas/Assinaturas continuam `GESTAO`. Nenhum item novo, nenhum item removido.
 
-### 2) Central do Dia — frontend
+### 2) Bottom-tab (mobile)
 
-`src/components/dashboard/dashboard.tsx`, ordem fixa:
+Nova `<nav>` fixa no rodapé, visível apenas em `<lg` e apenas quando o usuário não é colaborador puro (colaborador só tem uma tela, não precisa de tabs). Itens = os 5 de Operação, na ordem:
 
-1. **Oportunidade de hoje** (card hero, gradiente primário): `horariosLivres` livres × `ticketMedio` = **`potencialFaturamento`**. CTA "Preencher agenda" → `/agendamentos`. Se `horariosLivres === 0` → "Agenda cheia hoje 🎉".
-2. **Agenda do dia** (já existe, manter estilo, máximo 5 itens, "Ver agenda completa").
-3. **Mini kanban 2×2** (já existe).
-4. **Reativação em buckets** — consumir `getClienteInativos({dias: 30})` e agrupar em `+30 / +60 / +90` dias (contadores). Nada de lista com "999 dias". CTA "Reativar clientes" → `/clientes/inativos`.
-5. **Ações rápidas** — já no `PageHeader.actions` (Agendamento / Cliente).
+```text
+[ Painel ] [ Agenda ] [ Fila ] [ OS ] [ Meu Trabalho ]
+```
 
-Remover o card "Insights do dia" atual (mistura oportunidade + reativação de forma desordenada).
+- Componente inline no `AppLayout`, `fixed bottom-0 inset-x-0 z-40 lg:hidden`, altura ~64px, safe-area (`pb-[env(safe-area-inset-bottom)]`).
+- Cada tab: ícone (lucide, mesmos já importados) + label 10px, estado ativo com cor `primary` e barra superior de 2px.
+- Filtro por RBAC: cada tab só renderiza se o papel atual está em `roles` do item correspondente (mesma lógica que a sidebar já usa). Se sobrar <2 tabs, esconde a barra.
+- `main` ganha `pb-20 lg:pb-0` para não cobrir conteúdo.
+- Header mobile atual (logo + menu hamburguer) permanece — o drawer ainda serve para acessar Relacionamento/Gestão.
 
-### 3) Tela do colaborador — redesenho conforme HTML anexado
+### 3) Fora de escopo
 
-Reescrever `src/routes/_authenticated/meu-trabalho.tsx` seguindo o mockup, sem inventar dados novos:
+- Nada de novas rotas, permissões, telas ou tokens de tema.
+- Sem mexer em `Meu Trabalho`, Dashboard ou fluxo do colaborador.
+- Sem tour/onboarding novo (o `data-tour="dashboard"` no item Painel é preservado).
 
-- **Header escuro** (gradiente navy) com avatar (iniciais do nome do funcionário), nome, papel ("Lavador · Turno da manhã" — usar `funcionario.cargo` se existir, senão "Colaborador"), botão "Sair" (signOut). Strip com ponto pulsante e "Turno ativo desde HH:MM" — usar a hora do primeiro `iniciado_em` do dia ou a hora de login (fallback: hora atual da montagem).
-- **Stat strip** compacta (4 colunas): `Atribuídos` (fila total), `Em serviço` (`em_lavagem`), `Concluídos` (hoje), `Próximo` (hora do próximo agendamento atribuído ou "Livre"). Substitui os 4 MetricCards atuais.
-- **Job card hero** para a OS ativa (primeira `em_lavagem`, se não houver, primeira `aguardando`):
-  - Topo: "Cliente · Nome" + título do serviço, badge de status com pulso.
-  - **Flow timer** (faixa navy com pipes animados): "Tempo em atendimento" com minutos desde `iniciado_em` (se `aguardando`, mostrar "Aguardando início"). Chip "✓ Checklist ok" estático por enquanto.
-  - Meta: "Iniciado às HH:MM · Veículo: modelo cor".
-  - **Upsell** (banner dourado) — versão estática institucional ("Ofereça serviços adicionais ao cliente"), sem IA. Botão desabilitado ou ocultável em v1 — confirmar comportamento.
-  - **Ações**: primário "▶ Continuar atendimento" (scrolla/foca card) quando `em_lavagem`, ou "▶ Iniciar" quando `aguardando`; linha secundária: "Avisar recepção" (v1: toast "Recepção notificada") + "Finalizar" (mutação existente `finalizarOs`).
-- **Lista abaixo** dos outros veículos da fila (formato compacto como cards menores, sem hero). Reaproveita `iniciarOs`/`finalizarOs`.
-- **Rodapé demoted**: "⇄ Trocar colaborador" (link para `/auth` ou signOut — confirmar).
+### Perguntas
 
-Tokens: usar cores do mockup como classes tailwind arbitrárias apenas dentro deste arquivo (navy `#0E2E33`, teal `#1E8A8C`, flow-blue `#2F6FED`, foam `#F4FAF9`, gold `#DE9C2C`). Não promover a tokens globais nesta rodada.
-
-### Fora de escopo
-
-- Sem migrações novas.
-- Sem alterar `getMeuTrabalho` (o payload atual já entrega `funcionario`, `fila`, `cards`).
-- Sem IA, sem OpenSquad, sem sugestão dinâmica no upsell.
-- Sem mexer nas outras rotas (fila, clientes, etc.) — isso são ondas B.5/B.6.
-
-### Perguntas rápidas
-
-1. O botão **"Avisar recepção"** existe como fluxo real? (v1 sugiro apenas um toast; depois viraria notificação.)
-2. **"Trocar colaborador"** deve fazer signOut ou abrir um seletor rápido de usuário?
-3. Upsell na v1: **ocultar** ou **mostrar mensagem estática** ("Ofereça enceramento/higienização") sem CTA funcional?
+1. Confirma que "Meu Trabalho" deve aparecer no bottom-tab para **owner/admin/gerente/atendente/lavador** (todos operacionais) ou apenas para papéis que executam serviço (lavador/atendente)?
+2. Ao clicar em "Meu Trabalho" sem estar vinculado a um funcionário, seguimos abrindo a tela com estado vazio (comportamento atual) ou escondemos a tab pra quem não tem `funcionario_id`?
