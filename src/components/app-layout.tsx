@@ -157,9 +157,39 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {open && <div className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden animate-in fade-in duration-200" onClick={() => setOpen(false)} />}
 
-      <main className="lg:pl-64 min-h-screen">
+      <main className="lg:pl-64 min-h-screen pb-20 lg:pb-0">
         <div className="px-4 lg:px-10 py-6 lg:py-10 max-w-7xl mx-auto animate-in fade-in duration-300">{children}</div>
       </main>
+
+      {!colab && (() => {
+        const opGroup = groups.find((g) => g.label === "Operação");
+        const tabs = (opGroup?.items ?? []).filter((it) => BOTTOM_TAB_ROUTES.includes(it.to as any))
+          .sort((a, b) => BOTTOM_TAB_ROUTES.indexOf(a.to as any) - BOTTOM_TAB_ROUTES.indexOf(b.to as any));
+        if (tabs.length < 2) return null;
+        return (
+          <nav className="lg:hidden fixed bottom-0 inset-x-0 z-40 bg-background/95 backdrop-blur-xl border-t shadow-[0_-4px_20px_-8px_rgba(0,0,0,0.15)] pb-[env(safe-area-inset-bottom)]">
+            <ul className="grid" style={{ gridTemplateColumns: `repeat(${tabs.length}, minmax(0, 1fr))` }}>
+              {tabs.map((it) => {
+                const Icon = it.icon;
+                const active = pathname === it.to || (it.to !== "/dashboard" && pathname.startsWith(it.to));
+                return (
+                  <li key={it.to}>
+                    <Link to={it.to} className={cn(
+                      "relative flex flex-col items-center justify-center gap-1 h-16 text-[10px] font-medium transition-colors",
+                      active ? "text-primary" : "text-muted-foreground hover:text-foreground",
+                    )}>
+                      {active && <span className="absolute top-0 left-1/2 -translate-x-1/2 h-0.5 w-8 rounded-b-full bg-primary" />}
+                      <Icon className={cn("h-5 w-5", active && "scale-110")} />
+                      <span className="leading-none">{it.label}</span>
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </nav>
+        );
+      })()}
+
 
       {!colab && <WelcomeModal />}
       {!colab && <GuidedTour />}
