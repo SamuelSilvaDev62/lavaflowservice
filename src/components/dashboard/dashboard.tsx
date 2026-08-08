@@ -99,20 +99,26 @@ export function Dashboard() {
 
           {horariosLivres === 0 ? (
             <>
-              <p className="font-display text-2xl font-bold">Agenda cheia hoje 🎉</p>
-              <p className="mt-1 text-sm opacity-90">Nenhum horário livre. Ótimo trabalho!</p>
+              <p className="font-display text-2xl font-bold text-primary-foreground">Agenda cheia hoje 🎉</p>
+              <p className="mt-1 text-sm text-primary-foreground/90">Nenhum horário livre. Ótimo trabalho!</p>
             </>
           ) : (
             <>
-              <p className="font-display text-3xl font-bold tabular-nums">{brl(potencial)}</p>
-              <p className="mt-1 text-sm opacity-90">
-                <strong>{horariosLivres}</strong> {horariosLivres === 1 ? "horário livre" : "horários livres"} × ticket médio de <strong>{brl(ticketMedio)}</strong>
+              <p className="font-display text-3xl font-bold tabular-nums text-primary-foreground">{brl(potencial)}</p>
+              <p className="mt-1 text-sm text-primary-foreground/90">
+                <strong className="font-bold text-primary-foreground">{horariosLivres}</strong> {horariosLivres === 1 ? "horário livre" : "horários livres"} × ticket médio de <strong className="font-bold text-primary-foreground">{brl(ticketMedio)}</strong>
               </p>
-              <Button asChild size="sm" variant="secondary" className="mt-3">
+              <Button
+                asChild
+                size="sm"
+                className="mt-3 border-0 font-semibold shadow-sm"
+                style={{ backgroundColor: "var(--card)", backgroundImage: "none", color: "var(--primary)" }}
+              >
                 <Link to="/agendamentos"><CalendarDays className="h-4 w-4" /> Preencher agenda</Link>
               </Button>
             </>
           )}
+
         </CardContent>
       </Card>
 
