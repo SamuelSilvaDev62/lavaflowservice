@@ -206,8 +206,8 @@ function Page() {
       )}
 
       {/* Faixa de dias */}
-      <div className="mb-4 flex items-center gap-2">
-        <div className="-mx-4 px-4 flex-1 flex gap-2 overflow-x-auto snap-x snap-mandatory sm:mx-0 sm:px-0">
+      <div className="mb-4 flex items-start gap-2">
+        <div className="grid flex-1 grid-cols-7 gap-1.5 sm:gap-2">
           {dayStrip.map(({ iso, date: d }) => {
             const active = iso === date;
             const isToday = iso === todayStr;
@@ -216,15 +216,15 @@ function Page() {
                 key={iso}
                 onClick={() => setDate(iso)}
                 className={cn(
-                  "snap-start shrink-0 flex flex-col items-center justify-center rounded-xl border w-14 h-16 transition-colors",
+                  "flex min-w-0 flex-col items-center justify-center rounded-xl border px-0.5 py-1.5 transition-colors",
                   active ? "bg-primary text-primary-foreground border-primary"
                     : "bg-card hover:bg-accent",
                 )}
               >
-                <span className={cn("text-[10px] uppercase font-medium", active ? "opacity-90" : "text-muted-foreground")}>
+                <span className={cn("text-[9px] uppercase font-medium sm:text-[10px]", active ? "opacity-90" : "text-muted-foreground")}>
                   {isToday ? "hoje" : WD[d.getDay()]}
                 </span>
-                <span className="text-lg font-bold leading-tight">{d.getDate()}</span>
+                <span className="text-base font-bold leading-tight sm:text-lg">{d.getDate()}</span>
                 <DayDots count={densidadePorDia.get(iso) ?? 0} active={active} />
               </button>
             );
