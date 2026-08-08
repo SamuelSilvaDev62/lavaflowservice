@@ -1127,6 +1127,22 @@ export const updateOrdemStatus = createServerFn({ method: "POST" })
     if (data.status === "entregue") patch.entregue_em = new Date().toISOString();
     const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", ownerId);
     if (error) throw error;
+    if (data.status === "entregue") {
+      const { data: ordem } = await supabase
+        .from("ordens_servico")
+        .select("id, cliente_id, valor, entregue_em, created_at")
+        .eq("id", data.id)
+        .eq("owner_id", ownerId)
+        .maybeSingle();
+      if (ordem) {
+        await atribuirConversaoCampanha(supabase, ownerId, {
+          id: ordem.id,
+          cliente_id: ordem.cliente_id,
+          valor: ordem.valor,
+          referencia: (ordem as any).entregue_em ?? ordem.created_at,
+        });
+      }
+    }
     return { ok: true };
   });
 
@@ -1456,7 +1472,24 @@ export const getCampanhas = createServerFn({ method: "GET" })
       receitaByCampanha.set(campanhaId, (receitaByCampanha.get(campanhaId) ?? 0) + Number(r.valor ?? 0));
     });
     return {
-      campanhas: (campanhas ?? []).map((c: any) => ({ ...c, alvos: byCampanha.get(c.id) ?? [], receitaInfluenciada: receitaByCampanha.get(c.id) ?? 0 })),
+      campanhas: (campanhas ?? []).map((c: any) => {
+        const lista = byCampanha.get(c.id) ?? [];
+        const enviados = lista.filter((a: any) => ["enviado", "convertido"].includes(a.status)).length;
+        const convertidos = lista.filter((a: any) => a.status === "convertido").length;
+        const pendentes = lista.filter((a: any) => a.status === "pendente").length;
+        return {
+          ...c,
+          alvos: lista,
+          receitaInfluenciada: receitaByCampanha.get(c.id) ?? 0,
+          metricas: {
+            total: lista.length,
+            enviados,
+            pendentes,
+            convertidos,
+            conversao: enviados ? convertidos / enviados : 0,
+          },
+        };
+      }),
       sugestoes: sugestoesData.sugestoes,
     };
   });
@@ -1496,6 +1529,71 @@ export const criarCampanhaInteligente = createServerFn({ method: "POST" })
     return { campanha };
   });
 
+// Atribuicao de conversao de campanha para uma OS entregue.
+// Regras V1: apenas alvos com envio confirmado; janela de 14 dias apos sent_at;
+// uma OS gera no maximo UMA atribuicao de campanha (campanha mais recente antes da venda).
+async function atribuirConversaoCampanha(
+  supabase: any,
+  ownerId: string,
+  ordem: { id: string; cliente_id: string | null; valor: number | null; referencia: string },
+) {
+  if (!ordem.cliente_id) return { atribuido: false };
+
+  const { data: jaAtribuida } = await supabase
+    .from("receita_influenciada")
+    .select("id")
+    .eq("owner_id", ownerId)
+    .eq("origem", "CAMPANHA")
+    .eq("ordem_id", ordem.id)
+    .maybeSingle();
+  if (jaAtribuida) return { atribuido: false };
+
+  const refMs = new Date(ordem.referencia).getTime();
+  const janelaInicio = new Date(refMs - CAMPANHA_JANELA_DIAS * 86_400_000).toISOString();
+
+  const { data: alvos } = await supabase
+    .from("campanha_alvos")
+    .select("id, campanha_id, cliente_id, sent_at, status, campanhas:campanha_id(nome, tipo)")
+    .eq("owner_id", ownerId)
+    .eq("cliente_id", ordem.cliente_id)
+    .eq("status", "enviado")
+    .not("sent_at", "is", null)
+    .gte("sent_at", janelaInicio)
+    .lte("sent_at", ordem.referencia)
+    .order("sent_at", { ascending: false })
+    .limit(1);
+
+  const alvo = (alvos ?? [])[0];
+  if (!alvo) return { atribuido: false };
+
+  const valor = Number(ordem.valor ?? 0);
+  const { error } = await supabase.from("receita_influenciada").insert({
+    owner_id: ownerId,
+    ordem_id: ordem.id,
+    cliente_id: ordem.cliente_id,
+    origem: "CAMPANHA",
+    valor,
+    descricao: `Conversao de campanha: ${(alvo.campanhas as any)?.nome ?? "Campanha"}`,
+    referencia_tipo: "campanha_alvo",
+    referencia_id: alvo.id,
+    metadata: {
+      campanha_id: alvo.campanha_id,
+      campanha_nome: (alvo.campanhas as any)?.nome ?? null,
+      campanha_tipo: (alvo.campanhas as any)?.tipo ?? null,
+      janela_dias: CAMPANHA_JANELA_DIAS,
+    },
+  } as any);
+  if (error) return { atribuido: false };
+
+  await supabase
+    .from("campanha_alvos")
+    .update({ status: "convertido", converted_at: ordem.referencia } as any)
+    .eq("id", alvo.id)
+    .eq("owner_id", ownerId);
+
+  return { atribuido: true, valor };
+}
+
 export const marcarCampanhaAlvoEnviado = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
@@ -1509,64 +1607,32 @@ export const marcarCampanhaAlvoEnviado = createServerFn({ method: "POST" })
 export const processarConversoesCampanhas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    // Fallback tecnico: a atribuicao normal acontece automaticamente na entrega da OS.
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
-    const { data: alvos } = await context.supabase
-      .from("campanha_alvos")
-      .select("id, campanha_id, cliente_id, sent_at, status, campanhas:campanha_id(nome, tipo)")
+    const desde = new Date(Date.now() - CAMPANHA_JANELA_DIAS * 86_400_000).toISOString();
+    const { data: ordens } = await context.supabase
+      .from("ordens_servico")
+      .select("id, cliente_id, valor, entregue_em, created_at")
       .eq("owner_id", ownerId)
-      .eq("status", "enviado")
-      .not("cliente_id", "is", null)
-      .not("sent_at", "is", null)
+      .eq("status", "entregue")
+      .gte("created_at", desde)
+      .order("created_at", { ascending: true })
       .limit(200);
 
     let convertidos = 0;
     let receita = 0;
-    for (const alvo of alvos ?? []) {
-      const { data: ordem } = await context.supabase
-        .from("ordens_servico")
-        .select("id, cliente_id, valor, created_at")
-        .eq("owner_id", ownerId)
-        .eq("cliente_id", alvo.cliente_id)
-        .gte("created_at", alvo.sent_at)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (!ordem) continue;
-
-      const { data: existente } = await context.supabase
-        .from("receita_influenciada")
-        .select("id")
-        .eq("owner_id", ownerId)
-        .eq("origem", "CAMPANHA")
-        .eq("referencia_tipo", "campanha_alvo")
-        .eq("referencia_id", alvo.id)
-        .maybeSingle();
-      if (!existente) {
-        await context.supabase.from("receita_influenciada").insert({
-          owner_id: ownerId,
-          ordem_id: ordem.id,
-          cliente_id: ordem.cliente_id,
-          origem: "CAMPANHA",
-          valor: Number(ordem.valor ?? 0),
-          descricao: `Conversao de campanha: ${(alvo.campanhas as any)?.nome ?? "Campanha"}`,
-          referencia_tipo: "campanha_alvo",
-          referencia_id: alvo.id,
-          metadata: {
-            campanha_id: alvo.campanha_id,
-            campanha_nome: (alvo.campanhas as any)?.nome ?? null,
-            campanha_tipo: (alvo.campanhas as any)?.tipo ?? null,
-          },
-        } as any);
+    for (const ordem of ordens ?? []) {
+      const res = await atribuirConversaoCampanha(context.supabase, ownerId, {
+        id: ordem.id,
+        cliente_id: ordem.cliente_id,
+        valor: ordem.valor,
+        referencia: (ordem as any).entregue_em ?? ordem.created_at,
+      });
+      if (res.atribuido) {
+        convertidos += 1;
+        receita += res.valor ?? 0;
       }
-      await context.supabase
-        .from("campanha_alvos")
-        .update({ status: "convertido", converted_at: ordem.created_at } as any)
-        .eq("id", alvo.id)
-        .eq("owner_id", ownerId);
-      convertidos += 1;
-      receita += Number(ordem.valor ?? 0);
     }
-
     return { convertidos, receita };
   });
 
