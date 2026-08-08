@@ -47,14 +47,34 @@ function endOfTodayIso() {
   return d.toISOString();
 }
 
+const APP_TZ = "America/Sao_Paulo";
+
 function localDateIso(offsetDays = 0) {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const d = new Date(Date.now() + offsetDays * 86_400_000);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
+
+/** Dia da semana (0=domingo) no fuso do app. */
+function localDayOfWeek() {
+  const wd = new Intl.DateTimeFormat("en-US", { timeZone: APP_TZ, weekday: "short" }).format(new Date());
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(wd);
+}
+
+/** "HH:MM" atual no fuso do app. */
+function localTimeHm() {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: APP_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
+}
+
 
 function agendamentoDateTime(a: any) {
   return new Date(`${a.data_agendada}T${String(a.hora_agendada ?? "00:00").slice(0, 5)}:00`);
