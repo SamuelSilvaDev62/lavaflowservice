@@ -306,16 +306,8 @@ function Column({ col, items, onAdvance, onReenviar }: { col: { key: OsStatus; l
     </div>
   );
 }
-function QuickCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="min-w-0">
-      <CardContent className="p-3">
-        <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{label}</p>
-        <p className="mt-1 truncate font-display text-lg font-bold sm:text-xl">{value}</p>
-      </CardContent>
-    </Card>
-  );
-}
+
+
 
 
 function tempoNaEtapa(ordem: any): string {
