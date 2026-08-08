@@ -392,6 +392,8 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         ticketMedio,
         capacidadeDia,
         horariosLivres,
+        expedienteEncerrado,
+        fechadoHoje,
         potencialFaturamento,
       },
       agendaHoje: agendaAtiva,
