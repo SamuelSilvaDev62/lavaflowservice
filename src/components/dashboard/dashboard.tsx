@@ -56,6 +56,8 @@ export function Dashboard() {
   const horariosLivres = Number(cards.horariosLivres ?? 0);
   const ticketMedio = Number(cards.ticketMedio ?? 0);
   const potencial = Number(cards.potencialFaturamento ?? 0);
+  const expedienteEncerrado = Boolean(cards.expedienteEncerrado);
+  const fechadoHoje = Boolean(cards.fechadoHoje);
 
   // Buckets de reativação a partir dos inativos 30+
   const inativos = ((inativosData?.inativos ?? []) as any[])
