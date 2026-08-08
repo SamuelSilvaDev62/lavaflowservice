@@ -427,10 +427,10 @@ function AgendamentoAbrirButton({ a }: { a: any }) {
 function KpiCard({ label, value, tone, sub, wide }: { label: string; value: number | string; tone?: "primary"|"warning"|"destructive"|"success"; sub?: string; wide?: boolean }) {
   const cls = tone === "primary" ? "text-primary" : tone === "warning" ? "text-warning" : tone === "destructive" ? "text-destructive" : tone === "success" ? "text-success" : "";
   return (
-    <Card className={cn("snap-start shrink-0 min-w-[120px] sm:min-w-0", wide && "min-w-[168px]")}>
+    <Card className={cn("min-w-0", wide && "col-span-2 sm:col-span-1")}>
       <CardContent className="p-3 sm:p-4">
-        <p className="text-xs text-muted-foreground truncate">{label}{sub && <span className="opacity-70"> ({sub})</span>}</p>
-        <p className={cn("text-2xl font-bold mt-0.5 tabular-nums", cls)}>{value}</p>
+        <p className="text-[11px] text-muted-foreground truncate sm:text-xs">{label}{sub && <span className="opacity-70"> ({sub})</span>}</p>
+        <p className={cn("mt-0.5 truncate text-xl font-bold tabular-nums sm:text-2xl", cls)}>{value}</p>
       </CardContent>
     </Card>
   );
