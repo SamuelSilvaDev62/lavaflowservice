@@ -355,6 +355,8 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
       }
     }
     const potencialFaturamento = horariosLivres * ticketMedio;
+    const expedienteEncerrado = abertoHoje && fimMin > inicioMin && nowMinutes >= fimMin;
+    const fechadoHoje = !abertoHoje || fimMin <= inicioMin;
 
     const alertas = [
       levaTrazProximos.length > 0 ? {
