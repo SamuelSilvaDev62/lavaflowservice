@@ -141,13 +141,15 @@ function FilaPage() {
         <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', o WhatsApp dispara automaticamente." />
       </div>
 
-      {/* KPIs — grade responsiva, sem rolagem lateral */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <QuickCard label="🚗 Na fila" value={String(naFila)} />
-        <QuickCard label="🔄 Em andamento" value={String(emAndamento)} />
-        <QuickCard label="✅ Prontos" value={String(prontos)} />
-        <QuickCard label="💰 Em produção" value={brl(receitaProducao)} />
+      {/* Resumo compacto — sem duplicar os contadores das etapas */}
+      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+        <span className="font-semibold text-foreground tabular-nums">{emOperacao}</span>
+        <span>{emOperacao === 1 ? "veículo em operação" : "veículos em operação"}</span>
+        <span className="text-border">·</span>
+        <span className="font-semibold text-foreground tabular-nums">{brl(receitaProducao)}</span>
+        <span>em produção</span>
       </div>
+
 
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
       {!isLoading && totalFila === 0 && (
