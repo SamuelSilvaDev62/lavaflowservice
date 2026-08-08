@@ -223,7 +223,7 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
     const hoje = localDateIso();
     const now = new Date();
     const startMonth30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
-    const [{ data: agendamentos }, { data: ordens }, { data: ordensFinalizadas }, { data: funcionarios }, { data: ordensEntregues30 }, { data: agendaCfg }] = await Promise.all([
+    const [{ data: agendamentos }, { data: ordens }, { data: ordensFinalizadas }, { data: funcionarios }, { data: ordensEntregues30 }, { data: agendaCfg }, { data: servicosAtivos }] = await Promise.all([
       supabase.from("agendamentos")
         .select(`id, data_agendada, hora_agendada, status, leva_traz, endereco_retirada, endereco_devolucao,
                  horario_retirada, horario_devolucao, taxa_leva_traz, cliente_id, servico_id, funcionario_id,
