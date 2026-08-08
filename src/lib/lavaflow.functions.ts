@@ -2123,7 +2123,7 @@ export const getReceitaInfluenciada = createServerFn({ method: "GET" })
     return getReceitaInfluenciadaData(context.supabase, ownerId, data);
   });
 
-// ============ COLABORADORES / MEU TRABALHO ============
+// ============ ESCOPO DO TENANT ============
 async function getOwnerScope(supabase: any, userId: string) {
   const { data } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
   const priority: Record<TenantRole, number> = {
