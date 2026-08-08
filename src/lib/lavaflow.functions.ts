@@ -312,7 +312,7 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
       : 50;
 
     // Capacidade do dia a partir de agenda_config; fallback 8.
-    const dow = new Date().getDay();
+    const dow = localDayOfWeek();
     let capacidadeDia = 8;
     if (agendaCfg) {
       const diasSemana = (agendaCfg.dias_semana ?? []) as number[];
@@ -357,7 +357,7 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
 
     return {
       cards: {
-        agendamentosHoje: agHoje.length,
+        agendamentosHoje: agendaAtiva.length,
         veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao"].includes(o.status)).length,
         servicosPendentes: osAbertas.filter((o: any) => ["aguardando", "pronto"].includes(o.status)).length,
         previsaoFaturamentoDia: previstosAgenda + faturamentoAberto,
@@ -367,7 +367,7 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         horariosLivres,
         potencialFaturamento,
       },
-      agendaHoje: proximos,
+      agendaHoje: agendaAtiva,
       veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao", "pronto"].includes(o.status)).slice(0, 6),
       alertas,
     };
