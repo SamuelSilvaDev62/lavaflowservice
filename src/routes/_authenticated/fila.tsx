@@ -141,18 +141,12 @@ function FilaPage() {
         <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', o WhatsApp dispara automaticamente." />
       </div>
 
-      {/* KPIs — grid no desktop, scroll horizontal no mobile */}
-      <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+      {/* KPIs — grade responsiva, sem rolagem lateral */}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <QuickCard label="🚗 Na fila" value={String(naFila)} />
         <QuickCard label="🔄 Em andamento" value={String(emAndamento)} />
         <QuickCard label="✅ Prontos" value={String(prontos)} />
         <QuickCard label="💰 Em produção" value={brl(receitaProducao)} />
-      </div>
-      <div className="sm:hidden -mx-4 px-4 mb-3 flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 [&::-webkit-scrollbar]:hidden">
-        <KpiChip label="Na fila" value={String(naFila)} emoji="🚗" />
-        <KpiChip label="Andamento" value={String(emAndamento)} emoji="🔄" />
-        <KpiChip label="Prontos" value={String(prontos)} emoji="✅" />
-        <KpiChip label="Produção" value={brl(receitaProducao)} emoji="💰" />
       </div>
 
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
@@ -171,15 +165,15 @@ function FilaPage() {
       {/* MOBILE: tabs de status + lista */}
       <div className="sm:hidden">
         <div className="sticky top-0 z-30 -mx-4 px-4 py-2 bg-background/95 backdrop-blur border-b">
-          <div className="flex gap-1.5 overflow-x-auto [&::-webkit-scrollbar]:hidden">
+          <div className="grid grid-cols-5 gap-1">
             {columns.map(c => {
               const n = countBy(c.key);
               const active = c.key === activeMobile;
               return (
                 <button key={c.key} onClick={() => setActiveMobile(c.key)}
-                  className={`shrink-0 px-3 py-1.5 rounded-full text-xs font-medium border transition ${active ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-card border-border text-foreground/70"}`}>
-                  <span className="mr-1">{c.emoji}</span>{c.short}
-                  <span className={`ml-1.5 inline-flex items-center justify-center min-w-[18px] h-[18px] px-1 rounded-full text-[10px] ${active ? "bg-primary-foreground/20" : "bg-muted"}`}>{n}</span>
+                  className={`flex min-w-0 flex-col items-center gap-0.5 rounded-xl border px-1 py-1.5 text-[10px] font-medium transition ${active ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-card border-border text-foreground/70"}`}>
+                  <span className="w-full truncate text-center leading-tight">{c.emoji} {c.short}</span>
+                  <span className={`inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] ${active ? "bg-primary-foreground/20" : "bg-muted"}`}>{n}</span>
                 </button>
               );
             })}
@@ -311,26 +305,17 @@ function Column({ col, items, onAdvance, onReenviar }: { col: { key: OsStatus; l
     </div>
   );
 }
-
 function QuickCard({ label, value }: { label: string; value: string }) {
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardContent className="p-3">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="font-display font-bold text-xl mt-1">{value}</p>
+        <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{label}</p>
+        <p className="mt-1 truncate font-display text-lg font-bold sm:text-xl">{value}</p>
       </CardContent>
     </Card>
   );
 }
 
-function KpiChip({ label, value, emoji }: { label: string; value: string; emoji: string }) {
-  return (
-    <div className="snap-start shrink-0 min-w-[120px] rounded-xl border bg-card px-3 py-2">
-      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><span>{emoji}</span>{label}</p>
-      <p className="font-display font-bold text-lg leading-tight mt-0.5">{value}</p>
-    </div>
-  );
-}
 
 function tempoNaEtapa(ordem: any): string {
   const ref = ordem.status === "em_lavagem" ? ordem.iniciado_em

@@ -164,8 +164,8 @@ function Page() {
         }
       />
 
-      {/* KPIs - grid no desktop, scroll horizontal no mobile */}
-      <div className="-mx-4 px-4 mb-4 flex gap-2 overflow-x-auto snap-x snap-mandatory sm:mx-0 sm:px-0 lg:grid lg:grid-cols-5 lg:gap-3 lg:overflow-visible">
+      {/* KPIs - grade responsiva, sem rolagem lateral */}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 lg:gap-3">
         <KpiCard label="Hoje" value={st?.hoje ?? 0} />
         <KpiCard label="Confirmados" value={confirmadosDia} tone="primary" />
         <KpiCard label="Pendentes" value={pendentesDia} tone="warning" />
@@ -206,8 +206,8 @@ function Page() {
       )}
 
       {/* Faixa de dias */}
-      <div className="mb-4 flex items-center gap-2">
-        <div className="-mx-4 px-4 flex-1 flex gap-2 overflow-x-auto snap-x snap-mandatory sm:mx-0 sm:px-0">
+      <div className="mb-4 flex items-start gap-2">
+        <div className="grid flex-1 grid-cols-7 gap-1.5 sm:gap-2">
           {dayStrip.map(({ iso, date: d }) => {
             const active = iso === date;
             const isToday = iso === todayStr;
@@ -216,15 +216,15 @@ function Page() {
                 key={iso}
                 onClick={() => setDate(iso)}
                 className={cn(
-                  "snap-start shrink-0 flex flex-col items-center justify-center rounded-xl border w-14 h-16 transition-colors",
+                  "flex min-w-0 flex-col items-center justify-center rounded-xl border px-0.5 py-1.5 transition-colors",
                   active ? "bg-primary text-primary-foreground border-primary"
                     : "bg-card hover:bg-accent",
                 )}
               >
-                <span className={cn("text-[10px] uppercase font-medium", active ? "opacity-90" : "text-muted-foreground")}>
+                <span className={cn("text-[9px] uppercase font-medium sm:text-[10px]", active ? "opacity-90" : "text-muted-foreground")}>
                   {isToday ? "hoje" : WD[d.getDay()]}
                 </span>
-                <span className="text-lg font-bold leading-tight">{d.getDate()}</span>
+                <span className="text-base font-bold leading-tight sm:text-lg">{d.getDate()}</span>
                 <DayDots count={densidadePorDia.get(iso) ?? 0} active={active} />
               </button>
             );
@@ -427,10 +427,10 @@ function AgendamentoAbrirButton({ a }: { a: any }) {
 function KpiCard({ label, value, tone, sub, wide }: { label: string; value: number | string; tone?: "primary"|"warning"|"destructive"|"success"; sub?: string; wide?: boolean }) {
   const cls = tone === "primary" ? "text-primary" : tone === "warning" ? "text-warning" : tone === "destructive" ? "text-destructive" : tone === "success" ? "text-success" : "";
   return (
-    <Card className={cn("snap-start shrink-0 min-w-[120px] sm:min-w-0", wide && "min-w-[168px]")}>
+    <Card className={cn("min-w-0", wide && "col-span-2 sm:col-span-1")}>
       <CardContent className="p-3 sm:p-4">
-        <p className="text-xs text-muted-foreground truncate">{label}{sub && <span className="opacity-70"> ({sub})</span>}</p>
-        <p className={cn("text-2xl font-bold mt-0.5 tabular-nums", cls)}>{value}</p>
+        <p className="text-[11px] text-muted-foreground truncate sm:text-xs">{label}{sub && <span className="opacity-70"> ({sub})</span>}</p>
+        <p className={cn("mt-0.5 truncate text-xl font-bold tabular-nums sm:text-2xl", cls)}>{value}</p>
       </CardContent>
     </Card>
   );
