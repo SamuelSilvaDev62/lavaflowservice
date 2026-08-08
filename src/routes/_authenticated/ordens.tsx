@@ -116,60 +116,61 @@ function OrdemRow({ o }: { o: any }) {
     onError: (e: any) => toast.error(e?.message ?? "Falha ao atualizar oportunidade"),
   });
   return (
-    <div className="p-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-      <div className="min-w-0 flex-1">
-        <p className="font-medium truncate">{o.clientes?.nome ?? "—"} <span className="text-xs text-muted-foreground font-mono">{o.veiculos?.placa ?? ""}</span></p>
-        <p className="text-xs text-muted-foreground">{o.servicos?.nome ?? "Serviço"} · {o.funcionarios?.nome ?? "Sem responsável"} · {dateTimeBr(o.created_at)}</p>
-        <p className="mt-1 text-xs text-muted-foreground">
+    <div className="flex w-full min-w-0 flex-col gap-3 overflow-hidden p-4 md:flex-row md:items-start md:justify-between">
+      <div className="min-w-0 flex-1 basis-0">
+        <p className="font-medium break-words">{o.clientes?.nome ?? "—"} <span className="text-xs text-muted-foreground font-mono break-all">{o.veiculos?.placa ?? ""}</span></p>
+        <p className="text-xs text-muted-foreground break-words">{o.servicos?.nome ?? "Serviço"} · {o.funcionarios?.nome ?? "Sem responsável"} · {dateTimeBr(o.created_at)}</p>
+        <p className="mt-1 text-xs text-muted-foreground break-words">
           Checklist inicial: {o.checklist_inicial_status === "concluido" ? "concluido" : o.checklist_inicial_status === "pulado" ? "pulado" : "pendente"}
           {o.checklist_funcionario?.nome ? ` · ${o.checklist_funcionario.nome}` : ""}
           {o.checklist_inicial_em ? ` · ${dateTimeBr(o.checklist_inicial_em)}` : ""}
         </p>
         {(o.origens_receita?.length ?? 0) > 0 && (
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+          <div className="mt-2 flex min-w-0 flex-wrap items-center gap-1.5">
             <span className="text-xs text-muted-foreground">Origem da venda:</span>
             {o.origens_receita.map((r: any) => (
-              <Badge key={r.id} variant="outline" className="text-[11px]">
+              <Badge key={r.id} variant="outline" className="max-w-full whitespace-normal break-words text-[11px]">
                 {origemReceitaLabel(r.origem)} {Number(r.valor ?? 0) > 0 ? `· ${brl(Number(r.valor))}` : ""}
               </Badge>
             ))}
           </div>
         )}
         {(o.upsell_oportunidades?.length ?? 0) > 0 && (
-          <div className="mt-3 space-y-2 rounded-lg border bg-primary/5 p-3">
+          <div className="mt-3 min-w-0 space-y-2 rounded-lg border bg-primary/5 p-3">
             <p className="text-xs font-semibold text-primary">Oportunidades identificadas pelo checklist</p>
             {o.upsell_oportunidades.map((u: any) => (
-              <div key={u.id} className="rounded-md bg-card p-2">
-                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium">{u.servico_sugerido}</p>
-                    <p className="text-xs text-muted-foreground">{u.motivo}</p>
-                    <p className="text-xs text-muted-foreground">
+              <div key={u.id} className="min-w-0 rounded-md bg-card p-2">
+                <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0 flex-1 basis-0">
+                    <p className="text-sm font-medium break-words">{u.servico_sugerido}</p>
+                    <p className="text-xs text-muted-foreground break-words">{u.motivo}</p>
+                    <p className="text-xs text-muted-foreground break-words">
                       {u.valor_estimado != null ? `Valor estimado: ${brl(Number(u.valor_estimado))}` : "Valor estimado: sem servico vinculado"}
                     </p>
                   </div>
-                  <Badge variant="secondary" className="w-fit shrink-0">{u.status}</Badge>
+                  <Badge variant="secondary" className="w-fit max-w-full shrink-0 whitespace-normal break-words">{u.status}</Badge>
                 </div>
                 <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
-                  <Button size="sm" variant="outline" onClick={() => upsellMut.mutate({ id: u.id, status: "oferecida" })}>Oferecido</Button>
-                  <Button size="sm" onClick={() => upsellMut.mutate({ id: u.id, status: "aceita" })}>Cliente aceitou</Button>
-                  <Button size="sm" variant="outline" onClick={() => upsellMut.mutate({ id: u.id, status: "recusada" })}>Cliente recusou</Button>
+                  <Button size="sm" variant="outline" className="w-full min-w-0" onClick={() => upsellMut.mutate({ id: u.id, status: "oferecida" })}>Oferecido</Button>
+                  <Button size="sm" className="w-full min-w-0" onClick={() => upsellMut.mutate({ id: u.id, status: "aceita" })}>Cliente aceitou</Button>
+                  <Button size="sm" variant="outline" className="w-full min-w-0" onClick={() => upsellMut.mutate({ id: u.id, status: "recusada" })}>Cliente recusou</Button>
                 </div>
               </div>
             ))}
           </div>
         )}
       </div>
-      <div className="flex items-center justify-between gap-2 md:shrink-0 md:justify-end">
+      <div className="flex min-w-0 flex-wrap items-center justify-between gap-2 md:w-auto md:shrink-0 md:justify-end">
         <p className="font-semibold tabular-nums">{brl(o.valor)}</p>
         <Select value={o.status} onValueChange={(v) => mut.mutate(v as OsStatus)}>
-          <SelectTrigger className={`h-8 w-[150px] text-xs ${statusColor[o.status]}`}><SelectValue /></SelectTrigger>
+          <SelectTrigger className={`h-9 w-[150px] max-w-full text-xs ${statusColor[o.status]}`}><SelectValue /></SelectTrigger>
           <SelectContent>{STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s.replace("_", " ")}</SelectItem>)}</SelectContent>
         </Select>
       </div>
     </div>
   );
 }
+
 
 function origemReceitaLabel(origem: string) {
   const labels: Record<string, string> = {
