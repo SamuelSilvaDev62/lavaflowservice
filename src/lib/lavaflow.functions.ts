@@ -1282,6 +1282,51 @@ function campanhaMensagem(tipo: string, nome?: string) {
   return mensagens[tipo] ?? mensagens.inativos;
 }
 
+// Janela maxima de atribuicao de conversao de campanha (dias).
+const CAMPANHA_JANELA_DIAS = 14;
+
+// Taxas conservadoras iniciais por tipo, usadas enquanto nao houver historico suficiente.
+const TAXA_ESPERADA_PADRAO: Record<string, number> = {
+  inativos: 0.2,
+  fidelidade: 0.3,
+  assinatura: 0.15,
+  baixa_ocupacao: 0.1,
+  aniversario: 0.25,
+};
+
+const HISTORICO_MINIMO_ENVIOS = 10;
+
+function clampTaxa(v: number) {
+  return Math.min(0.6, Math.max(0.05, v));
+}
+
+// Taxa historica real (convertidos / envios confirmados) por tipo de campanha,
+// usada apenas quando ha volume suficiente; caso contrario cai no padrao.
+async function getTaxasEsperadasPorTipo(supabase: any, ownerId: string) {
+  const taxas: Record<string, number> = { ...TAXA_ESPERADA_PADRAO };
+  const { data: campanhas } = await supabase
+    .from("campanhas").select("id, tipo").eq("owner_id", ownerId).limit(500);
+  const ids = (campanhas ?? []).map((c: any) => c.id);
+  if (!ids.length) return taxas;
+  const { data: alvos } = await supabase
+    .from("campanha_alvos").select("campanha_id, status").eq("owner_id", ownerId).in("campanha_id", ids).limit(5000);
+  const tipoDe = new Map<string, string>((campanhas ?? []).map((c: any) => [c.id, c.tipo]));
+  const acc = new Map<string, { enviados: number; convertidos: number }>();
+  (alvos ?? []).forEach((a: any) => {
+    const tipo = tipoDe.get(a.campanha_id);
+    if (!tipo) return;
+    if (!["enviado", "convertido"].includes(a.status)) return;
+    const cur = acc.get(tipo) ?? { enviados: 0, convertidos: 0 };
+    cur.enviados += 1;
+    if (a.status === "convertido") cur.convertidos += 1;
+    acc.set(tipo, cur);
+  });
+  acc.forEach((v, tipo) => {
+    if (v.enviados >= HISTORICO_MINIMO_ENVIOS) taxas[tipo] = clampTaxa(v.convertidos / v.enviados);
+  });
+  return taxas;
+}
+
 async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
   const now = new Date();
   const hoje = now.toISOString().slice(0, 10);
@@ -1297,6 +1342,13 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
     supabase.from("agendamentos").select("id, data_agendada, status").eq("owner_id", ownerId).gte("data_agendada", hoje).lte("data_agendada", futuro),
     supabase.from("planos_assinatura").select("id, nome, valor_mensal, ativo").eq("owner_id", ownerId).eq("ativo", true).order("valor_mensal").limit(1),
   ]);
+  const taxas = await getTaxasEsperadasPorTipo(supabase, ownerId);
+  const valorPlano = Number(planos?.[0]?.valor_mensal ?? 0);
+  const potencial = (tipo: string, qtd: number, valorUnit: number) => ({
+    taxaEsperada: taxas[tipo] ?? 0.15,
+    valorEsperado: roundMoney(valorUnit),
+    potencialEsperado: roundMoney(qtd * (taxas[tipo] ?? 0.15) * valorUnit),
+  });
 
   const clientesRows = clientes ?? [];
   const ordensRows = ordens ?? [];
@@ -1344,6 +1396,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
       titulo: "Recuperar clientes inativos",
       descricao: `${inativos.length} cliente(s) sem retorno ha mais de 45 dias.`,
       impactoEstimado: roundMoney(inativos.length * ticketMedio),
+      ...potencial("inativos", inativos.length, ticketMedio),
       alvos: inativos.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { dias_inativo: c.dias_inativo } })),
       mensagem: campanhaMensagem("inativos"),
     },
@@ -1352,6 +1405,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
       titulo: "Ativar beneficios de fidelidade",
       descricao: `${fidelidade.length} cliente(s) possuem pontos para resgate.`,
       impactoEstimado: roundMoney(fidelidade.length * ticketMedio),
+      ...potencial("fidelidade", fidelidade.length, ticketMedio),
       alvos: fidelidade.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { pontos: c.pontos_saldo } })),
       mensagem: campanhaMensagem("fidelidade"),
     },
@@ -1359,7 +1413,8 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
       tipo: "assinatura",
       titulo: "Oferecer plano para clientes frequentes",
       descricao: `${assinatura.length} cliente(s) frequentes ainda nao assinam um plano.`,
-      impactoEstimado: roundMoney(assinatura.length * Number(planos?.[0]?.valor_mensal ?? ticketMedio)),
+      impactoEstimado: roundMoney(assinatura.length * (valorPlano || ticketMedio)),
+      ...potencial("assinatura", assinatura.length, valorPlano || ticketMedio),
       alvos: assinatura.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { visitas: visitas.get(c.id) ?? 0 } })),
       mensagem: campanhaMensagem("assinatura"),
     },
@@ -1368,6 +1423,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
       titulo: "Preencher dias com baixa ocupacao",
       descricao: `${diasBaixos.length} dia(s) da semana estao com baixa demanda.`,
       impactoEstimado: roundMoney(Math.max(0, diasBaixos.length) * ticketMedio),
+      ...potencial("baixa_ocupacao", inativos.slice(0, 15).length, ticketMedio),
       alvos: inativos.slice(0, 15).map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { dias_baixos: diasBaixos } })),
       mensagem: campanhaMensagem("baixa_ocupacao"),
     },
