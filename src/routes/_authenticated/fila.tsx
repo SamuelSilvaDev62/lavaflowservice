@@ -267,26 +267,26 @@ function FilaPage() {
         </DrawerContent>
       </Drawer>
 
-      <Card className="mt-6">
-        <CardContent className="p-5">
-          <h3 className="font-display font-semibold mb-3 flex items-center gap-2"><Send className="h-4 w-4 text-success" />Logs WhatsApp</h3>
-          {(logsData?.logs ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum envio registrado ainda.</p>
-          ) : (
-            <div className="space-y-1 max-h-64 overflow-y-auto">
-              {logsData!.logs.map((l: any) => (
-                <div key={l.id} className="flex items-center justify-between gap-2 text-xs border-l-2 border-success/40 pl-3 py-1">
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{l.clientes?.nome ?? "Cliente"}</p>
-                    <p className="text-muted-foreground truncate">{l.descricao}</p>
-                  </div>
-                  <span className="text-muted-foreground whitespace-nowrap shrink-0">{dateTimeBr(l.created_at)}</span>
+      {(logsData?.logs ?? []).length > 0 && (
+        <details className="mt-6 rounded-xl border bg-card/60 px-4 py-3">
+          <summary className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Send className="h-3.5 w-3.5 shrink-0 text-success" />
+            Logs WhatsApp ({logsData!.logs.length})
+          </summary>
+          <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+            {logsData!.logs.map((l: any) => (
+              <div key={l.id} className="flex items-center justify-between gap-2 border-l-2 border-success/40 py-1 pl-3 text-xs">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{l.clientes?.nome ?? "Cliente"}</p>
+                  <p className="truncate text-muted-foreground">{l.descricao}</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <span className="shrink-0 whitespace-nowrap text-muted-foreground">{dateTimeBr(l.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
     </>
   );
 }
