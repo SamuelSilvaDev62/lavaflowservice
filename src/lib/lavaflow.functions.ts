@@ -47,14 +47,34 @@ function endOfTodayIso() {
   return d.toISOString();
 }
 
+const APP_TZ = "America/Sao_Paulo";
+
 function localDateIso(offsetDays = 0) {
-  const d = new Date();
-  d.setDate(d.getDate() + offsetDays);
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
+  const d = new Date(Date.now() + offsetDays * 86_400_000);
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).format(d);
 }
+
+/** Dia da semana (0=domingo) no fuso do app. */
+function localDayOfWeek() {
+  const wd = new Intl.DateTimeFormat("en-US", { timeZone: APP_TZ, weekday: "short" }).format(new Date());
+  return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(wd);
+}
+
+/** "HH:MM" atual no fuso do app. */
+function localTimeHm() {
+  return new Intl.DateTimeFormat("en-GB", {
+    timeZone: APP_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
+}
+
 
 function agendamentoDateTime(a: any) {
   return new Date(`${a.data_agendada}T${String(a.hora_agendada ?? "00:00").slice(0, 5)}:00`);
@@ -245,15 +265,31 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
       .reduce((s: number, a: any) => s + Number(a.servicos?.preco_padrao ?? 0) + Number(a.taxa_leva_traz ?? 0), 0);
     const faturamentoAberto = osAbertas.reduce((s: number, o: any) => s + Number(o.valor ?? 0), 0);
 
-    const proximos = agHoje
-      .filter((a: any) => isActiveStatus(a.status) && agendamentoDateTime(a) >= now)
-      .slice(0, 5);
+    // Agenda do dia (fuso do app): todos os ativos, ordenados por hora, com marcacoes.
+    const nowHm = localTimeHm();
+    const nowMinutes = Number(nowHm.slice(0, 2)) * 60 + Number(nowHm.slice(3, 5));
+    const hmToMinutes = (v: any) => {
+      const s = String(v ?? "00:00").slice(0, 5);
+      return Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
+    };
+    const agendaAtiva = agHoje
+      .filter((a: any) => isActiveStatus(a.status))
+      .sort((a: any, b: any) => hmToMinutes(a.hora_agendada) - hmToMinutes(b.hora_agendada))
+      .map((a: any) => {
+        const delta = hmToMinutes(a.hora_agendada) - nowMinutes;
+        return {
+          ...a,
+          minutos_para_inicio: delta,
+          atrasado: delta < -5 && !["concluido", "entregue"].includes(a.status),
+          proximo: delta >= -5 && delta <= 60 && ["agendado", "confirmado"].includes(a.status),
+        };
+      });
     const levaTrazProximos = agHoje.filter((a: any) => {
       if (!a.leva_traz || !a.horario_retirada || !isActiveStatus(a.status)) return false;
-      const t = new Date(`${a.data_agendada}T${String(a.horario_retirada).slice(0, 5)}:00`).getTime();
-      const diffMin = (t - now.getTime()) / 60000;
+      const diffMin = hmToMinutes(a.horario_retirada) - nowMinutes;
       return diffMin >= 0 && diffMin <= 90;
     });
+
 
     const ocupacaoPorFunc = new Map<string, number>();
     agHoje.filter((a: any) => isActiveStatus(a.status) && a.funcionario_id).forEach((a: any) => {
@@ -276,7 +312,7 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
       : 50;
 
     // Capacidade do dia a partir de agenda_config; fallback 8.
-    const dow = new Date().getDay();
+    const dow = localDayOfWeek();
     let capacidadeDia = 8;
     if (agendaCfg) {
       const diasSemana = (agendaCfg.dias_semana ?? []) as number[];
@@ -321,7 +357,7 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
 
     return {
       cards: {
-        agendamentosHoje: agHoje.length,
+        agendamentosHoje: agendaAtiva.length,
         veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao"].includes(o.status)).length,
         servicosPendentes: osAbertas.filter((o: any) => ["aguardando", "pronto"].includes(o.status)).length,
         previsaoFaturamentoDia: previstosAgenda + faturamentoAberto,
@@ -331,7 +367,7 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         horariosLivres,
         potencialFaturamento,
       },
-      agendaHoje: proximos,
+      agendaHoje: agendaAtiva,
       veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao", "pronto"].includes(o.status)).slice(0, 6),
       alertas,
     };

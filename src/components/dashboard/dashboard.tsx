@@ -52,6 +52,7 @@ export function Dashboard() {
   const agenda = (data.agendaHoje ?? []) as any[];
   const veiculos = (data.veiculosEmAtendimento ?? []) as any[];
   const cards = data.cards ?? ({} as any);
+  const totalAgenda = Number(cards.agendamentosHoje ?? agenda.length);
   const horariosLivres = Number(cards.horariosLivres ?? 0);
   const ticketMedio = Number(cards.ticketMedio ?? 0);
   const potencial = Number(cards.potencialFaturamento ?? 0);
@@ -73,7 +74,7 @@ export function Dashboard() {
     <>
       <PageHeader
         title="Central do Dia"
-        subtitle={`${agenda.length} ${agenda.length === 1 ? "agendamento" : "agendamentos"} · ${brl(Number(cards.previsaoFaturamentoDia ?? 0))} previstos`}
+        subtitle={`${totalAgenda} ${totalAgenda === 1 ? "agendamento" : "agendamentos"} · ${brl(Number(cards.previsaoFaturamentoDia ?? 0))} previstos`}
         actions={
           <div className="flex gap-2">
             <Button asChild variant="premium" size="sm"><Link to="/agendamentos"><Plus className="h-4 w-4" /> Agendamento</Link></Button>
@@ -121,9 +122,9 @@ export function Dashboard() {
               <ul className="divide-y">
                 {agenda.slice(0, 5).map((a) => {
                   const hora = a.hora_agendada?.slice(0, 5) ?? "--:--";
-                  const delta = diffMin(hora);
-                  const atrasado = delta < -5 && !["concluido", "entregue", "cancelado", "nao_compareceu"].includes(a.status);
-                  const proximo = delta >= -5 && delta <= 60 && ["agendado", "confirmado"].includes(a.status);
+                  const delta = a.minutos_para_inicio ?? diffMin(hora);
+                  const atrasado = a.atrasado ?? (delta < -5 && !["concluido", "entregue", "cancelado", "nao_compareceu"].includes(a.status));
+                  const proximo = a.proximo ?? (delta >= -5 && delta <= 60 && ["agendado", "confirmado"].includes(a.status));
                   return (
                     <li key={a.id} className="grid grid-cols-[56px_1fr_auto] items-center gap-3 py-2.5">
                       <span className="font-display text-lg font-bold tabular-nums">{hora}</span>

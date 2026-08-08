@@ -116,7 +116,7 @@ function OrdemRow({ o }: { o: any }) {
     onError: (e: any) => toast.error(e?.message ?? "Falha ao atualizar oportunidade"),
   });
   return (
-    <div className="p-4 flex items-center justify-between gap-3 flex-wrap">
+    <div className="p-4 flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
       <div className="min-w-0 flex-1">
         <p className="font-medium truncate">{o.clientes?.nome ?? "—"} <span className="text-xs text-muted-foreground font-mono">{o.veiculos?.placa ?? ""}</span></p>
         <p className="text-xs text-muted-foreground">{o.servicos?.nome ?? "Serviço"} · {o.funcionarios?.nome ?? "Sem responsável"} · {dateTimeBr(o.created_at)}</p>
@@ -130,7 +130,7 @@ function OrdemRow({ o }: { o: any }) {
             <span className="text-xs text-muted-foreground">Origem da venda:</span>
             {o.origens_receita.map((r: any) => (
               <Badge key={r.id} variant="outline" className="text-[11px]">
-                {origemReceitaLabel(r.origem)} {Number(r.valor ?? 0) > 0 ? `Â· ${brl(Number(r.valor))}` : ""}
+                {origemReceitaLabel(r.origem)} {Number(r.valor ?? 0) > 0 ? `· ${brl(Number(r.valor))}` : ""}
               </Badge>
             ))}
           </div>
@@ -140,17 +140,17 @@ function OrdemRow({ o }: { o: any }) {
             <p className="text-xs font-semibold text-primary">Oportunidades identificadas pelo checklist</p>
             {o.upsell_oportunidades.map((u: any) => (
               <div key={u.id} className="rounded-md bg-card p-2">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <div>
+                <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
                     <p className="text-sm font-medium">{u.servico_sugerido}</p>
                     <p className="text-xs text-muted-foreground">{u.motivo}</p>
                     <p className="text-xs text-muted-foreground">
                       {u.valor_estimado != null ? `Valor estimado: ${brl(Number(u.valor_estimado))}` : "Valor estimado: sem servico vinculado"}
                     </p>
                   </div>
-                  <Badge variant="secondary">{u.status}</Badge>
+                  <Badge variant="secondary" className="w-fit shrink-0">{u.status}</Badge>
                 </div>
-                <div className="mt-2 flex flex-wrap gap-1">
+                <div className="mt-2 grid grid-cols-1 gap-1.5 sm:grid-cols-3">
                   <Button size="sm" variant="outline" onClick={() => upsellMut.mutate({ id: u.id, status: "oferecida" })}>Oferecido</Button>
                   <Button size="sm" onClick={() => upsellMut.mutate({ id: u.id, status: "aceita" })}>Cliente aceitou</Button>
                   <Button size="sm" variant="outline" onClick={() => upsellMut.mutate({ id: u.id, status: "recusada" })}>Cliente recusou</Button>
@@ -160,10 +160,10 @@ function OrdemRow({ o }: { o: any }) {
           </div>
         )}
       </div>
-      <div className="flex items-center gap-2 shrink-0">
-        <p className="font-semibold">{brl(o.valor)}</p>
+      <div className="flex items-center justify-between gap-2 md:shrink-0 md:justify-end">
+        <p className="font-semibold tabular-nums">{brl(o.valor)}</p>
         <Select value={o.status} onValueChange={(v) => mut.mutate(v as OsStatus)}>
-          <SelectTrigger className={`h-8 w-[140px] text-xs ${statusColor[o.status]}`}><SelectValue /></SelectTrigger>
+          <SelectTrigger className={`h-8 w-[150px] text-xs ${statusColor[o.status]}`}><SelectValue /></SelectTrigger>
           <SelectContent>{STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{s.replace("_", " ")}</SelectItem>)}</SelectContent>
         </Select>
       </div>
