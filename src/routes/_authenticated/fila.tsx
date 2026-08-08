@@ -141,18 +141,12 @@ function FilaPage() {
         <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', o WhatsApp dispara automaticamente." />
       </div>
 
-      {/* KPIs — grid no desktop, scroll horizontal no mobile */}
-      <div className="hidden sm:grid grid-cols-2 lg:grid-cols-4 gap-2 mb-4">
+      {/* KPIs — grade responsiva, sem rolagem lateral */}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         <QuickCard label="🚗 Na fila" value={String(naFila)} />
         <QuickCard label="🔄 Em andamento" value={String(emAndamento)} />
         <QuickCard label="✅ Prontos" value={String(prontos)} />
         <QuickCard label="💰 Em produção" value={brl(receitaProducao)} />
-      </div>
-      <div className="sm:hidden -mx-4 px-4 mb-3 flex gap-2 overflow-x-auto snap-x snap-mandatory pb-1 [&::-webkit-scrollbar]:hidden">
-        <KpiChip label="Na fila" value={String(naFila)} emoji="🚗" />
-        <KpiChip label="Andamento" value={String(emAndamento)} emoji="🔄" />
-        <KpiChip label="Prontos" value={String(prontos)} emoji="✅" />
-        <KpiChip label="Produção" value={brl(receitaProducao)} emoji="💰" />
       </div>
 
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
