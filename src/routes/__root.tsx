@@ -146,7 +146,9 @@ function AuthListener() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
       if (event !== "SIGNED_IN" && event !== "SIGNED_OUT" && event !== "USER_UPDATED") return;
       router.invalidate();
-      if (event !== "SIGNED_OUT") qc.invalidateQueries();
+      // Only the identity-scoped caches are dropped; no global cache reset.
+      qc.invalidateQueries({ queryKey: ["current-user-role"] });
+      qc.invalidateQueries({ queryKey: ["current-owner-id"] });
     });
     return () => subscription.unsubscribe();
   }, [router, qc]);

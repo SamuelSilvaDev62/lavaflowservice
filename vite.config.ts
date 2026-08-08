@@ -22,19 +22,14 @@ export default defineConfig({
         devOptions: { enabled: false },
         manifest: false, // we ship our own /public/manifest.webmanifest
         workbox: {
-          globPatterns: ["**/*.{js,css,html,ico,png,svg,webp,woff2}"],
-          navigateFallback: "/",
-          navigateFallbackDenylist: [/^\/api\//, /^\/~oauth/],
+          // HTML is never precached or cached at runtime: navigations always hit
+          // the network so a deploy is picked up on the first open.
+          globPatterns: ["**/*.{js,css,ico,png,svg,webp,woff2}"],
+          navigateFallback: null,
+          cleanupOutdatedCaches: true,
+          clientsClaim: true,
+          skipWaiting: true,
           runtimeCaching: [
-            {
-              urlPattern: ({ request }) => request.mode === "navigate",
-              handler: "NetworkFirst",
-              options: {
-                cacheName: "html-nav",
-                networkTimeoutSeconds: 4,
-                expiration: { maxEntries: 30, maxAgeSeconds: 60 * 60 * 24 },
-              },
-            },
             {
               urlPattern: ({ url, sameOrigin }) =>
                 sameOrigin && /\.(?:js|css|woff2|png|jpg|jpeg|svg|webp|ico)$/.test(url.pathname),

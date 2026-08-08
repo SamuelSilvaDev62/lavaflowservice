@@ -19,10 +19,10 @@ function EntryGate() {
 
   useEffect(() => {
     let cancelled = false;
-    supabase.auth.getUser().then(({ data }) => {
+    supabase.auth.getSession().then(({ data }) => {
       if (cancelled) return;
       navigate({
-        to: data.user ? "/dashboard" : "/auth",
+        to: data.session ? "/dashboard" : "/auth",
         replace: true,
       });
     });

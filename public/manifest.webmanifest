@@ -2,7 +2,7 @@
   "name": "LavaFlow — Gestão de Lava-Rápido",
   "short_name": "LavaFlow",
   "description": "Plataforma de crescimento para lava-rápidos: recupere clientes, crie receita recorrente e tome decisões com dados.",
-  "start_url": "/dashboard",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0F172A",
