@@ -122,12 +122,11 @@ function FilaPage() {
   const ordensList = data?.ordens ?? [];
   const totalFila = ordensList.length;
   const countBy = (s: OsStatus) => ordensList.filter(o => o.status === s).length;
-  const naFila = countBy("aguardando");
-  const emAndamento = countBy("em_lavagem") + countBy("finalizacao");
-  const prontos = countBy("pronto");
+  const emOperacao = countBy("aguardando") + countBy("em_lavagem") + countBy("finalizacao") + countBy("pronto");
   const receitaProducao = ordensList
     .filter(o => o.status === "em_lavagem" || o.status === "finalizacao" || o.status === "pronto")
     .reduce((s, o) => s + Number(o.valor ?? 0), 0);
+
 
   const itemsMobile = ordensList.filter(o => o.status === activeMobile);
 
