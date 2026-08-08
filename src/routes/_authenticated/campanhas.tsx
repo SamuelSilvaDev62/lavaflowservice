@@ -71,7 +71,7 @@ function Page() {
         title="Campanhas"
         subtitle="Transforme oportunidades em conversas — cada campanha vira receita rastreável."
         actions={
-          <Button variant="outline" onClick={() => processarMut.mutate()} disabled={processarMut.isPending}>
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => processarMut.mutate()} disabled={processarMut.isPending}>
             <RefreshCw className="mr-1 h-4 w-4" />Atualizar conversões
           </Button>
         }
@@ -93,9 +93,9 @@ function Page() {
             {data.sugestoes.length === 0 ? (
               <Card><CardContent className="p-6 text-sm text-muted-foreground">Ainda não há uma campanha recomendada com dados suficientes.</CardContent></Card>
             ) : (
-              <div className="grid gap-4 lg:grid-cols-2 list-stagger">
+              <div className="grid min-w-0 gap-4 lg:grid-cols-2 list-stagger">
                 {data.sugestoes.map((s: any, i: number) => (
-                  <div key={s.tipo} style={{ ["--i" as any]: i }}>
+                  <div key={s.tipo} className="min-w-0" style={{ ["--i" as any]: i }}>
                     <CampaignCard
                       title={s.titulo}
                       objective={tipoLabel[s.tipo] ?? s.tipo}
@@ -110,7 +110,7 @@ function Page() {
                         </Button>
                       }
                     >
-                      <p className="text-sm leading-relaxed text-muted-foreground">{s.descricao}</p>
+                      <p className="break-words text-sm leading-relaxed text-muted-foreground">{s.descricao}</p>
                     </CampaignCard>
                   </div>
                 ))}
@@ -133,7 +133,7 @@ function Page() {
                   const conversao = enviados ? convertidos / enviados : 0;
                   const date = c.created_at ? new Date(c.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : undefined;
                   return (
-                    <div key={c.id} style={{ ["--i" as any]: i }}>
+                    <div key={c.id} className="min-w-0" style={{ ["--i" as any]: i }}>
                       <CampaignCard
                         title={c.nome}
                         objective={tipoLabel[c.tipo] ?? c.tipo}
@@ -144,19 +144,19 @@ function Page() {
                         channels={["whatsapp"]}
                         metric={{ label: "Receita influenciada", value: brl(c.receitaInfluenciada ?? 0) }}
                       >
-                        <p className="text-sm leading-relaxed text-muted-foreground">{c.mensagem}</p>
+                        <p className="break-words text-sm leading-relaxed text-muted-foreground">{c.mensagem}</p>
                         <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                          <span className="inline-flex items-center gap-1"><Users className="h-3.5 w-3.5" />{convertidos} conv. · {Math.round(conversao * 100)}%</span>
+                          <span className="inline-flex min-w-0 items-center gap-1"><Users className="h-3.5 w-3.5 shrink-0" /><span className="break-words">{convertidos} conv. · {Math.round(conversao * 100)}%</span></span>
                         </div>
-                        <div className="divide-y rounded-2xl border bg-card">
+                        <div className="min-w-0 divide-y rounded-2xl border bg-card">
                           {c.alvos.slice(0, 12).map((a: any) => (
-                            <div key={a.id} className="flex flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
+                            <div key={a.id} className="flex min-w-0 flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
                               <div className="min-w-0">
                                 <p className="truncate text-sm font-medium">{a.nome ?? "Cliente"}</p>
                                 <p className="truncate text-xs text-muted-foreground">{a.telefone ?? "sem telefone"} · {a.status}</p>
                               </div>
                               {a.telefone && (
-                                <Button asChild size="sm" variant={a.status === "enviado" ? "outline" : "default"} onClick={() => enviarMut.mutate(a.id)}>
+                                <Button asChild size="sm" className="w-full shrink-0 sm:w-auto" variant={a.status === "enviado" ? "outline" : "default"} onClick={() => enviarMut.mutate(a.id)}>
                                   <a href={waLink(a.telefone, msgFor(c.mensagem, a))} target="_blank" rel="noreferrer">
                                     <MessageCircle className="mr-1 h-4 w-4" />Enviar
                                   </a>

@@ -56,6 +56,8 @@ export function Dashboard() {
   const horariosLivres = Number(cards.horariosLivres ?? 0);
   const ticketMedio = Number(cards.ticketMedio ?? 0);
   const potencial = Number(cards.potencialFaturamento ?? 0);
+  const expedienteEncerrado = Boolean(cards.expedienteEncerrado);
+  const fechadoHoje = Boolean(cards.fechadoHoje);
 
   // Buckets de reativação a partir dos inativos 30+
   const inativos = ((inativosData?.inativos ?? []) as any[])
@@ -99,8 +101,16 @@ export function Dashboard() {
 
           {horariosLivres === 0 ? (
             <>
-              <p className="font-display text-2xl font-bold text-primary-foreground">Agenda cheia hoje 🎉</p>
-              <p className="mt-1 text-sm text-primary-foreground/90">Nenhum horário livre. Ótimo trabalho!</p>
+              <p className="font-display text-2xl font-bold text-primary-foreground">
+                {fechadoHoje ? "Fechado hoje" : expedienteEncerrado ? "Expediente encerrado" : "Agenda cheia hoje 🎉"}
+              </p>
+              <p className="mt-1 text-sm text-primary-foreground/90">
+                {fechadoHoje
+                  ? "Hoje não é dia de funcionamento na sua configuração de agenda."
+                  : expedienteEncerrado
+                    ? "Não há mais horários vendáveis hoje. Foque na agenda de amanhã."
+                    : "Nenhum horário livre até o fim do expediente. Ótimo trabalho!"}
+              </p>
             </>
           ) : (
             <>

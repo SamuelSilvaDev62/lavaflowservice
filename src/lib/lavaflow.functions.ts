@@ -223,7 +223,7 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
     const hoje = localDateIso();
     const now = new Date();
     const startMonth30 = new Date(Date.now() - 30 * 86_400_000).toISOString();
-    const [{ data: agendamentos }, { data: ordens }, { data: ordensFinalizadas }, { data: funcionarios }, { data: ordensEntregues30 }, { data: agendaCfg }] = await Promise.all([
+    const [{ data: agendamentos }, { data: ordens }, { data: ordensFinalizadas }, { data: funcionarios }, { data: ordensEntregues30 }, { data: agendaCfg }, { data: servicosAtivos }] = await Promise.all([
       supabase.from("agendamentos")
         .select(`id, data_agendada, hora_agendada, status, leva_traz, endereco_retirada, endereco_devolucao,
                  horario_retirada, horario_devolucao, taxa_leva_traz, cliente_id, servico_id, funcionario_id,
@@ -255,6 +255,10 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         .select("hora_inicio, hora_fim, intervalo_min, capacidade_simultanea, dias_semana")
         .eq("owner_id", ownerId)
         .maybeSingle(),
+      supabase.from("servicos")
+        .select("preco_padrao")
+        .eq("owner_id", ownerId)
+        .eq("ativo", true),
     ]);
 
 
@@ -305,31 +309,54 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
       .filter((f: any) => f.ocupacao >= f.capacidade)
       .slice(0, 3);
 
-    // Ticket médio (últimos 30 dias, entregues); fallback 50.
+    // Ticket médio (últimos 30 dias, entregues); fallback: média dos serviços ativos.
     const entregues30 = ordensEntregues30 ?? [];
+    const precosAtivos = (servicosAtivos ?? [])
+      .map((s: any) => Number(s.preco_padrao ?? 0))
+      .filter((v: number) => v > 0);
+    const mediaServicos = precosAtivos.length
+      ? precosAtivos.reduce((s: number, v: number) => s + v, 0) / precosAtivos.length
+      : 0;
     const ticketMedio = entregues30.length
       ? entregues30.reduce((s: number, r: any) => s + Number(r.valor ?? 0), 0) / entregues30.length
-      : 50;
+      : (mediaServicos || 50);
 
-    // Capacidade do dia a partir de agenda_config; fallback 8.
+    // Capacidade AINDA utilizável hoje: slots do horário atual até o fim do expediente,
+    // respeitando capacidade simultânea e descontando o que já está agendado por slot.
     const dow = localDayOfWeek();
-    let capacidadeDia = 8;
-    if (agendaCfg) {
-      const diasSemana = (agendaCfg.dias_semana ?? []) as number[];
-      if (diasSemana.length === 0 || diasSemana.includes(dow)) {
-        const [hi, mi] = String(agendaCfg.hora_inicio ?? "08:00").split(":").map(Number);
-        const [hf, mf] = String(agendaCfg.hora_fim ?? "18:00").split(":").map(Number);
-        const minutos = Math.max(0, (hf * 60 + (mf || 0)) - (hi * 60 + (mi || 0)));
-        const intervalo = Math.max(15, Number(agendaCfg.intervalo_min ?? 60));
-        const cap = Math.max(1, Number(agendaCfg.capacidade_simultanea ?? 1));
-        capacidadeDia = Math.max(0, Math.floor(minutos / intervalo)) * cap;
-      } else {
-        capacidadeDia = 0;
+    const cfgInicio = String(agendaCfg?.hora_inicio ?? "08:00").slice(0, 5);
+    const cfgFim = String(agendaCfg?.hora_fim ?? "18:00").slice(0, 5);
+    const intervalo = Math.max(15, Number(agendaCfg?.intervalo_min ?? 60));
+    const capSimultanea = Math.max(1, Number(agendaCfg?.capacidade_simultanea ?? 1));
+    const diasSemana = (agendaCfg?.dias_semana ?? []) as number[];
+    const abertoHoje = !agendaCfg || diasSemana.length === 0 || diasSemana.includes(dow);
+
+    const inicioMin = hmToMinutes(cfgInicio);
+    const fimMin = hmToMinutes(cfgFim);
+    // Ocupação ativa por slot (arredondando o agendamento para o slot da grade).
+    const ocupacaoPorSlot = new Map<number, number>();
+    agHoje.filter((a: any) => isActiveStatus(a.status)).forEach((a: any) => {
+      const m = hmToMinutes(a.hora_agendada);
+      const slot = inicioMin + Math.floor(Math.max(0, m - inicioMin) / intervalo) * intervalo;
+      ocupacaoPorSlot.set(slot, (ocupacaoPorSlot.get(slot) ?? 0) + 1);
+    });
+
+    let capacidadeDia = 0;
+    let horariosLivres = 0;
+    if (abertoHoje && fimMin > inicioMin) {
+      // Primeiro slot que ainda pode ser vendido (não conta slots passados).
+      const primeiroSlot = nowMinutes <= inicioMin
+        ? inicioMin
+        : inicioMin + Math.ceil((nowMinutes - inicioMin) / intervalo) * intervalo;
+      for (let slot = inicioMin; slot + intervalo <= fimMin; slot += intervalo) {
+        capacidadeDia += capSimultanea;
+        if (slot < primeiroSlot) continue;
+        horariosLivres += Math.max(0, capSimultanea - (ocupacaoPorSlot.get(slot) ?? 0));
       }
     }
-    const agendadosAtivos = agHoje.filter((a: any) => isActiveStatus(a.status)).length;
-    const horariosLivres = Math.max(0, capacidadeDia - agendadosAtivos);
     const potencialFaturamento = horariosLivres * ticketMedio;
+    const expedienteEncerrado = abertoHoje && fimMin > inicioMin && nowMinutes >= fimMin;
+    const fechadoHoje = !abertoHoje || fimMin <= inicioMin;
 
     const alertas = [
       levaTrazProximos.length > 0 ? {
@@ -365,6 +392,8 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         ticketMedio,
         capacidadeDia,
         horariosLivres,
+        expedienteEncerrado,
+        fechadoHoje,
         potencialFaturamento,
       },
       agendaHoje: agendaAtiva,
