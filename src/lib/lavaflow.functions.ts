@@ -1289,11 +1289,11 @@ export const getClienteInativos = createServerFn({ method: "GET" })
 function campanhaMensagem(tipo: string, nome?: string) {
   const primeiroNome = nome ? nome.split(" ")[0] : "{{nome}}";
   const mensagens: Record<string, string> = {
-    inativos: `Ola ${primeiroNome}! Sentimos sua falta por aqui. Quer agendar um horario esta semana para cuidar do seu veiculo?`,
-    fidelidade: `Ola ${primeiroNome}! Voce possui beneficio disponivel no nosso programa de fidelidade. Quer aproveitar na sua proxima lavagem?`,
-    assinatura: `Ola ${primeiroNome}! Temos planos para deixar suas lavagens mais praticas e previsiveis. Posso te explicar como funciona?`,
-    baixa_ocupacao: `Ola ${primeiroNome}! Temos horarios disponiveis esta semana para cuidar do seu veiculo. Quer reservar um horario?`,
-    aniversario: `Ola ${primeiroNome}! Feliz aniversario! Temos um convite especial para voce cuidar do seu veiculo com a gente.`,
+    inativos: `Olá ${primeiroNome}! Sentimos sua falta por aqui. Quer agendar um horário esta semana para cuidar do seu veículo?`,
+    fidelidade: `Olá ${primeiroNome}! Você possui benefício disponível no nosso programa de fidelidade. Quer aproveitar na sua próxima lavagem?`,
+    assinatura: `Olá ${primeiroNome}! Temos planos para deixar suas lavagens mais práticas e previsíveis. Posso te explicar como funciona?`,
+    baixa_ocupacao: `Olá ${primeiroNome}! Temos horários disponíveis esta semana para cuidar do seu veículo. Quer reservar um horário?`,
+    aniversario: `Olá ${primeiroNome}! Feliz aniversário! Temos um convite especial para você cuidar do seu veículo com a gente.`,
   };
   return mensagens[tipo] ?? mensagens.inativos;
 }
@@ -1410,7 +1410,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
     {
       tipo: "inativos",
       titulo: "Recuperar clientes inativos",
-      descricao: `${inativos.length} cliente(s) sem retorno ha mais de 45 dias.`,
+      descricao: `${inativos.length} cliente(s) sem retorno há mais de 45 dias.`,
       impactoEstimado: roundMoney(inativos.length * ticketMedio),
       ...potencial("inativos", inativos.length, ticketMedio),
       alvos: inativos.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { dias_inativo: c.dias_inativo } })),
@@ -1418,7 +1418,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
     },
     {
       tipo: "fidelidade",
-      titulo: "Ativar beneficios de fidelidade",
+      titulo: "Ativar benefícios de fidelidade",
       descricao: `${fidelidade.length} cliente(s) possuem pontos para resgate.`,
       impactoEstimado: roundMoney(fidelidade.length * ticketMedio),
       ...potencial("fidelidade", fidelidade.length, ticketMedio),
@@ -1428,7 +1428,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
     {
       tipo: "assinatura",
       titulo: "Oferecer plano para clientes frequentes",
-      descricao: `${assinatura.length} cliente(s) frequentes ainda nao assinam um plano.`,
+      descricao: `${assinatura.length} cliente(s) frequentes ainda não assinam um plano.`,
       impactoEstimado: roundMoney(assinatura.length * (valorPlano || ticketMedio)),
       ...potencial("assinatura", assinatura.length, valorPlano || ticketMedio),
       alvos: assinatura.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { visitas: visitas.get(c.id) ?? 0 } })),
@@ -1436,8 +1436,8 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
     },
     {
       tipo: "baixa_ocupacao",
-      titulo: "Preencher dias com baixa ocupacao",
-      descricao: `${diasBaixos.length} dia(s) da semana estao com baixa demanda.`,
+      titulo: "Preencher dias com baixa ocupação",
+      descricao: `${diasBaixos.length} dia(s) da semana estão com baixa demanda.`,
       impactoEstimado: roundMoney(Math.max(0, diasBaixos.length) * ticketMedio),
       ...potencial("baixa_ocupacao", inativos.slice(0, 15).length, ticketMedio),
       alvos: inativos.slice(0, 15).map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { dias_baixos: diasBaixos } })),
