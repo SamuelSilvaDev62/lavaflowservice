@@ -71,7 +71,7 @@ function Page() {
         title="Campanhas"
         subtitle="Transforme oportunidades em conversas — cada campanha vira receita rastreável."
         actions={
-          <Button variant="outline" onClick={() => processarMut.mutate()} disabled={processarMut.isPending}>
+          <Button variant="outline" className="w-full sm:w-auto" onClick={() => processarMut.mutate()} disabled={processarMut.isPending}>
             <RefreshCw className="mr-1 h-4 w-4" />Atualizar conversões
           </Button>
         }
