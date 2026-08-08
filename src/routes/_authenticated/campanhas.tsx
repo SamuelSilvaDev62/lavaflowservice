@@ -93,9 +93,9 @@ function Page() {
             {data.sugestoes.length === 0 ? (
               <Card><CardContent className="p-6 text-sm text-muted-foreground">Ainda não há uma campanha recomendada com dados suficientes.</CardContent></Card>
             ) : (
-              <div className="grid gap-4 lg:grid-cols-2 list-stagger">
+              <div className="grid min-w-0 gap-4 lg:grid-cols-2 list-stagger">
                 {data.sugestoes.map((s: any, i: number) => (
-                  <div key={s.tipo} style={{ ["--i" as any]: i }}>
+                  <div key={s.tipo} className="min-w-0" style={{ ["--i" as any]: i }}>
                     <CampaignCard
                       title={s.titulo}
                       objective={tipoLabel[s.tipo] ?? s.tipo}
@@ -110,7 +110,7 @@ function Page() {
                         </Button>
                       }
                     >
-                      <p className="text-sm leading-relaxed text-muted-foreground">{s.descricao}</p>
+                      <p className="break-words text-sm leading-relaxed text-muted-foreground">{s.descricao}</p>
                     </CampaignCard>
                   </div>
                 ))}
