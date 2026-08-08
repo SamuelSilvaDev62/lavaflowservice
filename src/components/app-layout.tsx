@@ -4,7 +4,6 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Award,
   BarChart3,
-  Briefcase,
   CalendarDays,
   Car,
   ClipboardList,
@@ -27,7 +26,7 @@ import { WelcomeModal } from "@/components/welcome-modal";
 import { GuidedTour } from "@/components/guided-tour";
 import { OperationalAlerts } from "@/components/operational-alerts";
 import { useRole } from "@/hooks/use-role";
-import { ADMINS, GESTAO, OPERACIONAL, isColaborador, type AppRole, ROLE_LABELS } from "@/lib/rbac";
+import { ADMINS, GESTAO, OPERACIONAL, type AppRole, ROLE_LABELS } from "@/lib/rbac";
 
 type NavItem = { to: string; label: string; icon: any; tour?: string; roles: AppRole[] };
 type NavGroup = { label: string; items: NavItem[] };
@@ -38,7 +37,6 @@ const groupsAll: NavGroup[] = [
     { to: "/agendamentos", label: "Agenda", icon: CalendarDays, roles: OPERACIONAL },
     { to: "/fila", label: "Fila", icon: ListChecks, roles: OPERACIONAL },
     { to: "/ordens", label: "OS", icon: ClipboardList, roles: OPERACIONAL },
-    { to: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, roles: OPERACIONAL },
   ]},
   { label: "Relacionamento", items: [
     { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes", roles: OPERACIONAL },
@@ -54,13 +52,7 @@ const groupsAll: NavGroup[] = [
   ]},
 ];
 
-const colabGroups: NavGroup[] = [
-  { label: "Operação", items: [
-    { to: "/meu-trabalho", label: "Meu Trabalho", icon: Briefcase, roles: ["lavador", "colaborador"] },
-  ]},
-];
-
-const BOTTOM_TAB_ROUTES = ["/dashboard", "/agendamentos", "/fila", "/ordens", "/meu-trabalho"] as const;
+const BOTTOM_TAB_ROUTES = ["/dashboard", "/agendamentos", "/fila", "/ordens"] as const;
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
@@ -71,15 +63,12 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
   useEffect(() => setOpen(false), [pathname]);
 
-  const colab = isColaborador(role);
-  const groups: NavGroup[] = colab
-    ? colabGroups
-    : groupsAll
-        .map((g) => ({
-          ...g,
-          items: g.items.filter((it) => !role || it.roles.includes(role)),
-        }))
-        .filter((g) => g.items.length > 0);
+  const groups: NavGroup[] = groupsAll
+    .map((g) => ({
+      ...g,
+      items: g.items.filter((it) => !role || it.roles.includes(role)),
+    }))
+    .filter((g) => g.items.length > 0);
 
   async function signOut() {
     await qc.cancelQueries();
@@ -91,7 +80,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
   return (
     <div className="min-h-screen bg-background">
       <header className="lg:hidden sticky top-0 z-30 flex items-center justify-between bg-background/80 backdrop-blur-xl px-4 h-16 shadow-[var(--shadow-neo-sm)]">
-        <Link to={colab ? "/meu-trabalho" : "/dashboard"} className="inline-flex items-center gap-2 font-display text-lg font-bold leading-none tracking-tight">
+        <Link to="/dashboard" className="inline-flex items-center gap-2 font-display text-lg font-bold leading-none tracking-tight">
           <span className="grid h-9 w-9 place-content-center rounded-2xl bg-gradient-to-br from-primary to-primary/70 shadow-[var(--shadow-neo-sm)]">
             <Car className="h-4 w-4 text-primary-foreground" />
           </span>
@@ -110,7 +99,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-primary to-primary/70 grid place-content-center shadow-[var(--shadow-neo-sm)]">
             <Car className="h-5 w-5 text-primary-foreground" />
           </div>
-          <Link to={colab ? "/meu-trabalho" : "/dashboard"} className="font-display text-xl font-bold tracking-tight">
+          <Link to="/dashboard" className="font-display text-xl font-bold tracking-tight">
             Lava<span className="text-primary">Flow</span>
           </Link>
         </div>
@@ -161,7 +150,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         <div className="px-4 lg:px-10 py-6 lg:py-10 max-w-7xl mx-auto animate-in fade-in duration-300">{children}</div>
       </main>
 
-      {!colab && (() => {
+      {(() => {
         const opGroup = groups.find((g) => g.label === "Operação");
         const tabs = (opGroup?.items ?? []).filter((it) => BOTTOM_TAB_ROUTES.includes(it.to as any))
           .sort((a, b) => BOTTOM_TAB_ROUTES.indexOf(a.to as any) - BOTTOM_TAB_ROUTES.indexOf(b.to as any));
@@ -191,9 +180,9 @@ export function AppLayout({ children }: { children: ReactNode }) {
       })()}
 
 
-      {!colab && <WelcomeModal />}
-      {!colab && <GuidedTour />}
-      {!colab && <OperationalAlerts />}
+      <WelcomeModal />
+      <GuidedTour />
+      <OperationalAlerts />
     </div>
   );
 }

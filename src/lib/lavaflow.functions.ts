@@ -2123,7 +2123,7 @@ export const getReceitaInfluenciada = createServerFn({ method: "GET" })
     return getReceitaInfluenciadaData(context.supabase, ownerId, data);
   });
 
-// ============ COLABORADORES / MEU TRABALHO ============
+// ============ ESCOPO DO TENANT ============
 async function getOwnerScope(supabase: any, userId: string) {
   const { data } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
   const priority: Record<TenantRole, number> = {
@@ -3275,94 +3275,6 @@ export const updateClienteCompleto = createServerFn({ method: "POST" })
         if (error) throw error;
       }
     }
-    return { ok: true };
-  });
-
-export const getMeuTrabalho = createServerFn({ method: "GET" })
-  .middleware([requireSupabaseAuth])
-  .handler(async ({ context }) => {
-    const { supabase, userId } = context;
-    const { ownerId } = await getOwnerScope(supabase, userId);
-    const { data: meFunc } = await supabase
-      .from("funcionarios")
-      .select("id, owner_id, nome, cargo, telefone, email, avatar_url, ativo, auth_user_id, perm_iniciar_atendimento, perm_finalizar_atendimento, perm_realizar_checklist, perm_ver_apenas_atribuidos, perm_ver_todos_veiculos")
-      .eq("owner_id", ownerId)
-      .eq("auth_user_id", userId)
-      .maybeSingle();
-
-    const startToday = new Date(); startToday.setHours(0,0,0,0);
-    const startWeek = new Date(); startWeek.setDate(startWeek.getDate() - 7);
-    const startMonth = new Date(); startMonth.setDate(1); startMonth.setHours(0,0,0,0);
-
-    const [{ data: ordens }, { data: comissoesMes }] = await Promise.all([
-      supabase
-        .from("ordens_servico")
-        .select(`id, status, valor, created_at, iniciado_em, finalizado_em, entregue_em, funcionario_id,
-                 clientes:cliente_id(nome, telefone), veiculos:veiculo_id(placa, modelo), servicos:servico_id(nome)`)
-        .eq("owner_id", ownerId)
-        .in("status", ["aguardando", "em_lavagem"])
-        .order("created_at", { ascending: true }),
-      meFunc?.id
-        ? supabase.from("comissoes").select("valor, created_at").eq("owner_id", ownerId).eq("funcionario_id", meFunc.id).gte("created_at", startMonth.toISOString())
-        : Promise.resolve({ data: [] as any[] }),
-    ]);
-
-    // Métricas próprias
-    const { data: minhasOs } = meFunc?.id
-      ? await supabase
-          .from("ordens_servico")
-          .select("status, valor, iniciado_em, finalizado_em, entregue_em, created_at")
-          .eq("owner_id", ownerId)
-          .eq("funcionario_id", meFunc.id)
-          .gte("created_at", startWeek.toISOString())
-      : { data: [] as any[] };
-
-    const hoje = (minhasOs ?? []).filter(o => o.entregue_em && new Date(o.entregue_em) >= startToday);
-    const semana = (minhasOs ?? []).filter(o => o.entregue_em);
-    const tempos = (minhasOs ?? [])
-      .filter(o => o.iniciado_em && o.finalizado_em)
-      .map(o => (new Date(o.finalizado_em!).getTime() - new Date(o.iniciado_em!).getTime()) / 60000);
-    const tempoMedio = tempos.length ? Math.round(tempos.reduce((s, t) => s + t, 0) / tempos.length) : 0;
-    const comissaoMes = (comissoesMes ?? []).reduce((s: number, c: any) => s + Number(c.valor ?? 0), 0);
-
-    return {
-      funcionario: meFunc,
-      cards: {
-        concluidasHoje: hoje.length,
-        tempoMedioMin: tempoMedio,
-        comissaoMes,
-        lavagensSemana: semana.length,
-      },
-      fila: ordens ?? [],
-    };
-  });
-
-export const iniciarOs = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { supabase, userId } = context;
-    const { ownerId } = await getOwnerScope(supabase, userId);
-    const { data: meFuncId } = await supabase.rpc("get_my_funcionario_id");
-    await assertPodeIniciarLavagem(supabase, ownerId, data.id);
-    const patch: any = { status: "em_lavagem", iniciado_em: new Date().toISOString() };
-    if (meFuncId) patch.funcionario_id = meFuncId;
-    const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", ownerId);
-    if (error) throw error;
-    return { ok: true };
-  });
-
-export const finalizarOs = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
-    const { error } = await context.supabase
-      .from("ordens_servico")
-      .update({ status: "pronto", finalizado_em: new Date().toISOString() })
-      .eq("id", data.id)
-      .eq("owner_id", ownerId);
-    if (error) throw error;
     return { ok: true };
   });
 
