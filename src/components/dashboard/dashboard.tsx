@@ -84,11 +84,19 @@ export function Dashboard() {
       />
 
       {/* 1. Oportunidade de hoje — hero */}
-      <Card className="mb-4 overflow-hidden border-0 bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg">
+      <Card
+        className="mb-4 overflow-hidden border-0 text-primary-foreground shadow-lg"
+        style={{
+          backgroundColor: "var(--primary)",
+          backgroundImage:
+            "linear-gradient(135deg, color-mix(in oklab, var(--primary) 92%, white 8%), var(--primary) 55%, color-mix(in oklab, var(--primary) 82%, black 18%))",
+        }}
+      >
         <CardContent className="p-5">
-          <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-widest opacity-90">
-            <TrendingUp className="h-3.5 w-3.5" /> Oportunidade de hoje
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary-foreground/90">
+            <TrendingUp className="h-3.5 w-3.5 shrink-0" /> Oportunidade de hoje
           </div>
+
           {horariosLivres === 0 ? (
             <>
               <p className="font-display text-2xl font-bold">Agenda cheia hoje 🎉</p>
