@@ -255,6 +255,10 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         .select("hora_inicio, hora_fim, intervalo_min, capacidade_simultanea, dias_semana")
         .eq("owner_id", ownerId)
         .maybeSingle(),
+      supabase.from("servicos")
+        .select("preco_padrao")
+        .eq("owner_id", ownerId)
+        .eq("ativo", true),
     ]);
 
 
