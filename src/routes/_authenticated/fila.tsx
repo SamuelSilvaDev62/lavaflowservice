@@ -305,26 +305,17 @@ function Column({ col, items, onAdvance, onReenviar }: { col: { key: OsStatus; l
     </div>
   );
 }
-
 function QuickCard({ label, value }: { label: string; value: string }) {
   return (
-    <Card>
+    <Card className="min-w-0">
       <CardContent className="p-3">
-        <p className="text-xs text-muted-foreground">{label}</p>
-        <p className="font-display font-bold text-xl mt-1">{value}</p>
+        <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{label}</p>
+        <p className="mt-1 truncate font-display text-lg font-bold sm:text-xl">{value}</p>
       </CardContent>
     </Card>
   );
 }
 
-function KpiChip({ label, value, emoji }: { label: string; value: string; emoji: string }) {
-  return (
-    <div className="snap-start shrink-0 min-w-[120px] rounded-xl border bg-card px-3 py-2">
-      <p className="text-[11px] text-muted-foreground flex items-center gap-1"><span>{emoji}</span>{label}</p>
-      <p className="font-display font-bold text-lg leading-tight mt-0.5">{value}</p>
-    </div>
-  );
-}
 
 function tempoNaEtapa(ordem: any): string {
   const ref = ordem.status === "em_lavagem" ? ordem.iniciado_em
