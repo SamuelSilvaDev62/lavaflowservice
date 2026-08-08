@@ -1,91 +1,95 @@
-# Portal operacional dedicado em `/work`
+# Rodada final de estabilização — auditoria e plano
 
-Separar a experiência do lavador da área administrativa, mantendo o mesmo backend, autenticação, tenant e regras de negócio.
+Sem novas funcionalidades. Três frentes: remover o fluxo de colaborador, corrigir o "só carrega no refresh" e cortar trabalho redundante no bootstrap.
 
-## 1) Diagnóstico do estado atual
+## 1) Auditoria técnica curta
 
-- **Rotas**: tudo autenticado vive sob `src/routes/_authenticated/`, com o gate em `_authenticated/route.tsx` (`ssr: false`) que verifica sessão e consulta `user_roles`. Se todos os papéis do usuário são `lavador`/`colaborador`, ele já é redirecionado para `/meu-trabalho`.
-- **Layout único**: `_authenticated/route.tsx` envolve TODAS as telas em `AppLayout`. O lavador recebe a mesma casca administrativa (header mobile com logo/hambúrguer, sidebar fixa `lg:pl-64`, botão Sair) só com o menu reduzido (`colabGroups`). A bottom-tab é escondida via `!colab`, mas o layout continua sendo o administrativo.
-- **Tela do lavador**: `_authenticated/meu-trabalho.tsx` já é um mockup mobile-first próprio (header navy, stat strip, job card com timer, fila compacta) e usa `-m-4` para "furar" o padding do `AppLayout` — sintoma claro de layout inadequado.
-- **Papéis**: `src/lib/rbac.ts` define `AppRole`, conjuntos (`ADMINS`, `GESTAO`, `OPERACIONAL`, `COLABORADORES`) e `isColaborador()`. `useRole()` lê o papel via server fn; `<RequireRole>` bloqueia conteúdo no cliente.
-- **Backend disponível**: `getMeuTrabalho`, `iniciarOs`, `finalizarOs`, `equipeConcluirChecklistInicial`, `equipePularChecklistInicial` já existem em `src/lib/lavaflow.functions.ts`, com permissões por funcionário (`perm_iniciar_atendimento`, `perm_finalizar_atendimento`, `perm_realizar_checklist`) e auditoria em `equipe_auditoria`.
-- **Modo Equipe (PIN)**: `/modo-equipe` + `/equipe/$slug` são um fluxo paralelo, sem sessão Supabase (token de `equipe_sessoes`). Ele NÃO deve ser tocado nem fundido com `/work`.
-- **Lacuna**: o payload de `getMeuTrabalho` não expõe hoje "próximo agendamento atribuído" (a tela mostra `"Livre"` hardcoded) nem histórico do dia com detalhe; fotos de checklist existem no schema (`itens jsonb`, `fotos: []`) mas sem upload ligado na tela do lavador.
+**Fluxo de colaborador (a remover)**
+- `src/routes/_authenticated/meu-trabalho.tsx` — única tela do fluxo; único consumidor de `getMeuTrabalho`, `iniciarOs`, `finalizarOs` (confirmado por busca: nenhum outro arquivo importa essas fns).
+- `src/routes/_authenticated/route.tsx`:12-21 — consulta extra em `user_roles` a cada navegação só para decidir `isColab` e redirecionar para `/meu-trabalho`.
+- `src/components/app-layout.tsx` — item "Meu Trabalho" na sidebar e na bottom-tab, `colabGroups`, flag `colab` usada em 6 pontos (logo, sidebar, bottom-tab, WelcomeModal, GuidedTour, OperationalAlerts).
+- `src/lib/rbac.ts` — `COLABORADORES`, `isColaborador()` (usados só pelo layout/gate).
 
-## 2) Arquitetura proposta
+**Fluxo PIN de quiosque (separado, NÃO é o mesmo código)**
+- `/modo-equipe` + `/equipe/$slug` usam `equipeIniciarAtendimento`, `equipeFinalizarAtendimento`, `equipe*ChecklistInicial`, `autenticarEquipePin`, sessão própria em `equipe_sessoes` — sem sessão Supabase. `src/routes/_authenticated/equipe.tsx`:137 gera o link `/equipe/{slug}` e `src/routes/lp.tsx` menciona o modo. É um fluxo à parte do "Meu Trabalho" (ver Perguntas).
 
-Um segundo subtree autenticado, irmão de `_authenticated`, com layout próprio:
-
+**Bootstrap autenticado hoje (cold start em `/`)**
 ```text
-src/routes/
-  _authenticated/            área administrativa (AppLayout, sidebar, bottom-tab)
-  _work/                     NOVO: portal operacional
-    route.tsx                gate: sessão + papel operacional -> WorkLayout
-    index.tsx                /work  -> Meu Trabalho (agora + próximo veículo)
-    os.$id.tsx               /work/os/:id -> checklist + fotos + iniciar/finalizar
-    historico.tsx            /work/historico -> últimos serviços do colaborador
+/  index.tsx  useEffect → auth.getUser()            (rede)
+   → navigate /dashboard
+   → _authenticated beforeLoad → auth.getUser()     (rede, de novo)
+                               → select user_roles  (rede)
+   → AppLayout → useRole() → getCurrentUserRole     (server fn + rede)
+   → dashboard → queries de dados
 ```
+Quatro idas e voltas de auth/role em série antes do primeiro dado útil, duas delas redundantes. `getUser()` sempre revalida na rede; `beforeLoad` roda em cada navegação para o subtree.
 
-- `_work/route.tsx`: `ssr: false`, valida sessão (redirect `/auth`), lê `user_roles`; se o papel NÃO é lavador/colaborador, redireciona para `/dashboard` (admins não usam o portal). Envolve em `WorkLayout`.
-- `_authenticated/route.tsx`: troca o redirect de `/meu-trabalho` por `/work`.
-- `WorkLayout` (novo, `src/components/work/work-layout.tsx`): full-screen mobile-first, sem sidebar, sem bottom-tab administrativa, sem `WelcomeModal`/`GuidedTour`/`OperationalAlerts`. Só header do colaborador (nome, cargo, turno, Sair) e um rodapé mínimo de 2–3 itens do próprio portal (Agora · Histórico), o que satisfaz "sem bottom navigation com Painel/Agenda/Fila/OS".
-- Reuso: o visual atual de `meu-trabalho.tsx` (tokens locais `C`, `JobCard`, `MiniJob`, `SectionLabel`, `Stat`) migra para `src/components/work/*` e passa a ser compartilhado pelas telas do portal. Backend, `useRole`, `rbac.ts` e as server fns permanecem exatamente como estão.
-- `/meu-trabalho` continua existindo como rota de compatibilidade que redireciona para `/work` (evita links/atalhos quebrados), e sai da sidebar administrativa.
+**PWA**
+- `vite.config.ts` gera `sw.js` com `registerType: "autoUpdate"`, `navigateFallback: "/"`, `NetworkFirst` (timeout 4s) para navegações, `CacheFirst` para JS/CSS com hash, sem `cleanupOutdatedCaches`.
+- `src/pwa/register-sw.ts` registra com os guardas corretos (dev/preview/iframe/`?sw=off`), mas não trata atualização de controlador nem `sw=off` como limpeza completa.
+- `public/manifest.webmanifest` tem `start_url: "/dashboard"` — rota protegida; app instalado abre direto num gate que pode redirecionar.
 
-## 3) Arquivos/áreas que precisariam mudar
+**Outros pontos de bootstrap**
+- `src/routes/__root.tsx` `AuthListener`: `router.invalidate()` + `qc.invalidateQueries()` global em `SIGNED_IN`/`USER_UPDATED` — invalidação de tudo, inclusive no primeiro sign-in, em cima de um cache que acabou de ser preenchido.
+- `src/routes/auth.tsx` faz `getUser()` no mount e usa `redirect_uri` = `origin + "/dashboard"` (rota protegida) no OAuth.
 
-| Arquivo | Mudança |
-| --- | --- |
-| `src/routes/_work/route.tsx` | novo gate + `WorkLayout` |
-| `src/routes/_work/index.tsx` | novo: Meu Trabalho (extraído de `meu-trabalho.tsx`) |
-| `src/routes/_work/os.$id.tsx` | novo: detalhe da OS com checklist, fotos, início/fim |
-| `src/routes/_work/historico.tsx` | novo: histórico essencial do colaborador |
-| `src/components/work/work-layout.tsx` | novo layout dedicado |
-| `src/components/work/*.tsx` | `JobCard`, `MiniJob`, `SectionLabel`, tokens visuais extraídos |
-| `src/routes/_authenticated/route.tsx` | redirect colaborador `/meu-trabalho` → `/work` |
-| `src/routes/_authenticated/meu-trabalho.tsx` | reduzido a redirect para `/work` |
-| `src/components/app-layout.tsx` | remover "Meu Trabalho" da sidebar/bottom-tab e o ramo `colabGroups`/`colab` |
-| `src/lib/lavaflow.functions.ts` | estender `getMeuTrabalho` com próximo agendamento atribuído e histórico do dia; nova fn de leitura de histórico se necessário |
-| `src/lib/rbac.ts` | (opcional) helper `homeRouteForRole(role)` para centralizar destino pós-login |
-| `src/routes/index.tsx`, `src/routes/auth.tsx` | pós-login enviar lavador para `/work` em vez de `/dashboard` |
+## 2) Hipóteses de causa do "não carrega na primeira abertura"
 
-Não muda: schema, RLS, GRANTs, permissões por funcionário, `/modo-equipe`, `/equipe/$slug`, `src/integrations/supabase/*`.
+Em ordem de probabilidade:
 
-## 4) Riscos e cuidados
+- **H1 — Service worker servindo shell velho (mais provável).** `navigateFallback: "/"` + `CacheFirst` de assets com hash + ausência de `cleanupOutdatedCaches`: depois de um deploy, o SW pode responder a navegação com o HTML antigo precacheado, que referencia chunks que já não existem → tela branca. O refresh (ou a segunda visita, já com o SW novo ativo) funciona. Além disso `navigateFallback: "/"` é errado para este app: `/` é um gate client-only, não o shell de `/dashboard`.
+- **H2 — Corrida de sessão no gate.** `_authenticated` usa `getUser()` (chamada de rede). Em rede fria/lenta, um erro transitório faz `error || !data.user` → redirect para `/auth` mesmo com sessão válida; no refresh o token já está quente e passa.
+- **H3 — Cascata dupla de redirect.** `/` decide via `useEffect` (depois do render) e o gate decide de novo; qualquer falha de uma das chamadas deixa a tela no spinner de `index.tsx` sem tratamento de erro/timeout.
+- **H4 — `start_url: "/dashboard"` no app instalado** entra direto na rota protegida; combinada com H1/H2, é o caminho onde a falha aparece mais.
+- **H5 — Erro de SSR/hidratação silenciado.** `src/server.ts` normaliza 500 para uma página HTML de erro; um throw pré-dispatch aparece como página que "não carrega" e melhora no refresh. Verificar Server Logs antes de descartar.
 
-- **Loop de redirect** entre `_authenticated` e `_work` se as condições não forem exatamente complementares. Regra única: lavador/colaborador ⇒ `/work`; todos os outros ⇒ área principal. Uma só fonte de verdade para essa decisão.
-- **Papéis mistos**: hoje `isColab` exige que TODOS os papéis sejam de colaborador. Preservar essa semântica; um lavador que também é gerente continua na área principal (com acesso manual a `/work` permitido, sem redirect forçado).
-- **Uploads de foto**: só ligar se já houver bucket e política de storage compatíveis; caso contrário tratar como etapa separada (E5) e não bloquear o resto.
-- **Layout duplicado**: extrair componentes em vez de copiar/colar, senão a tela do lavador vira código órfão.
-- **`-m-4` residual**: remover ao sair do `AppLayout`, senão aparece corte nas laterais.
-- **Deep links antigos** para `/meu-trabalho` (QR, atalho PWA, `public/manifest.webmanifest`) — manter redirect e revisar o manifest.
-- **Prerender/SSR**: manter `ssr: false` no gate, como no `_authenticated`, para não chamar auth durante build.
-- Sem `src/routes/_work/index.tsx` conflitando com `/` — pathless layout com filho `index` resolve `/work` só porque o segmento é `_work`; usar arquivo `work.index.tsx`/pasta `work/` se o gerador reclamar do caminho.
+H1 e H2 explicam o padrão relatado; as duas serão corrigidas.
 
-## 5) Ordem de implementação (etapas pequenas)
+## 3) Mudanças propostas
 
-1. **E1 — Extração visual**: mover componentes de `meu-trabalho.tsx` para `src/components/work/` sem mudar rota. Tela idêntica.
-2. **E2 — Layout + rota**: criar `WorkLayout`, `_work/route.tsx` e `/work` renderizando o Meu Trabalho extraído. `/meu-trabalho` intacto ainda.
-3. **E3 — Chaveamento de acesso**: redirects (`_authenticated` → `/work`, `/meu-trabalho` → `/work`, pós-login por papel) e limpeza do `AppLayout` (sem item nem ramo de colaborador).
-4. **E4 — Próximo veículo + histórico**: estender o payload do backend e criar `/work/historico`; substituir o `"Livre"` hardcoded.
-5. **E5 — Checklist e fotos**: `/work/os/$id` consumindo `equipeConcluirChecklistInicial`/`equipePularChecklistInicial`, com upload de fotos só se o storage já suportar.
-6. **E6 — Acabamento**: safe-area, estados vazios, offline/PWA, manifest, typecheck limpo.
+**A. Remoção do fluxo de colaborador**
+1. Apagar `src/routes/_authenticated/meu-trabalho.tsx`.
+2. Apagar `getMeuTrabalho`, `iniciarOs`, `finalizarOs` de `src/lib/lavaflow.functions.ts` (sem outros consumidores). Manter intactas todas as fns `equipe*`, comissões, pagamentos e equipe.
+3. `src/routes/_authenticated/route.tsx`: remover a query em `user_roles` e o redirect para `/meu-trabalho`.
+4. `src/components/app-layout.tsx`: remover o item "Meu Trabalho", `colabGroups`, a flag `colab` e os condicionais derivados (logo passa a apontar sempre `/dashboard`; WelcomeModal/GuidedTour/OperationalAlerts sempre montados).
+5. `src/lib/rbac.ts`: remover `COLABORADORES` e `isColaborador`; manter `AppRole`, `ADMINS`, `GESTAO`, `OPERACIONAL`, `TODOS`, `ROLE_LABELS`, `canAny` (RBAC e RLS inalterados).
+6. Zero mudanças de banco: nenhuma migração, o enum `app_role` e as policies ficam como estão.
 
-Cada etapa é entregável e reversível isoladamente.
+**B. Correção do primeiro carregamento (PWA)**
+7. `vite.config.ts`: `navigateFallback: null`, `cleanupOutdatedCaches: true`, manter `NetworkFirst` para navegações (sem cache de HTML como fallback de deploy) e `CacheFirst` só para assets com hash.
+8. `src/pwa/register-sw.ts`: registrar com `updateViaCache: "none"`; ao detectar SW novo assumindo o controle (`controllerchange`), recarregar uma única vez (com guarda anti-loop); em contexto recusado, além de desregistrar, limpar as caches Workbox da própria app (sem tocar caches de terceiros).
+9. `public/manifest.webmanifest`: `start_url` de `/dashboard` para `/` (o gate decide o destino). Observação: apps já instalados só pegam o novo `start_url` ao reinstalar.
 
-## 6) Critérios de aceite e testes
+**C. Bootstrap mais rápido e sem duplicação**
+10. `src/routes/index.tsx`: decidir em `beforeLoad` (client-only) com `getSession()` (leitura local, sem rede) + `redirect()`, em vez de `useEffect` + `navigate`, eliminando um round-trip e o flash de spinner.
+11. `src/routes/_authenticated/route.tsx`: usar `getSession()` para o caminho comum e só cair em `getUser()` quando não houver sessão local; devolver `user` no context. Não redirecionar em erro de rede transitório sem sessão local ausente.
+12. Papel único no cache: o `beforeLoad` do subtree passa a semear `queryClient.setQueryData(["current-user-role"], …)`, ou `useRole` passa a ser a única fonte (uma chamada por sessão, `staleTime` longo). O objetivo é **uma** resolução de papel por sessão, não três leituras (select direto + RPC + refetch).
+13. `src/hooks/use-role.ts`: substituir o `refetch()` no listener local por invalidação pontual da chave `current-user-role` (o listener global já existe no root; hoje há dois assinantes concorrentes de `onAuthStateChange`).
+14. `src/routes/__root.tsx`: no `AuthListener`, trocar `qc.invalidateQueries()` (global) por invalidação de `current-user-role` + `router.invalidate()`; manter a limpeza no sign-out.
+15. `src/routes/auth.tsx`: `redirect_uri` para `window.location.origin` (rota pública), guardando o destino pretendido e navegando depois que a sessão estiver hidratada; trocar o `getUser()` do mount por `getSession()`.
+16. `src/router.tsx`: `defaultPreload: "intent"` mantido; revisar `defaultPreloadStaleTime: 0` (hoje força refetch em hover, custo extra em mobile).
 
-- Login como `lavador`/`colaborador` cai em `/work`; nenhuma rota administrativa é alcançável (`/dashboard`, `/agendamentos`, `/fila`, `/ordens`, `/equipe` redirecionam).
-- Login como `owner`/`admin`/`gerente`/`atendente` cai na área principal; acessar `/work` manualmente redireciona para `/dashboard`.
-- Em `/work` não existe sidebar, menu hambúrguer administrativo, nem bottom-tab com Painel/Agenda/Fila/OS.
-- `/work` mostra: veículo em atendimento, próximo veículo, checklist, fotos, iniciar/finalizar, histórico essencial.
-- Iniciar/finalizar respeita `perm_iniciar_atendimento`/`perm_finalizar_atendimento` e o bloqueio de checklist inicial obrigatório (`exigir_checklist_inicial`).
-- Isolamento de tenant preservado: colaborador só vê OS do próprio `owner_id` e, com `perm_ver_apenas_atribuidos`, apenas as suas.
-- `/meu-trabalho` redireciona para `/work`; nenhum link morto na área administrativa.
-- `/modo-equipe` (PIN) continua funcionando sem alteração.
-- Sem loop de redirect em nenhuma combinação de papéis; `tsgo` limpo; smoke test manual mobile (375px) e desktop.
+Nada de mudanças em Supabase, RLS, GRANTs, papéis, comissões, equipe, agenda, OS ou clientes.
+
+## 4) Riscos e regressões a testar
+
+- **Órfãos de rota**: link/atalho antigo para `/meu-trabalho` passa a cair no 404 do root. Testar navegação direta e o manifest/atalhos.
+- **Usuários com papel `lavador`/`colaborador`**: hoje são forçados para `/meu-trabalho`. Sem o fluxo, entram na área principal e a sidebar filtra por papel — `lavador` pode ficar com o menu vazio (nenhum grupo). Precisa de decisão (ver Perguntas) para não gerar tela sem navegação.
+- **Remoção de fns**: confirmar por busca que `getMeuTrabalho`/`iniciarOs`/`finalizarOs` não são usadas por nenhuma outra tela antes de apagar; o quiosque usa as `equipe*`, que ficam.
+- **SW kill-switch**: quem já tem o SW antigo instalado só melhora depois de o navegador ver o worker novo; testar 1ª visita, 2ª visita e deploy seguido de reabertura, incluindo app instalado no celular.
+- **Reload no `controllerchange`**: risco de loop de recarga se a guarda estiver errada — testar com rede lenta e offline.
+- **`getSession()` sem revalidação**: token expirado localmente pode passar do gate e falhar na primeira server fn (que valida o bearer). Aceitável porque a fn 401 → redirect, mas testar sessão expirada e após 1h de idle.
+- **OAuth Google**: mudar o `redirect_uri` mexe no caminho de login; testar login Google no preview, no publicado e no app instalado.
+- **Invalidação mais estreita**: garantir que dados continuam atualizando após troca de usuário (login A → logout → login B não deve mostrar dados de A).
+- **Sem regressão administrativa**: smoke test em Painel, Agenda, Fila, OS, Clientes, Equipe (comissões, pagamento, comissão por serviço), Relatórios, Assinaturas, Campanhas, Fidelidade, Mídia, Configurações; `/modo-equipe` e `/equipe/$slug` inalterados; `tsgo` limpo.
+
+## Ordem sugerida
+
+1. Remoção do fluxo de colaborador (A) — isolada e reversível.
+2. Correção do PWA/primeiro load (B) — validar em produção publicada.
+3. Enxugamento de auth/roles/bootstrap (C) — passo a passo, com smoke test entre cada mudança.
 
 ## Perguntas
 
-1. Um usuário com papéis mistos (ex.: gerente + lavador) deve ficar na área principal com acesso opcional a `/work` (proposta atual) ou ser forçado ao portal?
-2. O upload de fotos no checklist deve entrar já na E5 ou fica para uma onda posterior (depende de bucket/política de storage existente)?
+1. `/modo-equipe` + `/equipe/$slug` (acesso da equipe por PIN, sem login Supabase) deve **permanecer** — entendo que sim, é o canal operacional que sobra — ou também sai nesta rodada?
+2. Para usuários com papel `lavador`: (a) manter o papel apenas para vínculo/comissões, sem acesso à área administrativa (bloqueado com mensagem), (b) dar a eles acesso somente a Fila/OS, ou (c) deixar de oferecer `lavador` como papel de login?
