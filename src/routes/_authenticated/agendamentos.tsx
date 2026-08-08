@@ -164,8 +164,8 @@ function Page() {
         }
       />
 
-      {/* KPIs - grid no desktop, scroll horizontal no mobile */}
-      <div className="-mx-4 px-4 mb-4 flex gap-2 overflow-x-auto snap-x snap-mandatory sm:mx-0 sm:px-0 lg:grid lg:grid-cols-5 lg:gap-3 lg:overflow-visible">
+      {/* KPIs - grade responsiva, sem rolagem lateral */}
+      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5 lg:gap-3">
         <KpiCard label="Hoje" value={st?.hoje ?? 0} />
         <KpiCard label="Confirmados" value={confirmadosDia} tone="primary" />
         <KpiCard label="Pendentes" value={pendentesDia} tone="warning" />
