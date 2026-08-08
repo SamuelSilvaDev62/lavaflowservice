@@ -84,27 +84,41 @@ export function Dashboard() {
       />
 
       {/* 1. Oportunidade de hoje — hero */}
-      <Card className="mb-4 overflow-hidden border-0 bg-gradient-to-br from-primary to-primary/70 text-primary-foreground shadow-lg">
+      <Card
+        className="mb-4 overflow-hidden border-0 text-primary-foreground shadow-lg"
+        style={{
+          backgroundColor: "var(--primary)",
+          backgroundImage:
+            "linear-gradient(135deg, color-mix(in oklab, var(--primary) 92%, white 8%), var(--primary) 55%, color-mix(in oklab, var(--primary) 82%, black 18%))",
+        }}
+      >
         <CardContent className="p-5">
-          <div className="mb-2 flex items-center gap-2 text-xs uppercase tracking-widest opacity-90">
-            <TrendingUp className="h-3.5 w-3.5" /> Oportunidade de hoje
+          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary-foreground/90">
+            <TrendingUp className="h-3.5 w-3.5 shrink-0" /> Oportunidade de hoje
           </div>
+
           {horariosLivres === 0 ? (
             <>
-              <p className="font-display text-2xl font-bold">Agenda cheia hoje 🎉</p>
-              <p className="mt-1 text-sm opacity-90">Nenhum horário livre. Ótimo trabalho!</p>
+              <p className="font-display text-2xl font-bold text-primary-foreground">Agenda cheia hoje 🎉</p>
+              <p className="mt-1 text-sm text-primary-foreground/90">Nenhum horário livre. Ótimo trabalho!</p>
             </>
           ) : (
             <>
-              <p className="font-display text-3xl font-bold tabular-nums">{brl(potencial)}</p>
-              <p className="mt-1 text-sm opacity-90">
-                <strong>{horariosLivres}</strong> {horariosLivres === 1 ? "horário livre" : "horários livres"} × ticket médio de <strong>{brl(ticketMedio)}</strong>
+              <p className="font-display text-3xl font-bold tabular-nums text-primary-foreground">{brl(potencial)}</p>
+              <p className="mt-1 text-sm text-primary-foreground/90">
+                <strong className="font-bold text-primary-foreground">{horariosLivres}</strong> {horariosLivres === 1 ? "horário livre" : "horários livres"} × ticket médio de <strong className="font-bold text-primary-foreground">{brl(ticketMedio)}</strong>
               </p>
-              <Button asChild size="sm" variant="secondary" className="mt-3">
+              <Button
+                asChild
+                size="sm"
+                className="mt-3 border-0 font-semibold shadow-sm"
+                style={{ backgroundColor: "var(--card)", backgroundImage: "none", color: "var(--primary)" }}
+              >
                 <Link to="/agendamentos"><CalendarDays className="h-4 w-4" /> Preencher agenda</Link>
               </Button>
             </>
           )}
+
         </CardContent>
       </Card>
 

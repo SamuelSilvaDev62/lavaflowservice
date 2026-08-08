@@ -122,12 +122,11 @@ function FilaPage() {
   const ordensList = data?.ordens ?? [];
   const totalFila = ordensList.length;
   const countBy = (s: OsStatus) => ordensList.filter(o => o.status === s).length;
-  const naFila = countBy("aguardando");
-  const emAndamento = countBy("em_lavagem") + countBy("finalizacao");
-  const prontos = countBy("pronto");
+  const emOperacao = countBy("aguardando") + countBy("em_lavagem") + countBy("finalizacao") + countBy("pronto");
   const receitaProducao = ordensList
     .filter(o => o.status === "em_lavagem" || o.status === "finalizacao" || o.status === "pronto")
     .reduce((s, o) => s + Number(o.valor ?? 0), 0);
+
 
   const itemsMobile = ordensList.filter(o => o.status === activeMobile);
 
@@ -141,13 +140,15 @@ function FilaPage() {
         <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', o WhatsApp dispara automaticamente." />
       </div>
 
-      {/* KPIs — grade responsiva, sem rolagem lateral */}
-      <div className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
-        <QuickCard label="🚗 Na fila" value={String(naFila)} />
-        <QuickCard label="🔄 Em andamento" value={String(emAndamento)} />
-        <QuickCard label="✅ Prontos" value={String(prontos)} />
-        <QuickCard label="💰 Em produção" value={brl(receitaProducao)} />
+      {/* Resumo compacto — sem duplicar os contadores das etapas */}
+      <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
+        <span className="font-semibold text-foreground tabular-nums">{emOperacao}</span>
+        <span>{emOperacao === 1 ? "veículo em operação" : "veículos em operação"}</span>
+        <span className="text-border">·</span>
+        <span className="font-semibold text-foreground tabular-nums">{brl(receitaProducao)}</span>
+        <span>em produção</span>
       </div>
+
 
       {isLoading && <div className="h-96 rounded-xl bg-muted animate-pulse" />}
       {!isLoading && totalFila === 0 && (
@@ -266,26 +267,26 @@ function FilaPage() {
         </DrawerContent>
       </Drawer>
 
-      <Card className="mt-6">
-        <CardContent className="p-5">
-          <h3 className="font-display font-semibold mb-3 flex items-center gap-2"><Send className="h-4 w-4 text-success" />Logs WhatsApp</h3>
-          {(logsData?.logs ?? []).length === 0 ? (
-            <p className="text-sm text-muted-foreground">Nenhum envio registrado ainda.</p>
-          ) : (
-            <div className="space-y-1 max-h-64 overflow-y-auto">
-              {logsData!.logs.map((l: any) => (
-                <div key={l.id} className="flex items-center justify-between gap-2 text-xs border-l-2 border-success/40 pl-3 py-1">
-                  <div className="min-w-0">
-                    <p className="font-medium text-sm truncate">{l.clientes?.nome ?? "Cliente"}</p>
-                    <p className="text-muted-foreground truncate">{l.descricao}</p>
-                  </div>
-                  <span className="text-muted-foreground whitespace-nowrap shrink-0">{dateTimeBr(l.created_at)}</span>
+      {(logsData?.logs ?? []).length > 0 && (
+        <details className="mt-6 rounded-xl border bg-card/60 px-4 py-3">
+          <summary className="flex cursor-pointer items-center gap-2 text-xs font-medium text-muted-foreground">
+            <Send className="h-3.5 w-3.5 shrink-0 text-success" />
+            Logs WhatsApp ({logsData!.logs.length})
+          </summary>
+          <div className="mt-2 max-h-56 space-y-1 overflow-y-auto">
+            {logsData!.logs.map((l: any) => (
+              <div key={l.id} className="flex items-center justify-between gap-2 border-l-2 border-success/40 py-1 pl-3 text-xs">
+                <div className="min-w-0">
+                  <p className="truncate font-medium">{l.clientes?.nome ?? "Cliente"}</p>
+                  <p className="truncate text-muted-foreground">{l.descricao}</p>
                 </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                <span className="shrink-0 whitespace-nowrap text-muted-foreground">{dateTimeBr(l.created_at)}</span>
+              </div>
+            ))}
+          </div>
+        </details>
+      )}
+
     </>
   );
 }
@@ -305,16 +306,8 @@ function Column({ col, items, onAdvance, onReenviar }: { col: { key: OsStatus; l
     </div>
   );
 }
-function QuickCard({ label, value }: { label: string; value: string }) {
-  return (
-    <Card className="min-w-0">
-      <CardContent className="p-3">
-        <p className="truncate text-[11px] text-muted-foreground sm:text-xs">{label}</p>
-        <p className="mt-1 truncate font-display text-lg font-bold sm:text-xl">{value}</p>
-      </CardContent>
-    </Card>
-  );
-}
+
+
 
 
 function tempoNaEtapa(ordem: any): string {
