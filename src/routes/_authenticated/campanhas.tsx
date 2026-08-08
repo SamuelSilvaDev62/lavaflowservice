@@ -1,16 +1,17 @@
+import { useMemo, useState } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { PageHeader } from "@/components/app-layout";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
-import { getCampanhas, criarCampanhaInteligente, marcarCampanhaAlvoEnviado, processarConversoesCampanhas } from "@/lib/lavaflow.functions";
+import { getCampanhas, criarCampanhaInteligente, marcarCampanhaAlvoEnviado } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { CampaignCard } from "@/components/ui/campaign-card";
-import { MessageCircle, Megaphone, RefreshCw, Sparkles, Users } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { ArrowLeft, Check, ChevronRight, MessageCircle, Megaphone, Play, Sparkles, SkipForward, Users } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/campanhas")({
@@ -25,20 +26,30 @@ const tipoLabel: Record<string, string> = {
   aniversario: "Aniversário",
 };
 
-const statusTone: Record<string, "active" | "draft" | "done" | "paused"> = {
-  ativa: "active",
-  rascunho: "draft",
-  concluida: "done",
-  pausada: "paused",
-};
+function personalizar(template: string, nome?: string | null) {
+  return template.replaceAll("{{nome}}", String(nome ?? "Cliente").split(" ")[0]);
+}
+
+function Metric({ label, value, muted }: { label: string; value: string; muted?: boolean }) {
+  return (
+    <div className="min-w-0">
+      <p className="truncate text-[10px] uppercase tracking-wider text-muted-foreground">{label}</p>
+      <p className={`break-words font-display text-sm font-bold tabular-nums ${muted ? "text-muted-foreground" : ""}`}>{value}</p>
+    </div>
+  );
+}
 
 function Page() {
   const list = useServerFn(getCampanhas);
   const criar = useServerFn(criarCampanhaInteligente);
   const marcar = useServerFn(marcarCampanhaAlvoEnviado);
-  const processar = useServerFn(processarConversoesCampanhas);
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({ queryKey: ["campanhas"], queryFn: () => list() });
+
+  const [execId, setExecId] = useState<string | null>(null);
+  const [pulados, setPulados] = useState<string[]>([]);
+  const [aberto, setAberto] = useState(false);
+  const [mostrarHistorico, setMostrarHistorico] = useState(false);
 
   const criarMut = useMutation({
     mutationFn: (s: any) => criar({ data: { tipo: s.tipo, nome: s.titulo, mensagem: s.mensagem } }),
@@ -46,132 +57,221 @@ function Page() {
     onError: (e: any) => toast.error(e?.message ?? "Erro ao criar campanha"),
   });
 
-  const enviarMut = useMutation({
+  const confirmarMut = useMutation({
     mutationFn: (id: string) => marcar({ data: { id } }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["campanhas"] }),
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao registrar envio"),
-  });
-  const processarMut = useMutation({
-    mutationFn: () => processar(),
-    onSuccess: (res: any) => {
-      qc.invalidateQueries({ queryKey: ["campanhas"] });
-      qc.invalidateQueries({ queryKey: ["receita-influenciada"] });
-      toast.success(`${res.convertidos} conversão(ões) encontradas`);
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Erro ao atualizar conversões"),
+    onSuccess: () => { setAberto(false); qc.invalidateQueries({ queryKey: ["campanhas"] }); },
+    onError: (e: any) => toast.error(e?.message ?? "Erro ao confirmar envio"),
   });
 
-  function msgFor(template: string, alvo: any) {
-    return template.replaceAll("{{nome}}", String(alvo.nome ?? "Cliente").split(" ")[0]);
+  const campanhas = data?.campanhas ?? [];
+  const emAndamento = campanhas.filter((c: any) => c.status !== "concluida");
+  const historico = campanhas.filter((c: any) => c.status === "concluida");
+  const execucao = useMemo(() => campanhas.find((c: any) => c.id === execId), [campanhas, execId]);
+
+  if (execucao) {
+    const alvos = (execucao.alvos ?? []) as any[];
+    const pendentes = alvos.filter((a: any) => a.status === "pendente" && !pulados.includes(a.id));
+    const alvo = pendentes[0];
+    const contatados = alvos.filter((a: any) => ["enviado", "convertido"].includes(a.status)).length;
+
+    return (
+      <>
+        <PageHeader title={execucao.nome} subtitle={`${contatados} de ${alvos.length} contatados`} />
+        <div className="mx-auto w-full max-w-xl space-y-4">
+          <Button variant="ghost" size="sm" onClick={() => { setExecId(null); setAberto(false); setPulados([]); }}>
+            <ArrowLeft className="mr-1 h-4 w-4" />Voltar
+          </Button>
+
+          {!alvo ? (
+            <Card>
+              <CardContent className="min-w-0 space-y-3 p-5">
+                <h2 className="font-display text-lg font-semibold">Contatos concluídos</h2>
+                <p className="text-sm text-muted-foreground">Todos os alvos desta campanha já foram tratados. Aguardando conversões.</p>
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                  <Metric label="Público" value={String(execucao.metricas.total)} />
+                  <Metric label="Enviados" value={String(execucao.metricas.enviados)} />
+                  <Metric label="Convertidos" value={String(execucao.metricas.convertidos)} />
+                  <Metric
+                    label="Receita"
+                    value={execucao.receitaInfluenciada ? brl(execucao.receitaInfluenciada) : "Sem receita ainda"}
+                    muted={!execucao.receitaInfluenciada}
+                  />
+                </div>
+              </CardContent>
+            </Card>
+          ) : (
+            <Card>
+              <CardContent className="min-w-0 space-y-4 p-5">
+                <div className="min-w-0">
+                  <p className="text-[10px] uppercase tracking-wider text-muted-foreground">Próximo contato</p>
+                  <h2 className="break-words font-display text-lg font-semibold">{alvo.nome ?? "Cliente"}</h2>
+                  <p className="break-words text-sm text-muted-foreground">{alvo.telefone ?? "sem telefone"}</p>
+                </div>
+
+                <div className="min-w-0 whitespace-pre-wrap break-words rounded-2xl border bg-muted/40 p-3 text-sm leading-relaxed">
+                  {personalizar(execucao.mensagem, alvo.nome)}
+                </div>
+
+                {!aberto ? (
+                  <Button asChild className="w-full" variant="premium" disabled={!alvo.telefone}>
+                    <a
+                      href={alvo.telefone ? waLink(alvo.telefone, personalizar(execucao.mensagem, alvo.nome)) : "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      onClick={() => setAberto(true)}
+                    >
+                      <MessageCircle className="mr-1 h-4 w-4" />Abrir WhatsApp
+                    </a>
+                  </Button>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2">
+                    <Button className="w-full" onClick={() => confirmarMut.mutate(alvo.id)} disabled={confirmarMut.isPending}>
+                      <Check className="mr-1 h-4 w-4" />Confirmar envio
+                    </Button>
+                    <Button variant="outline" className="w-full" onClick={() => { setPulados((p) => [...p, alvo.id]); setAberto(false); }}>
+                      <SkipForward className="mr-1 h-4 w-4" />Pular
+                    </Button>
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  Abrir o WhatsApp não marca envio. Confirme apenas depois de enviar de fato.
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      </>
+    );
   }
 
   return (
     <>
       <PageHeader
         title="Campanhas"
-        subtitle="Transforme oportunidades em conversas — cada campanha vira receita rastreável."
-        actions={
-          <Button variant="outline" className="w-full sm:w-auto" onClick={() => processarMut.mutate()} disabled={processarMut.isPending}>
-            <RefreshCw className="mr-1 h-4 w-4" />Atualizar conversões
-          </Button>
-        }
+        subtitle="Sugestão, execução e resultado — em um fluxo simples."
       />
 
       {isLoading && (
         <div className="space-y-3">
-          {[1, 2, 3].map((i) => <div key={i} className="h-40 rounded-2xl skeleton-shimmer" />)}
+          {[1, 2, 3].map((i) => <div key={i} className="h-28 rounded-2xl skeleton-shimmer" />)}
         </div>
       )}
 
       {data && (
-        <div className="space-y-6">
-          <section>
+        <div className="min-w-0 space-y-6">
+          <section className="min-w-0">
             <div className="mb-3 flex items-center gap-2">
               <Sparkles className="h-4 w-4 text-primary" />
-              <h2 className="font-display font-semibold">Sugeridas para você</h2>
+              <h2 className="font-display font-semibold">Recomendado agora</h2>
             </div>
             {data.sugestoes.length === 0 ? (
-              <Card><CardContent className="p-6 text-sm text-muted-foreground">Ainda não há uma campanha recomendada com dados suficientes.</CardContent></Card>
+              <Card><CardContent className="p-5 text-sm text-muted-foreground">Nenhuma campanha recomendada com os dados atuais.</CardContent></Card>
             ) : (
-              <div className="grid min-w-0 gap-4 lg:grid-cols-2 list-stagger">
-                {data.sugestoes.map((s: any, i: number) => (
-                  <div key={s.tipo} className="min-w-0" style={{ ["--i" as any]: i }}>
-                    <CampaignCard
-                      title={s.titulo}
-                      objective={tipoLabel[s.tipo] ?? s.tipo}
-                      audienceLabel={`${s.alvos.length} cliente(s)`}
-                      status="Sugerida"
-                      statusTone="draft"
-                      channels={["whatsapp"]}
-                      metric={{ label: "Potencial", value: brl(s.impactoEstimado) }}
-                      actions={
-                        <Button size="sm" onClick={() => criarMut.mutate(s)} disabled={criarMut.isPending} variant="premium">
-                          <Megaphone className="mr-1 h-4 w-4" />Criar campanha
-                        </Button>
-                      }
-                    >
-                      <p className="break-words text-sm leading-relaxed text-muted-foreground">{s.descricao}</p>
-                    </CampaignCard>
-                  </div>
+              <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+                {data.sugestoes.map((s: any) => (
+                  <Card key={s.tipo} className="w-full max-w-full overflow-hidden">
+                    <CardContent className="min-w-0 space-y-3 p-4">
+                      <div className="min-w-0">
+                        <Badge variant="secondary" className="max-w-full whitespace-normal break-words">{tipoLabel[s.tipo] ?? s.tipo}</Badge>
+                        <h3 className="mt-2 break-words font-display text-base font-semibold">{s.titulo}</h3>
+                        <p className="mt-1 break-words text-sm text-muted-foreground">{s.descricao}</p>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <Metric label="Clientes elegíveis" value={String(s.alvos.length)} />
+                        <Metric label="Potencial esperado" value={brl(s.potencialEsperado ?? 0)} />
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Estimativa com {Math.round((s.taxaEsperada ?? 0) * 100)}% de conversão esperada — não é receita garantida.
+                      </p>
+                      <Button className="w-full" variant="premium" onClick={() => criarMut.mutate(s)} disabled={criarMut.isPending}>
+                        <Megaphone className="mr-1 h-4 w-4" />Criar campanha
+                      </Button>
+                    </CardContent>
+                  </Card>
                 ))}
               </div>
             )}
           </section>
 
-          <section>
+          <section className="min-w-0">
             <div className="mb-3 flex items-center gap-2">
-              <Megaphone className="h-4 w-4 text-primary" />
-              <h2 className="font-display font-semibold">Suas campanhas</h2>
+              <Play className="h-4 w-4 text-primary" />
+              <h2 className="font-display font-semibold">Em andamento</h2>
             </div>
-            {(data.campanhas ?? []).length === 0 ? (
-              <Card><CardContent className="p-6 text-sm text-muted-foreground">Nenhuma campanha criada ainda.</CardContent></Card>
+            {emAndamento.length === 0 ? (
+              <Card><CardContent className="p-5 text-sm text-muted-foreground">Nenhuma campanha em andamento.</CardContent></Card>
             ) : (
-              <div className="space-y-4 list-stagger">
-                {data.campanhas.map((c: any, i: number) => {
-                  const enviados = c.alvos.filter((a: any) => ["enviado", "convertido"].includes(a.status)).length;
-                  const convertidos = c.alvos.filter((a: any) => a.status === "convertido").length;
-                  const conversao = enviados ? convertidos / enviados : 0;
-                  const date = c.created_at ? new Date(c.created_at).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }) : undefined;
+              <div className="grid min-w-0 gap-3 lg:grid-cols-2">
+                {emAndamento.map((c: any) => {
+                  const m = c.metricas;
+                  const semPendentes = m.pendentes === 0;
                   return (
-                    <div key={c.id} className="min-w-0" style={{ ["--i" as any]: i }}>
-                      <CampaignCard
-                        title={c.nome}
-                        objective={tipoLabel[c.tipo] ?? c.tipo}
-                        audienceLabel={`${c.alvos.length} alvo(s)`}
-                        status={c.status}
-                        statusTone={statusTone[c.status] ?? "draft"}
-                        date={date}
-                        channels={["whatsapp"]}
-                        metric={{ label: "Receita influenciada", value: brl(c.receitaInfluenciada ?? 0) }}
-                      >
-                        <p className="break-words text-sm leading-relaxed text-muted-foreground">{c.mensagem}</p>
-                        <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
-                          <span className="inline-flex min-w-0 items-center gap-1"><Users className="h-3.5 w-3.5 shrink-0" /><span className="break-words">{convertidos} conv. · {Math.round(conversao * 100)}%</span></span>
+                    <Card key={c.id} className="w-full max-w-full overflow-hidden">
+                      <CardContent className="min-w-0 space-y-3 p-4">
+                        <div className="min-w-0">
+                          <Badge variant="secondary" className="max-w-full whitespace-normal break-words">{tipoLabel[c.tipo] ?? c.tipo}</Badge>
+                          <h3 className="mt-2 break-words font-display text-base font-semibold">{c.nome}</h3>
+                          <p className="mt-1 line-clamp-2 break-words text-sm text-muted-foreground">{c.mensagem}</p>
                         </div>
-                        <div className="min-w-0 divide-y rounded-2xl border bg-card">
-                          {c.alvos.slice(0, 12).map((a: any) => (
-                            <div key={a.id} className="flex min-w-0 flex-col gap-2 p-3 sm:flex-row sm:items-center sm:justify-between">
-                              <div className="min-w-0">
-                                <p className="truncate text-sm font-medium">{a.nome ?? "Cliente"}</p>
-                                <p className="truncate text-xs text-muted-foreground">{a.telefone ?? "sem telefone"} · {a.status}</p>
-                              </div>
-                              {a.telefone && (
-                                <Button asChild size="sm" className="w-full shrink-0 sm:w-auto" variant={a.status === "enviado" ? "outline" : "default"} onClick={() => enviarMut.mutate(a.id)}>
-                                  <a href={waLink(a.telefone, msgFor(c.mensagem, a))} target="_blank" rel="noreferrer">
-                                    <MessageCircle className="mr-1 h-4 w-4" />Enviar
-                                  </a>
-                                </Button>
-                              )}
-                            </div>
-                          ))}
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                          <Metric label="Público" value={String(m.total)} />
+                          <Metric label="Enviados" value={`${m.enviados}/${m.total}`} />
+                          <Metric label="Convertidos" value={`${m.convertidos} · ${Math.round(m.conversao * 100)}%`} />
+                          <Metric
+                            label="Receita influenciada"
+                            value={c.receitaInfluenciada ? brl(c.receitaInfluenciada) : "Sem receita atribuída ainda"}
+                            muted={!c.receitaInfluenciada}
+                          />
                         </div>
-                      </CampaignCard>
-                    </div>
+                        {semPendentes ? (
+                          <p className="inline-flex min-w-0 items-center gap-1 break-words text-xs text-muted-foreground">
+                            <Users className="h-3.5 w-3.5 shrink-0" />Contatos concluídos · aguardando conversões
+                          </p>
+                        ) : (
+                          <Button className="w-full" onClick={() => { setExecId(c.id); setAberto(false); setPulados([]); }}>
+                            Continuar campanha<ChevronRight className="ml-1 h-4 w-4" />
+                          </Button>
+                        )}
+                      </CardContent>
+                    </Card>
                   );
                 })}
               </div>
             )}
           </section>
+
+          {historico.length > 0 && (
+            <section className="min-w-0">
+              <button
+                type="button"
+                className="mb-3 flex w-full items-center justify-between gap-2 text-left"
+                onClick={() => setMostrarHistorico((v) => !v)}
+              >
+                <h2 className="min-w-0 truncate font-display font-semibold text-muted-foreground">Histórico ({historico.length})</h2>
+                <ChevronRight className={`h-4 w-4 shrink-0 text-muted-foreground transition-transform ${mostrarHistorico ? "rotate-90" : ""}`} />
+              </button>
+              {mostrarHistorico && (
+                <div className="min-w-0 divide-y rounded-2xl border bg-card">
+                  {historico.map((c: any) => (
+                    <div key={c.id} className="min-w-0 space-y-2 p-4">
+                      <p className="break-words text-sm font-medium">{c.nome}</p>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+                        <Metric label="Contatos" value={String(c.metricas.total)} />
+                        <Metric label="Enviados" value={String(c.metricas.enviados)} />
+                        <Metric label="Convertidos" value={`${c.metricas.convertidos} · ${Math.round(c.metricas.conversao * 100)}%`} />
+                        <Metric
+                          label="Receita"
+                          value={c.receitaInfluenciada ? brl(c.receitaInfluenciada) : "Sem receita atribuída"}
+                          muted={!c.receitaInfluenciada}
+                        />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+          )}
         </div>
       )}
     </>

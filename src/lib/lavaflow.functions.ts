@@ -1127,6 +1127,22 @@ export const updateOrdemStatus = createServerFn({ method: "POST" })
     if (data.status === "entregue") patch.entregue_em = new Date().toISOString();
     const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", ownerId);
     if (error) throw error;
+    if (data.status === "entregue") {
+      const { data: ordem } = await supabase
+        .from("ordens_servico")
+        .select("id, cliente_id, valor, entregue_em, created_at")
+        .eq("id", data.id)
+        .eq("owner_id", ownerId)
+        .maybeSingle();
+      if (ordem) {
+        await atribuirConversaoCampanha(supabase, ownerId, {
+          id: ordem.id,
+          cliente_id: ordem.cliente_id,
+          valor: ordem.valor,
+          referencia: (ordem as any).entregue_em ?? ordem.created_at,
+        });
+      }
+    }
     return { ok: true };
   });
 
@@ -1273,13 +1289,58 @@ export const getClienteInativos = createServerFn({ method: "GET" })
 function campanhaMensagem(tipo: string, nome?: string) {
   const primeiroNome = nome ? nome.split(" ")[0] : "{{nome}}";
   const mensagens: Record<string, string> = {
-    inativos: `Ola ${primeiroNome}! Sentimos sua falta por aqui. Quer agendar um horario esta semana para cuidar do seu veiculo?`,
-    fidelidade: `Ola ${primeiroNome}! Voce possui beneficio disponivel no nosso programa de fidelidade. Quer aproveitar na sua proxima lavagem?`,
-    assinatura: `Ola ${primeiroNome}! Temos planos para deixar suas lavagens mais praticas e previsiveis. Posso te explicar como funciona?`,
-    baixa_ocupacao: `Ola ${primeiroNome}! Temos horarios disponiveis esta semana para cuidar do seu veiculo. Quer reservar um horario?`,
-    aniversario: `Ola ${primeiroNome}! Feliz aniversario! Temos um convite especial para voce cuidar do seu veiculo com a gente.`,
+    inativos: `Olá ${primeiroNome}! Sentimos sua falta por aqui. Quer agendar um horário esta semana para cuidar do seu veículo?`,
+    fidelidade: `Olá ${primeiroNome}! Você possui benefício disponível no nosso programa de fidelidade. Quer aproveitar na sua próxima lavagem?`,
+    assinatura: `Olá ${primeiroNome}! Temos planos para deixar suas lavagens mais práticas e previsíveis. Posso te explicar como funciona?`,
+    baixa_ocupacao: `Olá ${primeiroNome}! Temos horários disponíveis esta semana para cuidar do seu veículo. Quer reservar um horário?`,
+    aniversario: `Olá ${primeiroNome}! Feliz aniversário! Temos um convite especial para você cuidar do seu veículo com a gente.`,
   };
   return mensagens[tipo] ?? mensagens.inativos;
+}
+
+// Janela maxima de atribuicao de conversao de campanha (dias).
+const CAMPANHA_JANELA_DIAS = 14;
+
+// Taxas conservadoras iniciais por tipo, usadas enquanto nao houver historico suficiente.
+const TAXA_ESPERADA_PADRAO: Record<string, number> = {
+  inativos: 0.2,
+  fidelidade: 0.3,
+  assinatura: 0.15,
+  baixa_ocupacao: 0.1,
+  aniversario: 0.25,
+};
+
+const HISTORICO_MINIMO_ENVIOS = 10;
+
+function clampTaxa(v: number) {
+  return Math.min(0.6, Math.max(0.05, v));
+}
+
+// Taxa historica real (convertidos / envios confirmados) por tipo de campanha,
+// usada apenas quando ha volume suficiente; caso contrario cai no padrao.
+async function getTaxasEsperadasPorTipo(supabase: any, ownerId: string) {
+  const taxas: Record<string, number> = { ...TAXA_ESPERADA_PADRAO };
+  const { data: campanhas } = await supabase
+    .from("campanhas").select("id, tipo").eq("owner_id", ownerId).limit(500);
+  const ids = (campanhas ?? []).map((c: any) => c.id);
+  if (!ids.length) return taxas;
+  const { data: alvos } = await supabase
+    .from("campanha_alvos").select("campanha_id, status").eq("owner_id", ownerId).in("campanha_id", ids).limit(5000);
+  const tipoDe = new Map<string, string>((campanhas ?? []).map((c: any) => [c.id, c.tipo]));
+  const acc = new Map<string, { enviados: number; convertidos: number }>();
+  (alvos ?? []).forEach((a: any) => {
+    const tipo = tipoDe.get(a.campanha_id);
+    if (!tipo) return;
+    if (!["enviado", "convertido"].includes(a.status)) return;
+    const cur = acc.get(tipo) ?? { enviados: 0, convertidos: 0 };
+    cur.enviados += 1;
+    if (a.status === "convertido") cur.convertidos += 1;
+    acc.set(tipo, cur);
+  });
+  acc.forEach((v, tipo) => {
+    if (v.enviados >= HISTORICO_MINIMO_ENVIOS) taxas[tipo] = clampTaxa(v.convertidos / v.enviados);
+  });
+  return taxas;
 }
 
 async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
@@ -1297,6 +1358,13 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
     supabase.from("agendamentos").select("id, data_agendada, status").eq("owner_id", ownerId).gte("data_agendada", hoje).lte("data_agendada", futuro),
     supabase.from("planos_assinatura").select("id, nome, valor_mensal, ativo").eq("owner_id", ownerId).eq("ativo", true).order("valor_mensal").limit(1),
   ]);
+  const taxas = await getTaxasEsperadasPorTipo(supabase, ownerId);
+  const valorPlano = Number(planos?.[0]?.valor_mensal ?? 0);
+  const potencial = (tipo: string, qtd: number, valorUnit: number) => ({
+    taxaEsperada: taxas[tipo] ?? 0.15,
+    valorEsperado: roundMoney(valorUnit),
+    potencialEsperado: roundMoney(qtd * (taxas[tipo] ?? 0.15) * valorUnit),
+  });
 
   const clientesRows = clientes ?? [];
   const ordensRows = ordens ?? [];
@@ -1342,32 +1410,36 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
     {
       tipo: "inativos",
       titulo: "Recuperar clientes inativos",
-      descricao: `${inativos.length} cliente(s) sem retorno ha mais de 45 dias.`,
+      descricao: `${inativos.length} cliente(s) sem retorno há mais de 45 dias.`,
       impactoEstimado: roundMoney(inativos.length * ticketMedio),
+      ...potencial("inativos", inativos.length, ticketMedio),
       alvos: inativos.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { dias_inativo: c.dias_inativo } })),
       mensagem: campanhaMensagem("inativos"),
     },
     {
       tipo: "fidelidade",
-      titulo: "Ativar beneficios de fidelidade",
+      titulo: "Ativar benefícios de fidelidade",
       descricao: `${fidelidade.length} cliente(s) possuem pontos para resgate.`,
       impactoEstimado: roundMoney(fidelidade.length * ticketMedio),
+      ...potencial("fidelidade", fidelidade.length, ticketMedio),
       alvos: fidelidade.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { pontos: c.pontos_saldo } })),
       mensagem: campanhaMensagem("fidelidade"),
     },
     {
       tipo: "assinatura",
       titulo: "Oferecer plano para clientes frequentes",
-      descricao: `${assinatura.length} cliente(s) frequentes ainda nao assinam um plano.`,
-      impactoEstimado: roundMoney(assinatura.length * Number(planos?.[0]?.valor_mensal ?? ticketMedio)),
+      descricao: `${assinatura.length} cliente(s) frequentes ainda não assinam um plano.`,
+      impactoEstimado: roundMoney(assinatura.length * (valorPlano || ticketMedio)),
+      ...potencial("assinatura", assinatura.length, valorPlano || ticketMedio),
       alvos: assinatura.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { visitas: visitas.get(c.id) ?? 0 } })),
       mensagem: campanhaMensagem("assinatura"),
     },
     {
       tipo: "baixa_ocupacao",
-      titulo: "Preencher dias com baixa ocupacao",
-      descricao: `${diasBaixos.length} dia(s) da semana estao com baixa demanda.`,
+      titulo: "Preencher dias com baixa ocupação",
+      descricao: `${diasBaixos.length} dia(s) da semana estão com baixa demanda.`,
       impactoEstimado: roundMoney(Math.max(0, diasBaixos.length) * ticketMedio),
+      ...potencial("baixa_ocupacao", inativos.slice(0, 15).length, ticketMedio),
       alvos: inativos.slice(0, 15).map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { dias_baixos: diasBaixos } })),
       mensagem: campanhaMensagem("baixa_ocupacao"),
     },
@@ -1400,7 +1472,24 @@ export const getCampanhas = createServerFn({ method: "GET" })
       receitaByCampanha.set(campanhaId, (receitaByCampanha.get(campanhaId) ?? 0) + Number(r.valor ?? 0));
     });
     return {
-      campanhas: (campanhas ?? []).map((c: any) => ({ ...c, alvos: byCampanha.get(c.id) ?? [], receitaInfluenciada: receitaByCampanha.get(c.id) ?? 0 })),
+      campanhas: (campanhas ?? []).map((c: any) => {
+        const lista = byCampanha.get(c.id) ?? [];
+        const enviados = lista.filter((a: any) => ["enviado", "convertido"].includes(a.status)).length;
+        const convertidos = lista.filter((a: any) => a.status === "convertido").length;
+        const pendentes = lista.filter((a: any) => a.status === "pendente").length;
+        return {
+          ...c,
+          alvos: lista,
+          receitaInfluenciada: receitaByCampanha.get(c.id) ?? 0,
+          metricas: {
+            total: lista.length,
+            enviados,
+            pendentes,
+            convertidos,
+            conversao: enviados ? convertidos / enviados : 0,
+          },
+        };
+      }),
       sugestoes: sugestoesData.sugestoes,
     };
   });
@@ -1440,6 +1529,71 @@ export const criarCampanhaInteligente = createServerFn({ method: "POST" })
     return { campanha };
   });
 
+// Atribuicao de conversao de campanha para uma OS entregue.
+// Regras V1: apenas alvos com envio confirmado; janela de 14 dias apos sent_at;
+// uma OS gera no maximo UMA atribuicao de campanha (campanha mais recente antes da venda).
+async function atribuirConversaoCampanha(
+  supabase: any,
+  ownerId: string,
+  ordem: { id: string; cliente_id: string | null; valor: number | null; referencia: string },
+) {
+  if (!ordem.cliente_id) return { atribuido: false };
+
+  const { data: jaAtribuida } = await supabase
+    .from("receita_influenciada")
+    .select("id")
+    .eq("owner_id", ownerId)
+    .eq("origem", "CAMPANHA")
+    .eq("ordem_id", ordem.id)
+    .maybeSingle();
+  if (jaAtribuida) return { atribuido: false };
+
+  const refMs = new Date(ordem.referencia).getTime();
+  const janelaInicio = new Date(refMs - CAMPANHA_JANELA_DIAS * 86_400_000).toISOString();
+
+  const { data: alvos } = await supabase
+    .from("campanha_alvos")
+    .select("id, campanha_id, cliente_id, sent_at, status, campanhas:campanha_id(nome, tipo)")
+    .eq("owner_id", ownerId)
+    .eq("cliente_id", ordem.cliente_id)
+    .eq("status", "enviado")
+    .not("sent_at", "is", null)
+    .gte("sent_at", janelaInicio)
+    .lte("sent_at", ordem.referencia)
+    .order("sent_at", { ascending: false })
+    .limit(1);
+
+  const alvo = (alvos ?? [])[0];
+  if (!alvo) return { atribuido: false };
+
+  const valor = Number(ordem.valor ?? 0);
+  const { error } = await supabase.from("receita_influenciada").insert({
+    owner_id: ownerId,
+    ordem_id: ordem.id,
+    cliente_id: ordem.cliente_id,
+    origem: "CAMPANHA",
+    valor,
+    descricao: `Conversao de campanha: ${(alvo.campanhas as any)?.nome ?? "Campanha"}`,
+    referencia_tipo: "campanha_alvo",
+    referencia_id: alvo.id,
+    metadata: {
+      campanha_id: alvo.campanha_id,
+      campanha_nome: (alvo.campanhas as any)?.nome ?? null,
+      campanha_tipo: (alvo.campanhas as any)?.tipo ?? null,
+      janela_dias: CAMPANHA_JANELA_DIAS,
+    },
+  } as any);
+  if (error) return { atribuido: false };
+
+  await supabase
+    .from("campanha_alvos")
+    .update({ status: "convertido", converted_at: ordem.referencia } as any)
+    .eq("id", alvo.id)
+    .eq("owner_id", ownerId);
+
+  return { atribuido: true, valor };
+}
+
 export const marcarCampanhaAlvoEnviado = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
@@ -1453,64 +1607,32 @@ export const marcarCampanhaAlvoEnviado = createServerFn({ method: "POST" })
 export const processarConversoesCampanhas = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
+    // Fallback tecnico: a atribuicao normal acontece automaticamente na entrega da OS.
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
-    const { data: alvos } = await context.supabase
-      .from("campanha_alvos")
-      .select("id, campanha_id, cliente_id, sent_at, status, campanhas:campanha_id(nome, tipo)")
+    const desde = new Date(Date.now() - CAMPANHA_JANELA_DIAS * 86_400_000).toISOString();
+    const { data: ordens } = await context.supabase
+      .from("ordens_servico")
+      .select("id, cliente_id, valor, entregue_em, created_at")
       .eq("owner_id", ownerId)
-      .eq("status", "enviado")
-      .not("cliente_id", "is", null)
-      .not("sent_at", "is", null)
+      .eq("status", "entregue")
+      .gte("created_at", desde)
+      .order("created_at", { ascending: true })
       .limit(200);
 
     let convertidos = 0;
     let receita = 0;
-    for (const alvo of alvos ?? []) {
-      const { data: ordem } = await context.supabase
-        .from("ordens_servico")
-        .select("id, cliente_id, valor, created_at")
-        .eq("owner_id", ownerId)
-        .eq("cliente_id", alvo.cliente_id)
-        .gte("created_at", alvo.sent_at)
-        .order("created_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (!ordem) continue;
-
-      const { data: existente } = await context.supabase
-        .from("receita_influenciada")
-        .select("id")
-        .eq("owner_id", ownerId)
-        .eq("origem", "CAMPANHA")
-        .eq("referencia_tipo", "campanha_alvo")
-        .eq("referencia_id", alvo.id)
-        .maybeSingle();
-      if (!existente) {
-        await context.supabase.from("receita_influenciada").insert({
-          owner_id: ownerId,
-          ordem_id: ordem.id,
-          cliente_id: ordem.cliente_id,
-          origem: "CAMPANHA",
-          valor: Number(ordem.valor ?? 0),
-          descricao: `Conversao de campanha: ${(alvo.campanhas as any)?.nome ?? "Campanha"}`,
-          referencia_tipo: "campanha_alvo",
-          referencia_id: alvo.id,
-          metadata: {
-            campanha_id: alvo.campanha_id,
-            campanha_nome: (alvo.campanhas as any)?.nome ?? null,
-            campanha_tipo: (alvo.campanhas as any)?.tipo ?? null,
-          },
-        } as any);
+    for (const ordem of ordens ?? []) {
+      const res = await atribuirConversaoCampanha(context.supabase, ownerId, {
+        id: ordem.id,
+        cliente_id: ordem.cliente_id,
+        valor: ordem.valor,
+        referencia: (ordem as any).entregue_em ?? ordem.created_at,
+      });
+      if (res.atribuido) {
+        convertidos += 1;
+        receita += res.valor ?? 0;
       }
-      await context.supabase
-        .from("campanha_alvos")
-        .update({ status: "convertido", converted_at: ordem.created_at } as any)
-        .eq("id", alvo.id)
-        .eq("owner_id", ownerId);
-      convertidos += 1;
-      receita += Number(ordem.valor ?? 0);
     }
-
     return { convertidos, receita };
   });
 
