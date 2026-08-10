@@ -7,12 +7,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { EmptyState } from "@/components/empty-state";
-import { getRelatoriosExecutivos } from "@/lib/lavaflow.functions";
+import { getRelatoriosExecutivos, getInsights } from "@/lib/lavaflow.functions";
 import { brl, pct } from "@/lib/format";
 import { RequireRole } from "@/components/require-role";
 import { GESTAO } from "@/lib/rbac";
+import { useFeature } from "@/hooks/use-entitlement";
 import {
-  BarChart3, CalendarDays, Car, CreditCard, DollarSign, Repeat,
+  BarChart3, CalendarDays, Car, CreditCard, DollarSign, Lock, Repeat,
   Sparkles, TrendingUp, UserPlus, Users,
 } from "lucide-react";
 
@@ -22,7 +23,15 @@ export const Route = createFileRoute("/_authenticated/relatorios")({
 
 function Page() {
   const fn = useServerFn(getRelatoriosExecutivos);
+  const insightsFn = useServerFn(getInsights);
+  const { allowed: canUseInsights, isLoading: checkingInsights } = useFeature("analises_inteligentes");
   const { data, isLoading } = useQuery({ queryKey: ["relatorios-executivos"], queryFn: () => fn() });
+  const { data: insightsData, isLoading: loadingInsights } = useQuery({
+    queryKey: ["intelligence-insights"],
+    queryFn: () => insightsFn(),
+    enabled: canUseInsights && !checkingInsights,
+    retry: false,
+  });
 
   return (
     <>
@@ -52,6 +61,63 @@ function Page() {
             <Kpi icon={Users} label="Retencao 90d" value={pct(data.cards.retencao, 0)} tone={data.cards.retencao >= 0.45 ? "success" : "warning"} />
           </div>
 
+          {checkingInsights ? (
+            <div className="h-36 rounded-2xl skeleton-shimmer" />
+          ) : canUseInsights ? (
+            <Card className="border-primary/30 bg-primary/5">
+              <CardContent className="p-5">
+                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-primary" />
+                      <h2 className="font-display font-semibold">Intelligence · Análises inteligentes</h2>
+                    </div>
+                    <p className="mt-1 text-sm text-muted-foreground">Sinais detectados automaticamente nos últimos 60 dias da operação.</p>
+                  </div>
+                  <Badge variant="secondary" className="w-fit">Intelligence</Badge>
+                </div>
+
+                {loadingInsights ? (
+                  <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                    {[1, 2, 3].map((item) => <div key={item} className="h-28 rounded-xl skeleton-shimmer" />)}
+                  </div>
+                ) : (
+                  <div className="mt-4 grid gap-3 lg:grid-cols-3">
+                    {(insightsData?.insights ?? []).map((insight) => (
+                      <div key={insight.id} className="rounded-2xl border bg-card/80 p-4">
+                        <Badge variant={insight.tipo === "alerta" ? "destructive" : "secondary"} className="mb-2">
+                          {insight.tipo === "positivo" ? "Oportunidade" : insight.tipo === "alerta" ? "Atenção" : "Insight"}
+                        </Badge>
+                        <p className="font-display font-semibold">{insight.titulo}</p>
+                        <p className="mt-1 text-sm text-muted-foreground">{insight.descricao}</p>
+                        {insight.acao && <p className="mt-2 text-xs font-medium text-primary">Sugestão: {insight.acao}</p>}
+                      </div>
+                    ))}
+                    {(insightsData?.insights ?? []).length === 0 && (
+                      <div className="rounded-2xl border bg-card/80 p-4 lg:col-span-3">
+                        <p className="text-sm text-muted-foreground">Ainda não há dados suficientes para gerar análises inteligentes.</p>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-dashed">
+              <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <div className="grid h-10 w-10 shrink-0 place-content-center rounded-xl bg-muted text-muted-foreground">
+                    <Lock className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <h2 className="font-display font-semibold">Análises inteligentes</h2>
+                    <p className="mt-1 text-sm text-muted-foreground">O plano Intelligence identifica padrões, dias fracos e oportunidades automaticamente.</p>
+                  </div>
+                </div>
+                <Button asChild size="sm" variant="outline" className="shrink-0"><Link to="/planos">Conhecer Intelligence</Link></Button>
+              </CardContent>
+            </Card>
+          )}
 
           <Card className="border-success/30 bg-success/5">
             <CardContent className="p-4">
