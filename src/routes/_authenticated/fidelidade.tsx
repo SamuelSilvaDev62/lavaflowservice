@@ -1,3 +1,4 @@
+import { FeatureGate } from "@/components/feature-gate";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -16,7 +17,7 @@ import { RequireRole } from "@/components/require-role";
 import { ADMINS } from "@/lib/rbac";
 
 export const Route = createFileRoute("/_authenticated/fidelidade")({
-  component: () => <RequireRole roles={ADMINS}><Page /></RequireRole>,
+  component: () => <RequireRole roles={ADMINS}><FeatureGate feature="fidelidade"><Page /></FeatureGate></RequireRole>,
 });
 
 function Page() {

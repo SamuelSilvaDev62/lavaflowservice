@@ -22,6 +22,7 @@ import { toast } from "sonner";
 import { RequireRole } from "@/components/require-role";
 import { ImageUploadField } from "@/components/image-upload-field";
 import { ADMINS } from "@/lib/rbac";
+import { AssinaturaTab } from "@/components/configuracoes/assinatura-tab";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   component: () => <RequireRole roles={ADMINS}><Page /></RequireRole>,
@@ -39,6 +40,7 @@ function Page() {
           <TabsTrigger value="agenda">Agenda</TabsTrigger>
           <TabsTrigger value="membros">Membros e papéis</TabsTrigger>
           <TabsTrigger value="msg">Mensagens</TabsTrigger>
+          <TabsTrigger value="assinatura">Assinatura</TabsTrigger>
         </TabsList>
         <TabsContent value="empresa"><EmpresaTab /></TabsContent>
         <TabsContent value="servicos"><ServicosTab /></TabsContent>
@@ -46,6 +48,7 @@ function Page() {
         <TabsContent value="agenda"><AgendaTab /></TabsContent>
         <TabsContent value="membros"><MembrosTab /></TabsContent>
         <TabsContent value="msg"><MsgTab /></TabsContent>
+        <TabsContent value="assinatura"><AssinaturaTab /></TabsContent>
       </Tabs>
     </>
   );

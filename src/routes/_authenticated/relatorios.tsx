@@ -1,3 +1,4 @@
+import { FeatureGate } from "@/components/feature-gate";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -16,7 +17,7 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
-  component: () => <RequireRole roles={GESTAO}><Page /></RequireRole>,
+  component: () => <RequireRole roles={GESTAO}><FeatureGate feature="relatorios_avancados"><Page /></FeatureGate></RequireRole>,
 });
 
 function Page() {

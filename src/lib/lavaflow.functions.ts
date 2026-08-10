@@ -963,6 +963,7 @@ export const getOportunidades = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
+    await assertPlanFeature(ownerId, "oportunidades");
     const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
 
     const [{ data: clientes }, { data: ordens }] = await Promise.all([
@@ -1020,6 +1021,7 @@ export const getInsights = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
+    await assertPlanFeature(ownerId, "analises_inteligentes");
     const sixtyAgo = new Date(Date.now() - 60 * 86_400_000).toISOString();
     const { data: ordens } = await supabase
       .from("ordens_servico")
@@ -1273,6 +1275,7 @@ export const getClienteInativos = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
+    await assertPlanFeature(ownerId, "clientes_inativos");
     const { data: clientes } = await supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", ownerId);
     const { data: ordens } = await supabase.from("ordens_servico").select("cliente_id, created_at").eq("owner_id", ownerId);
     const last = new Map<string, string>();
@@ -1452,6 +1455,7 @@ export const getCampanhas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "campanhas");
     const [{ data: campanhas }, sugestoesData] = await Promise.all([
       context.supabase.from("campanhas").select("*").eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(100),
       getCampanhaSugestoesData(context.supabase, ownerId),
@@ -1503,6 +1507,7 @@ export const criarCampanhaInteligente = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "campanhas");
     const sugestoes = await getCampanhaSugestoesData(context.supabase, ownerId);
     const sugestao = sugestoes.sugestoes.find((s: any) => s.tipo === data.tipo);
     if (!sugestao || sugestao.alvos.length === 0) throw new Error("Nao ha alvos disponiveis para esta campanha.");
@@ -1599,6 +1604,7 @@ export const marcarCampanhaAlvoEnviado = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "campanhas");
     const { error } = await context.supabase.from("campanha_alvos").update({ status: "enviado", sent_at: new Date().toISOString() } as any).eq("id", data.id).eq("owner_id", ownerId);
     if (error) throw error;
     return { ok: true };
@@ -1609,6 +1615,7 @@ export const processarConversoesCampanhas = createServerFn({ method: "POST" })
   .handler(async ({ context }) => {
     // Fallback tecnico: a atribuicao normal acontece automaticamente na entrega da OS.
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "campanhas");
     const desde = new Date(Date.now() - CAMPANHA_JANELA_DIAS * 86_400_000).toISOString();
     const { data: ordens } = await context.supabase
       .from("ordens_servico")
@@ -1772,6 +1779,7 @@ export const getAssinaturas = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "assinaturas");
     assertTenantRole(role, GESTAO_ROLES);
     const [{ data: planos }, { data: todas }, { data: emp }] = await Promise.all([
       context.supabase.from("planos_assinatura").select("*").eq("owner_id", ownerId).order("valor_mensal"),
@@ -1815,6 +1823,7 @@ export const upsertPlano = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "assinaturas");
     assertTenantRole(role, GESTAO_ROLES);
     const row: any = { ...data, owner_id: ownerId };
     if (!data.id) {
@@ -1903,6 +1912,7 @@ export const confirmarPagamentoAssinatura = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid(), gateway_ref: z.string().max(120).optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "assinaturas");
     assertTenantRole(role, GESTAO_ROLES);
     const proxima = new Date(); proxima.setDate(proxima.getDate() + 30);
     const { error } = await context.supabase.from("assinaturas_clientes").update({
@@ -1921,6 +1931,7 @@ export const cancelarAssinatura = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid() }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "assinaturas");
     assertTenantRole(role, GESTAO_ROLES);
     const { error } = await context.supabase.from("assinaturas_clientes")
       .update({ status: "cancelada" as any })
@@ -1934,6 +1945,7 @@ export const getFidelidade = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "fidelidade");
     const [{ data: cfg }, { data: recompensas }, { data: top }] = await Promise.all([
       context.supabase.from("fidelidade_config").select("*").eq("owner_id", ownerId).maybeSingle(),
       context.supabase.from("recompensas").select("*").eq("owner_id", ownerId).order("custo_pontos"),
@@ -1950,6 +1962,7 @@ export const updateFidelidadeConfig = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "fidelidade");
     const { error } = await context.supabase.from("fidelidade_config").upsert({ ...data, owner_id: ownerId }, { onConflict: "owner_id" });
     if (error) throw error;
     return { ok: true };
@@ -1965,6 +1978,7 @@ export const upsertRecompensa = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "fidelidade");
     const row = { ...data, owner_id: ownerId };
     const { error } = data.id
       ? await context.supabase.from("recompensas").update(row).eq("id", data.id).eq("owner_id", ownerId)
@@ -1999,6 +2013,42 @@ export const updateEmpresa = createServerFn({ method: "POST" })
     const { error } = await context.supabase.from("empresa").upsert({ ...data, owner_id: ownerId }, { onConflict: "owner_id" });
     if (error) throw error;
     return { ok: true };
+  });
+
+// Link público do estabelecimento (slug). Único por tenant, estável.
+function normalizeSlug(input: string) {
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export const atualizarSlugPublico = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ slug: z.string().min(3).max(60) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    assertTenantRole(role, ADMIN_ROLES, "Apenas o proprietario ou administrador pode alterar o link publico.");
+
+    const slug = normalizeSlug(data.slug);
+    if (slug.length < 3) throw new Error("Use ao menos 3 caracteres validos (letras, numeros e hifens).");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existente } = await supabaseAdmin
+      .from("empresa")
+      .select("owner_id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (existente && existente.owner_id !== ownerId) {
+      throw new Error("Este link ja esta em uso por outro estabelecimento.");
+    }
+
+    const { error } = await context.supabase.from("empresa").update({ slug }).eq("owner_id", ownerId);
+    if (error) throw error;
+    return { slug };
   });
 
 // ============ RELATÓRIOS ============
@@ -2205,6 +2255,7 @@ export const getRelatoriosExecutivos = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
+    await assertPlanFeature(ownerId, "relatorios_avancados");
     const now = new Date();
     const startMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString();
     const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
@@ -2307,10 +2358,17 @@ export const getReceitaInfluenciada = createServerFn({ method: "GET" })
   .inputValidator((d: { periodo?: string; inicio?: string; fim?: string } | undefined) => d ?? {})
   .handler(async ({ data, context }) => {
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "relatorios_avancados");
     return getReceitaInfluenciadaData(context.supabase, ownerId, data);
   });
 
 // ============ ESCOPO DO TENANT ============
+/** Gate de plano no backend: bloqueia recurso premium mesmo em chamada direta. */
+async function assertPlanFeature(ownerId: string, feature: import("@/lib/plans").FeatureKey) {
+  const { assertFeature } = await import("@/lib/entitlements.server");
+  return assertFeature(ownerId, feature);
+}
+
 async function getOwnerScope(supabase: any, userId: string) {
   const { data } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
   const priority: Record<TenantRole, number> = {
@@ -2970,6 +3028,7 @@ export const atualizarUpsellOportunidade = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    await assertPlanFeature(ownerId, "oportunidades");
     const { error, data: oportunidade } = await context.supabase
       .from("os_upsell_oportunidades")
       .update({ status: data.status, updated_at: new Date().toISOString() } as any)
@@ -4105,6 +4164,7 @@ export const getExtratoFidelidade = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
+    await assertPlanFeature(ownerId, "fidelidade");
     const [{ data: cliente }, { data: movs }, { data: recompensas }] = await Promise.all([
       supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("id", data.clienteId).eq("owner_id", ownerId).single(),
       supabase.from("pontos_movimentos")
@@ -4128,6 +4188,7 @@ export const getClientesComRecompensa = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
+    await assertPlanFeature(ownerId, "fidelidade");
     const [{ data: recompensas }, { data: clientes }, { data: ordens }] = await Promise.all([
       supabase.from("recompensas").select("id, nome, custo_pontos").eq("owner_id", ownerId).eq("ativo", true).order("custo_pontos"),
       supabase.from("clientes").select("id, nome, telefone, pontos_saldo").eq("owner_id", ownerId),
@@ -4160,6 +4221,7 @@ export const getCrescimentoKPIs = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
+    await assertPlanFeature(ownerId, "relatorios_avancados");
     const now = Date.now();
     const startOfMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1).getTime();
 

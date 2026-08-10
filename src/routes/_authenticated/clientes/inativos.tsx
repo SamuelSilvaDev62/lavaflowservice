@@ -1,3 +1,4 @@
+import { FeatureGate } from "@/components/feature-gate";
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -14,7 +15,11 @@ import { MessageCircle, Settings2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/clientes/inativos")({
-  component: Page,
+  component: () => (
+    <FeatureGate feature="clientes_inativos">
+      <Page />
+    </FeatureGate>
+  ),
 });
 
 const tabs = [

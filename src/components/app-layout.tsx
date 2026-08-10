@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  Sparkles,
   Image as ImageIcon,
   Users,
   UsersRound,
@@ -27,8 +28,10 @@ import { GuidedTour } from "@/components/guided-tour";
 import { OperationalAlerts } from "@/components/operational-alerts";
 import { useRole } from "@/hooks/use-role";
 import { ADMINS, GESTAO, OPERACIONAL, type AppRole, ROLE_LABELS } from "@/lib/rbac";
+import { useEntitlement } from "@/hooks/use-entitlement";
+import type { FeatureKey } from "@/lib/plans";
 
-type NavItem = { to: string; label: string; icon: any; tour?: string; roles: AppRole[] };
+type NavItem = { to: string; label: string; icon: any; tour?: string; roles: AppRole[]; feature?: FeatureKey };
 type NavGroup = { label: string; items: NavItem[] };
 
 const groupsAll: NavGroup[] = [
@@ -40,13 +43,14 @@ const groupsAll: NavGroup[] = [
   ]},
   { label: "Relacionamento", items: [
     { to: "/clientes", label: "Clientes", icon: Users, tour: "clientes", roles: OPERACIONAL },
-    { to: "/fidelidade", label: "Fidelidade", icon: Award, roles: ADMINS },
-    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: GESTAO },
-    { to: "/campanhas", label: "Campanhas", icon: Megaphone, roles: GESTAO },
+    { to: "/fidelidade", label: "Fidelidade", icon: Award, roles: ADMINS, feature: "fidelidade" },
+    { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: GESTAO, feature: "assinaturas" },
+    { to: "/campanhas", label: "Campanhas", icon: Megaphone, roles: GESTAO, feature: "campanhas" },
   ]},
   { label: "Gestão", items: [
     { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },
     { to: "/relatorios", label: "Relatórios", icon: BarChart3, roles: GESTAO },
+    { to: "/planos", label: "Planos", icon: Sparkles, roles: ADMINS },
     { to: "/midia", label: "Mídia", icon: ImageIcon, roles: ADMINS },
     { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
   ]},
@@ -60,13 +64,18 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const { role } = useRole();
+  const { can, isLoading: loadingPlano } = useEntitlement();
 
   useEffect(() => setOpen(false), [pathname]);
 
   const groups: NavGroup[] = groupsAll
     .map((g) => ({
       ...g,
-      items: g.items.filter((it) => !role || it.roles.includes(role)),
+      items: g.items.filter(
+        (it) =>
+          (!role || it.roles.includes(role)) &&
+          (!it.feature || loadingPlano || can(it.feature)),
+      ),
     }))
     .filter((g) => g.items.length > 0);
 

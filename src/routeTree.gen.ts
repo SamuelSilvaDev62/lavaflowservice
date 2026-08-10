@@ -20,6 +20,7 @@ import { Route as PlanoSlugRouteImport } from './routes/plano.$slug'
 import { Route as EquipeSlugRouteImport } from './routes/equipe.$slug'
 import { Route as AgendarSlugRouteImport } from './routes/agendar.$slug'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
+import { Route as AuthenticatedPlanosRouteImport } from './routes/_authenticated/planos'
 import { Route as AuthenticatedOrdensRouteImport } from './routes/_authenticated/ordens'
 import { Route as AuthenticatedOportunidadesRouteImport } from './routes/_authenticated/oportunidades'
 import { Route as AuthenticatedMidiaRouteImport } from './routes/_authenticated/midia'
@@ -32,6 +33,7 @@ import { Route as AuthenticatedCampanhasRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAssinaturasRouteImport } from './routes/_authenticated/assinaturas'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes/index'
+import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe-webhook'
 import { Route as AuthenticatedClientesInativosRouteImport } from './routes/_authenticated/clientes/inativos'
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes/$id'
 
@@ -87,6 +89,11 @@ const AgendarSlugRoute = AgendarSlugRouteImport.update({
 const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPlanosRoute = AuthenticatedPlanosRouteImport.update({
+  id: '/planos',
+  path: '/planos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedOrdensRoute = AuthenticatedOrdensRouteImport.update({
@@ -154,6 +161,11 @@ const AuthenticatedClientesIndexRoute =
     path: '/clientes/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
+  id: '/api/public/stripe-webhook',
+  path: '/api/public/stripe-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedClientesInativosRoute =
   AuthenticatedClientesInativosRouteImport.update({
     id: '/clientes/inativos',
@@ -184,12 +196,14 @@ export interface FileRoutesByFullPath {
   '/midia': typeof AuthenticatedMidiaRoute
   '/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/ordens': typeof AuthenticatedOrdensRoute
+  '/planos': typeof AuthenticatedPlanosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
+  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
   '/clientes/': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -210,12 +224,14 @@ export interface FileRoutesByTo {
   '/midia': typeof AuthenticatedMidiaRoute
   '/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/ordens': typeof AuthenticatedOrdensRoute
+  '/planos': typeof AuthenticatedPlanosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
+  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
   '/clientes': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRoutesById {
@@ -238,12 +254,14 @@ export interface FileRoutesById {
   '/_authenticated/midia': typeof AuthenticatedMidiaRoute
   '/_authenticated/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/_authenticated/ordens': typeof AuthenticatedOrdensRoute
+  '/_authenticated/planos': typeof AuthenticatedPlanosRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/_authenticated/clientes/inativos': typeof AuthenticatedClientesInativosRoute
+  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
   '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRouteTypes {
@@ -266,12 +284,14 @@ export interface FileRouteTypes {
     | '/midia'
     | '/oportunidades'
     | '/ordens'
+    | '/planos'
     | '/relatorios'
     | '/agendar/$slug'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/clientes/$id'
     | '/clientes/inativos'
+    | '/api/public/stripe-webhook'
     | '/clientes/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -292,12 +312,14 @@ export interface FileRouteTypes {
     | '/midia'
     | '/oportunidades'
     | '/ordens'
+    | '/planos'
     | '/relatorios'
     | '/agendar/$slug'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/clientes/$id'
     | '/clientes/inativos'
+    | '/api/public/stripe-webhook'
     | '/clientes'
   id:
     | '__root__'
@@ -319,12 +341,14 @@ export interface FileRouteTypes {
     | '/_authenticated/midia'
     | '/_authenticated/oportunidades'
     | '/_authenticated/ordens'
+    | '/_authenticated/planos'
     | '/_authenticated/relatorios'
     | '/agendar/$slug'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/inativos'
+    | '/api/public/stripe-webhook'
     | '/_authenticated/clientes/'
   fileRoutesById: FileRoutesById
 }
@@ -339,6 +363,7 @@ export interface RootRouteChildren {
   AgendarSlugRoute: typeof AgendarSlugRoute
   EquipeSlugRoute: typeof EquipeSlugRoute
   PlanoSlugRoute: typeof PlanoSlugRoute
+  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -418,6 +443,13 @@ declare module '@tanstack/react-router' {
       path: '/relatorios'
       fullPath: '/relatorios'
       preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/planos': {
+      id: '/_authenticated/planos'
+      path: '/planos'
+      fullPath: '/planos'
+      preLoaderRoute: typeof AuthenticatedPlanosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ordens': {
@@ -504,6 +536,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/stripe-webhook': {
+      id: '/api/public/stripe-webhook'
+      path: '/api/public/stripe-webhook'
+      fullPath: '/api/public/stripe-webhook'
+      preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/clientes/inativos': {
       id: '/_authenticated/clientes/inativos'
       path: '/clientes/inativos'
@@ -533,6 +572,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMidiaRoute: typeof AuthenticatedMidiaRoute
   AuthenticatedOportunidadesRoute: typeof AuthenticatedOportunidadesRoute
   AuthenticatedOrdensRoute: typeof AuthenticatedOrdensRoute
+  AuthenticatedPlanosRoute: typeof AuthenticatedPlanosRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRoute
   AuthenticatedClientesInativosRoute: typeof AuthenticatedClientesInativosRoute
@@ -551,6 +591,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMidiaRoute: AuthenticatedMidiaRoute,
   AuthenticatedOportunidadesRoute: AuthenticatedOportunidadesRoute,
   AuthenticatedOrdensRoute: AuthenticatedOrdensRoute,
+  AuthenticatedPlanosRoute: AuthenticatedPlanosRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedClientesIdRoute: AuthenticatedClientesIdRoute,
   AuthenticatedClientesInativosRoute: AuthenticatedClientesInativosRoute,
@@ -571,6 +612,7 @@ const rootRouteChildren: RootRouteChildren = {
   AgendarSlugRoute: AgendarSlugRoute,
   EquipeSlugRoute: EquipeSlugRoute,
   PlanoSlugRoute: PlanoSlugRoute,
+  ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { FeatureGate } from "@/components/feature-gate";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -15,7 +16,7 @@ import { ArrowLeft, Check, ChevronRight, MessageCircle, Megaphone, Play, Sparkle
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/_authenticated/campanhas")({
-  component: () => <RequireRole roles={GESTAO}><Page /></RequireRole>,
+  component: () => <RequireRole roles={GESTAO}><FeatureGate feature="campanhas"><Page /></FeatureGate></RequireRole>,
 });
 
 const tipoLabel: Record<string, string> = {
