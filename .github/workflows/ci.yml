@@ -28,8 +28,10 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Typecheck
-        run: bunx tsc --noEmit
-
+      # TanStack Router regenerates src/routeTree.gen.ts during Vite build.
+      # Build first so newly added file routes are present before standalone tsc.
       - name: Production build
         run: bun run build
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
