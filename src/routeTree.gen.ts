@@ -20,6 +20,7 @@ import { Route as PlanoSlugRouteImport } from './routes/plano.$slug'
 import { Route as EquipeSlugRouteImport } from './routes/equipe.$slug'
 import { Route as AgendarSlugRouteImport } from './routes/agendar.$slug'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
+import { Route as AuthenticatedPlanosRouteImport } from './routes/_authenticated/planos'
 import { Route as AuthenticatedOrdensRouteImport } from './routes/_authenticated/ordens'
 import { Route as AuthenticatedOportunidadesRouteImport } from './routes/_authenticated/oportunidades'
 import { Route as AuthenticatedMidiaRouteImport } from './routes/_authenticated/midia'
@@ -88,6 +89,11 @@ const AgendarSlugRoute = AgendarSlugRouteImport.update({
 const AuthenticatedRelatoriosRoute = AuthenticatedRelatoriosRouteImport.update({
   id: '/relatorios',
   path: '/relatorios',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedPlanosRoute = AuthenticatedPlanosRouteImport.update({
+  id: '/planos',
+  path: '/planos',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
 const AuthenticatedOrdensRoute = AuthenticatedOrdensRouteImport.update({
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/midia': typeof AuthenticatedMidiaRoute
   '/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/ordens': typeof AuthenticatedOrdensRoute
+  '/planos': typeof AuthenticatedPlanosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/equipe/$slug': typeof EquipeSlugRoute
@@ -217,6 +224,7 @@ export interface FileRoutesByTo {
   '/midia': typeof AuthenticatedMidiaRoute
   '/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/ordens': typeof AuthenticatedOrdensRoute
+  '/planos': typeof AuthenticatedPlanosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/equipe/$slug': typeof EquipeSlugRoute
@@ -246,6 +254,7 @@ export interface FileRoutesById {
   '/_authenticated/midia': typeof AuthenticatedMidiaRoute
   '/_authenticated/oportunidades': typeof AuthenticatedOportunidadesRoute
   '/_authenticated/ordens': typeof AuthenticatedOrdensRoute
+  '/_authenticated/planos': typeof AuthenticatedPlanosRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
   '/equipe/$slug': typeof EquipeSlugRoute
@@ -275,6 +284,7 @@ export interface FileRouteTypes {
     | '/midia'
     | '/oportunidades'
     | '/ordens'
+    | '/planos'
     | '/relatorios'
     | '/agendar/$slug'
     | '/equipe/$slug'
@@ -302,6 +312,7 @@ export interface FileRouteTypes {
     | '/midia'
     | '/oportunidades'
     | '/ordens'
+    | '/planos'
     | '/relatorios'
     | '/agendar/$slug'
     | '/equipe/$slug'
@@ -330,6 +341,7 @@ export interface FileRouteTypes {
     | '/_authenticated/midia'
     | '/_authenticated/oportunidades'
     | '/_authenticated/ordens'
+    | '/_authenticated/planos'
     | '/_authenticated/relatorios'
     | '/agendar/$slug'
     | '/equipe/$slug'
@@ -431,6 +443,13 @@ declare module '@tanstack/react-router' {
       path: '/relatorios'
       fullPath: '/relatorios'
       preLoaderRoute: typeof AuthenticatedRelatoriosRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/planos': {
+      id: '/_authenticated/planos'
+      path: '/planos'
+      fullPath: '/planos'
+      preLoaderRoute: typeof AuthenticatedPlanosRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
     '/_authenticated/ordens': {
@@ -553,6 +572,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedMidiaRoute: typeof AuthenticatedMidiaRoute
   AuthenticatedOportunidadesRoute: typeof AuthenticatedOportunidadesRoute
   AuthenticatedOrdensRoute: typeof AuthenticatedOrdensRoute
+  AuthenticatedPlanosRoute: typeof AuthenticatedPlanosRoute
   AuthenticatedRelatoriosRoute: typeof AuthenticatedRelatoriosRoute
   AuthenticatedClientesIdRoute: typeof AuthenticatedClientesIdRoute
   AuthenticatedClientesInativosRoute: typeof AuthenticatedClientesInativosRoute
@@ -571,6 +591,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedMidiaRoute: AuthenticatedMidiaRoute,
   AuthenticatedOportunidadesRoute: AuthenticatedOportunidadesRoute,
   AuthenticatedOrdensRoute: AuthenticatedOrdensRoute,
+  AuthenticatedPlanosRoute: AuthenticatedPlanosRoute,
   AuthenticatedRelatoriosRoute: AuthenticatedRelatoriosRoute,
   AuthenticatedClientesIdRoute: AuthenticatedClientesIdRoute,
   AuthenticatedClientesInativosRoute: AuthenticatedClientesInativosRoute,
