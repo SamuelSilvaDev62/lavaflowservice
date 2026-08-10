@@ -41,79 +41,81 @@ Acesso efetivo equivalente ao Intelligence enquanto a assinatura estiver válida
 | Assinatura/trial ativo para usar o app | ✅ `SubscriptionBoundary` global | ✅ middleware comercial exige entitlement ativo | Fechado |
 | Clientes / Agenda / OS / Fila / Equipe / Configurações | ✅ bloqueados globalmente sem plano | ✅ server functions com middleware padrão exigem assinatura/trial ativo | Fechado |
 | Billing / recuperação de assinatura | ✅ `/planos` continua acessível | ✅ `getMeuPlano`, Checkout e Portal usam middleware auth-only | Fechado |
-| Fidelidade | ✅ FeatureGate | ✅ `assertPlanFeature("fidelidade")` em leitura/escrita | Fechado |
+| Fidelidade | ✅ FeatureGate | ✅ `assertPlanFeature("fidelidade")` | Fechado |
 | Clientes inativos | ✅ FeatureGate + dashboard não consulta sem acesso | ✅ `assertPlanFeature("clientes_inativos")` | Fechado |
-| Campanhas | ✅ FeatureGate + menu | ✅ `assertPlanFeature("campanhas")` em leitura/escrita/processamento | Fechado |
+| Campanhas | ✅ FeatureGate + menu | ✅ `assertPlanFeature("campanhas")` | Fechado |
 | Assinaturas de serviços | ✅ FeatureGate + menu | ✅ `assertPlanFeature("assinaturas")` | Fechado |
 | Oportunidades | ✅ FeatureGate + menu + GESTAO | ✅ `assertPlanFeature("oportunidades")` | Fechado |
 | Relatórios avançados | ✅ FeatureGate + menu | ✅ `assertPlanFeature("relatorios_avancados")` | Fechado |
-| Análises inteligentes | ✅ bloco Intelligence dentro de Relatórios; Growth vê CTA de upgrade | ✅ `getInsights` exige `analises_inteligentes` | Fechado para a implementação atual |
-| WhatsApp automações | ⚠️ campanhas são Growth, mas os helpers de WhatsApp/manual não usam a feature dedicada | ⚠️ não há enforcement específico de `whatsapp_automacoes` | Parcial / definição de produto necessária |
-| Acompanhamento do cliente | ❌ não foi localizada rota/experiência dedicada atual | ❌ não foi localizado enforcement de `acompanhamento_cliente` | Gap de produto |
-| Assistente com IA | ❌ feature declarada e infraestrutura histórica existe, mas não há experiência atual localizada no app | ❌ não foi localizado enforcement de `ai_assistant` | Gap comercial — não prometer como pronto sem implementar |
-| Recomendações inteligentes | ⚠️ motor de upsell/regras existe em Configurações, porém não está protegido como Intelligence | ⚠️ `listUpsellRegras` / `upsertUpsellRegra` e `getSaudeNegocio` não possuem gate Intelligence | Gap de entitlement |
-| Founders | ✅ tratado como Intelligence e checkout separado dos cards públicos | ✅ oferta Founders só é aceita quando o tenant já está marcado no banco | Fechado |
+| Análises inteligentes | ✅ bloco Intelligence em Relatórios | ✅ `getInsights` exige `analises_inteligentes` | Fechado |
+| Assistente com IA | ✅ Consultor IA restaurado, menu e rota só Intelligence/Founders | ✅ endpoint autentica tenant/papel e exige `ai_assistant` antes do modelo | Implementado na branch; smoke test publicado pendente |
+| Recomendações inteligentes / Upsell | ⚠️ motor continua dentro de Configurações; UX de upgrade da aba pode ser refinada | ✅ migration exige Intelligence nas regras e oportunidades; trigger também bloqueia geração via service role | Backend fechado na branch; teste de migration pendente |
+| WhatsApp automações | ⚠️ campanhas são Growth, mas envio manual e automações ainda precisam ser separados conceitualmente | ⚠️ enforcement dedicado `whatsapp_automacoes` ainda não cobre todos os fluxos | P1 |
+| Acompanhamento do cliente | ❌ experiência dedicada não localizada | ❌ enforcement `acompanhamento_cliente` não localizado | P1 / definição de produto |
+| Founders | ✅ Intelligence efetivo + checkout separado dos cards públicos | ✅ oferta aceita apenas para tenant marcado `is_founders` | Fechado |
 
 ---
 
 ## Correções aplicadas nesta branch
 
-1. Criado `SubscriptionBoundary` no layout autenticado.
-   - Sem assinatura/trial válido, a operação não renderiza.
-   - `/planos` permanece acessível para regularização.
-   - Falha ao consultar entitlement fecha o acesso por segurança.
-   - Dados não são apagados.
+1. `SubscriptionBoundary` global e guard comercial central no backend.
+   - Sem assinatura/trial válido, a operação não renderiza e server functions operacionais não executam.
+   - `/planos`, consulta de assinatura, Checkout e Customer Portal permanecem disponíveis para recuperação.
 
-2. Criado guard comercial central no backend.
-   - `requireSupabaseAuth` agora autentica e consulta `get_my_subscription()` antes de permitir server functions operacionais.
-   - Trial válido, assinatura ativa e carência de pagamento continuam funcionando conforme `getEntitlement()`.
-   - Sem entitlement válido, o backend responde com erro HTTP conhecido e não executa a operação.
-   - Billing foi separado em `requireSupabaseAuthOnly`, portanto `getMeuPlano`, Checkout e Customer Portal continuam funcionando para uma conta sem plano e permitem recuperação da assinatura.
-   - Atenção de manutenção: `auth-middleware.ts` nasceu como arquivo gerado pelo Lovable; se for regenerado, preservar o guard comercial.
+2. Navegação e RBAC alinhados aos planos.
+   - Relatórios Growth+.
+   - Oportunidades Growth+ e papéis de gestão.
+   - Consultor IA aparece somente para Intelligence/Founders e papéis de gestão.
 
-3. Navegação alinhada aos planos.
-   - Relatórios agora só aparece para Growth+.
-   - Oportunidades passou a aparecer apenas para Growth+ e papéis de gestão.
+3. Intelligence ganhou valor visível.
+   - Análises inteligentes em Relatórios.
+   - Consultor LavaFlow IA restaurado com resumo executivo, health score, oportunidades priorizadas, plano de ação e chat.
+   - Chat consulta apenas dados do tenant e possui ferramentas server-side para clientes inativos, top clientes, dias da semana, serviços e apoio de mensagem.
+   - Endpoint verifica `ai_assistant` antes de qualquer chamada ao modelo e limita passos/rate de consultas.
 
-4. Oportunidades alinhado com RBAC.
-   - A rota agora exige `GESTAO` além do entitlement Growth.
+4. Recomendações/Upsell endurecidas.
+   - Nova função SQL `tenant_has_intelligence` considera Intelligence/Founders e validade comercial.
+   - RLS de `upsell_regras` e `os_upsell_oportunidades` exige Intelligence.
+   - Como o modo equipe usa service role, trigger no banco impede geração de oportunidade para plano inferior sem quebrar o checklist.
+   - Configuração de regra também recebe trigger de proteção.
 
-5. Intelligence passou a ter valor visível na UI atual.
-   - `getInsights`, que já era protegido no backend por `analises_inteligentes`, agora é consumido na tela de Relatórios.
-   - Growth vê o relatório normal e um card de upgrade para Intelligence.
-   - A consulta Intelligence só ocorre após confirmação do entitlement.
+5. Infra mínima de IA restaurada pela migration.
+   - `ai_usage_logs` para rate/observabilidade.
+   - `ai_recommendations` para persistir recomendações.
+   - Ambas tenant-aware, com RLS e exigência de Intelligence.
 
 6. Checkout Founders separado da seleção pública de planos.
-   - Essencial, Growth e Intelligence sempre enviam o plano que o usuário clicou.
-   - Uma conta elegível a Founders recebe um CTA próprio para o preço Founders.
-   - A oferta continua validada no backend pelo marcador `is_founders`; o cliente não consegue se autodeclarar Founder.
+   - Cards Essencial/Growth/Intelligence respeitam o plano clicado.
+   - Founders possui CTA próprio e continua sendo oferta interna.
 
-7. CI validado após o guard comercial.
-   - Install dependencies ✅
-   - Typecheck ✅
-   - Production build ✅
+7. CI ajustado para TanStack Router.
+   - Build roda antes do `tsc` para regenerar `routeTree.gen.ts` quando uma nova file route entra.
+   - Última validação: install ✅, production build ✅, typecheck ✅.
 
 ---
 
-## Bloqueadores antes de produção comercial
+## Antes de produção comercial
 
-### P0 — Recomendações / Upsell Intelligence
-Se o Motor de Upsell for parte de `recomendacoes`, adicionar gate `recomendacoes` tanto na UI de Configurações quanto em `listUpsellRegras`, `upsertUpsellRegra` e funções correlatas. Avaliar `getSaudeNegocio` como `analises_inteligentes` ou `recomendacoes` e protegê-lo no backend.
+### P0 — Smoke test do Intelligence publicado
+A implementação está na branch e compila, mas ainda não foi publicada. Antes do merge definitivo:
+- aplicar a migration nova em ambiente controlado;
+- validar Intelligence/Founders abrindo `/assistente`;
+- validar Growth/Essencial sem acesso ao Assistente/API;
+- testar GET do diagnóstico e uma conversa real pelo Lovable AI;
+- concluir checklist em Growth e confirmar que não gera upsell inteligente;
+- concluir checklist em Intelligence e confirmar que a oportunidade é criada.
 
-### P0 — Promessa do plano Intelligence
-A matriz comercial atualmente promete `Assistente com IA`. A experiência não foi localizada no código atual. A infraestrutura histórica (`ai_usage_logs`, `ai_recommendations`, `business_insights`, `flow_tasks`, `tenant_ai_settings`) existe, portanto há base para restaurar o recurso. Antes de vender Intelligence, escolher uma das duas opções:
-- implementar/restaurar a experiência do Assistente e proteger com `ai_assistant`; ou
-- remover temporariamente essa promessa da oferta até o recurso estar pronto.
-
-### P1 — Acompanhamento do cliente
-`acompanhamento_cliente` está declarado no Growth, mas não foi localizada uma experiência dedicada atual. Confirmar se a intenção é o acompanhamento público de OS/agendamento; implementar/restaurar e proteger, ou retirar temporariamente da matriz.
+### P0 — Customer Portal / ciclo de assinatura
+Validar upgrade, downgrade e cancelamento da Stripe e confirmar sincronização pelo webhook, incluindo bloqueio/liberação automática de features.
 
 ### P1 — WhatsApp
-Separar claramente:
-- envio manual via link/registro de interação (pode continuar operacional), e
-- automações de WhatsApp (Growth).
+Separar claramente envio manual (operação básica) de automações reais (Growth), aplicando `whatsapp_automacoes` somente às automações.
 
-Aplicar `whatsapp_automacoes` somente às automações reais para não bloquear comunicação manual básica indevidamente.
+### P1 — Acompanhamento do cliente
+Definir se `acompanhamento_cliente` representa o acompanhamento público de OS/agendamento. Implementar/restaurar e proteger ou retirar temporariamente da matriz comercial.
+
+### P1 — UX do Motor de Upsell
+O backend já está protegido; refinar a aba de Configurações para mostrar FeatureGate/CTA de Intelligence em vez de apenas depender do bloqueio do banco.
 
 ---
 
@@ -122,8 +124,9 @@ Aplicar `whatsapp_automacoes` somente às automações reais para não bloquear 
 - Checkout escolhe o Price ID correto para cada plano.
 - Webhook sincroniza criação, pagamento, upgrade, downgrade e cancelamento.
 - `tenant_subscriptions` é fonte de verdade comercial.
-- UI nunca monta recurso não autorizado.
+- UI não monta recurso não autorizado.
 - Backend rejeita chamada direta de recurso não autorizado.
-- Conta cancelada/expirada não opera, mas preserva dados e consegue acessar cobrança para reativar.
+- Conta cancelada/expirada não opera, preserva dados e consegue reativar.
 - Founders mantém acesso completo sem virar um quarto plano público.
-- Promessas exibidas na tela de planos correspondem a funcionalidades realmente disponíveis.
+- Intelligence entrega Assistente IA, análises e recomendações reais.
+- Promessas exibidas nos planos correspondem ao produto publicado.
