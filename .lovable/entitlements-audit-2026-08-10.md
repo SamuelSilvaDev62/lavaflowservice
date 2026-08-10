@@ -38,8 +38,9 @@ Acesso efetivo equivalente ao Intelligence enquanto a assinatura estiver válida
 
 | Área / feature | UI | Backend | Situação |
 |---|---|---|---|
-| Assinatura/trial ativo para usar o app | ✅ Boundary global | ⚠️ funções essenciais ainda não possuem guard global próprio | Parcial — UI fechada, hardening backend pendente |
-| Clientes / Agenda / OS / Fila / Equipe / Configurações | ✅ bloqueados globalmente sem plano | ⚠️ autorização de tenant/RBAC existe, mas falta guard comercial central para chamada direta | Parcial |
+| Assinatura/trial ativo para usar o app | ✅ `SubscriptionBoundary` global | ✅ middleware comercial exige entitlement ativo | Fechado |
+| Clientes / Agenda / OS / Fila / Equipe / Configurações | ✅ bloqueados globalmente sem plano | ✅ server functions com middleware padrão exigem assinatura/trial ativo | Fechado |
+| Billing / recuperação de assinatura | ✅ `/planos` continua acessível | ✅ `getMeuPlano`, Checkout e Portal usam middleware auth-only | Fechado |
 | Fidelidade | ✅ FeatureGate | ✅ `assertPlanFeature("fidelidade")` em leitura/escrita | Fechado |
 | Clientes inativos | ✅ FeatureGate + dashboard não consulta sem acesso | ✅ `assertPlanFeature("clientes_inativos")` | Fechado |
 | Campanhas | ✅ FeatureGate + menu | ✅ `assertPlanFeature("campanhas")` em leitura/escrita/processamento | Fechado |
@@ -49,7 +50,7 @@ Acesso efetivo equivalente ao Intelligence enquanto a assinatura estiver válida
 | Análises inteligentes | ✅ bloco Intelligence dentro de Relatórios; Growth vê CTA de upgrade | ✅ `getInsights` exige `analises_inteligentes` | Fechado para a implementação atual |
 | WhatsApp automações | ⚠️ campanhas são Growth, mas os helpers de WhatsApp/manual não usam a feature dedicada | ⚠️ não há enforcement específico de `whatsapp_automacoes` | Parcial / definição de produto necessária |
 | Acompanhamento do cliente | ❌ não foi localizada rota/experiência dedicada atual | ❌ não foi localizado enforcement de `acompanhamento_cliente` | Gap de produto |
-| Assistente com IA | ❌ feature declarada e migrations históricas existem, mas não há experiência atual localizada no app | ❌ não foi localizado enforcement de `ai_assistant` | Gap comercial — não prometer como pronto sem implementar |
+| Assistente com IA | ❌ feature declarada e infraestrutura histórica existe, mas não há experiência atual localizada no app | ❌ não foi localizado enforcement de `ai_assistant` | Gap comercial — não prometer como pronto sem implementar |
 | Recomendações inteligentes | ⚠️ motor de upsell/regras existe em Configurações, porém não está protegido como Intelligence | ⚠️ `listUpsellRegras` / `upsertUpsellRegra` e `getSaudeNegocio` não possuem gate Intelligence | Gap de entitlement |
 | Founders | ✅ tratado como Intelligence e checkout separado dos cards públicos | ✅ oferta Founders só é aceita quando o tenant já está marcado no banco | Fechado |
 
@@ -63,24 +64,32 @@ Acesso efetivo equivalente ao Intelligence enquanto a assinatura estiver válida
    - Falha ao consultar entitlement fecha o acesso por segurança.
    - Dados não são apagados.
 
-2. Navegação alinhada aos planos.
+2. Criado guard comercial central no backend.
+   - `requireSupabaseAuth` agora autentica e consulta `get_my_subscription()` antes de permitir server functions operacionais.
+   - Trial válido, assinatura ativa e carência de pagamento continuam funcionando conforme `getEntitlement()`.
+   - Sem entitlement válido, o backend responde com erro HTTP conhecido e não executa a operação.
+   - Billing foi separado em `requireSupabaseAuthOnly`, portanto `getMeuPlano`, Checkout e Customer Portal continuam funcionando para uma conta sem plano e permitem recuperação da assinatura.
+   - Atenção de manutenção: `auth-middleware.ts` nasceu como arquivo gerado pelo Lovable; se for regenerado, preservar o guard comercial.
+
+3. Navegação alinhada aos planos.
    - Relatórios agora só aparece para Growth+.
    - Oportunidades passou a aparecer apenas para Growth+ e papéis de gestão.
 
-3. Oportunidades alinhado com RBAC.
+4. Oportunidades alinhado com RBAC.
    - A rota agora exige `GESTAO` além do entitlement Growth.
 
-4. Intelligence passou a ter valor visível na UI atual.
+5. Intelligence passou a ter valor visível na UI atual.
    - `getInsights`, que já era protegido no backend por `analises_inteligentes`, agora é consumido na tela de Relatórios.
    - Growth vê o relatório normal e um card de upgrade para Intelligence.
    - A consulta Intelligence só ocorre após confirmação do entitlement.
 
-5. Checkout Founders separado da seleção pública de planos.
+6. Checkout Founders separado da seleção pública de planos.
    - Essencial, Growth e Intelligence sempre enviam o plano que o usuário clicou.
    - Uma conta elegível a Founders recebe um CTA próprio para o preço Founders.
    - A oferta continua validada no backend pelo marcador `is_founders`; o cliente não consegue se autodeclarar Founder.
 
-6. CI validado após as alterações estruturais.
+7. CI validado após o guard comercial.
+   - Install dependencies ✅
    - Typecheck ✅
    - Production build ✅
 
@@ -88,16 +97,11 @@ Acesso efetivo equivalente ao Intelligence enquanto a assinatura estiver válida
 
 ## Bloqueadores antes de produção comercial
 
-### P0 — Backend comercial para recursos Essencial
-O `SubscriptionBoundary` impede o uso normal pela interface, mas não substitui autorização server-side. Criar um guard/middleware de assinatura ativa para funções pagas da operação essencial, mantendo billing (`getMeuPlano`, checkout, portal) acessível para contas sem plano.
-
-Não acoplar essa regra cegamente ao `requireSupabaseAuth`, pois funções de cobrança também dependem desse middleware e precisam funcionar durante recuperação de assinatura.
-
 ### P0 — Recomendações / Upsell Intelligence
 Se o Motor de Upsell for parte de `recomendacoes`, adicionar gate `recomendacoes` tanto na UI de Configurações quanto em `listUpsellRegras`, `upsertUpsellRegra` e funções correlatas. Avaliar `getSaudeNegocio` como `analises_inteligentes` ou `recomendacoes` e protegê-lo no backend.
 
 ### P0 — Promessa do plano Intelligence
-A matriz comercial atualmente promete `Assistente com IA`. A experiência não foi localizada no código atual. Antes de vender Intelligence, escolher uma das duas opções:
+A matriz comercial atualmente promete `Assistente com IA`. A experiência não foi localizada no código atual. A infraestrutura histórica (`ai_usage_logs`, `ai_recommendations`, `business_insights`, `flow_tasks`, `tenant_ai_settings`) existe, portanto há base para restaurar o recurso. Antes de vender Intelligence, escolher uma das duas opções:
 - implementar/restaurar a experiência do Assistente e proteger com `ai_assistant`; ou
 - remover temporariamente essa promessa da oferta até o recurso estar pronto.
 
