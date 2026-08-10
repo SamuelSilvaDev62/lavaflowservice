@@ -1512,6 +1512,78 @@ export type Database = {
         }
         Relationships: []
       }
+      stripe_webhook_events: {
+        Row: {
+          created_at: string
+          id: string
+          owner_id: string | null
+          payload: Json
+          type: string
+        }
+        Insert: {
+          created_at?: string
+          id: string
+          owner_id?: string | null
+          payload?: Json
+          type: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          owner_id?: string | null
+          payload?: Json
+          type?: string
+        }
+        Relationships: []
+      }
+      tenant_subscriptions: {
+        Row: {
+          cancel_at_period_end: boolean
+          created_at: string
+          current_period_end: string | null
+          id: string
+          is_founders: boolean
+          owner_id: string
+          plan: Database["public"]["Enums"]["app_plan"] | null
+          stripe_customer_id: string | null
+          stripe_price_id: string | null
+          stripe_subscription_id: string | null
+          subscription_status: string
+          trial_ends_at: string | null
+          updated_at: string
+        }
+        Insert: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          is_founders?: boolean
+          owner_id: string
+          plan?: Database["public"]["Enums"]["app_plan"] | null
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Update: {
+          cancel_at_period_end?: boolean
+          created_at?: string
+          current_period_end?: string | null
+          id?: string
+          is_founders?: boolean
+          owner_id?: string
+          plan?: Database["public"]["Enums"]["app_plan"] | null
+          stripe_customer_id?: string | null
+          stripe_price_id?: string | null
+          stripe_subscription_id?: string | null
+          subscription_status?: string
+          trial_ends_at?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       upsell_regras: {
         Row: {
           ativo: boolean
@@ -1727,6 +1799,19 @@ export type Database = {
         }[]
       }
       get_my_funcionario_id: { Args: never; Returns: string }
+      get_my_subscription: {
+        Args: never
+        Returns: {
+          cancel_at_period_end: boolean
+          current_period_end: string
+          has_customer: boolean
+          is_founders: boolean
+          plan: string
+          stripe_price_id: string
+          subscription_status: string
+          trial_ends_at: string
+        }[]
+      }
       get_ocupacao_dia: {
         Args: { _data: string; _owner: string }
         Returns: {
@@ -1777,7 +1862,9 @@ export type Database = {
         }
         Returns: undefined
       }
+      slugify_public: { Args: { _input: string }; Returns: string }
       storage_path_owner: { Args: { _name: string }; Returns: string }
+      unaccent_fallback: { Args: { _input: string }; Returns: string }
       vincular_colaborador:
         | {
             Args: { _email: string; _funcionario_id: string }
@@ -1800,6 +1887,7 @@ export type Database = {
         | "concluido"
         | "cancelado"
         | "nao_compareceu"
+      app_plan: "essencial" | "growth" | "intelligence"
       app_role:
         | "owner"
         | "colaborador"
@@ -1962,6 +2050,7 @@ export const Constants = {
         "cancelado",
         "nao_compareceu",
       ],
+      app_plan: ["essencial", "growth", "intelligence"],
       app_role: [
         "owner",
         "colaborador",
