@@ -29,7 +29,8 @@ function PlanosPage() {
   const checkout = useServerFn(criarCheckoutAssinatura);
 
   const mut = useMutation({
-    mutationFn: (plan: PlanId) => checkout({ data: { plan, founders: entitlement.isFounders } }),
+    mutationFn: ({ plan, founders = false }: { plan: PlanId; founders?: boolean }) =>
+      checkout({ data: { plan, founders } }),
     onSuccess: (r: any) => {
       if (r?.url) window.location.href = r.url;
       else toast.error("Não foi possível abrir a cobrança.");
@@ -39,6 +40,7 @@ function PlanosPage() {
 
   const possuiAssinaturaStripe =
     entitlement.hasCustomer && !!entitlement.planoAssinado && entitlement.ativo;
+  const podeContratarFounders = entitlement.isFounders && !possuiAssinaturaStripe;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
@@ -67,6 +69,29 @@ function PlanosPage() {
         </Card>
       )}
 
+      {podeContratarFounders && (
+        <Card className="border-primary/50 bg-primary/5">
+          <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <Crown className="h-4 w-4 text-primary" />
+                <h2 className="font-display font-semibold">Sua oferta Founders está disponível</h2>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Acesso completo equivalente ao Intelligence por {brl(99)}/mês. Esta oferta não é um quarto plano público.
+              </p>
+            </div>
+            <Button
+              className="shrink-0"
+              disabled={mut.isPending || !stripeConfigurado}
+              onClick={() => mut.mutate({ plan: "intelligence", founders: true })}
+            >
+              {mut.isPending ? "Abrindo…" : "Assinar Founders · R$ 99"}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
       {possuiAssinaturaStripe && (
         <Card>
           <CardContent className="p-4 text-sm text-muted-foreground">
@@ -78,7 +103,7 @@ function PlanosPage() {
 
       <div className="grid gap-4 md:grid-cols-3">
         {PLANS.map((plano) => {
-          const atual = entitlement.planoAssinado === plano.id;
+          const atual = !entitlement.isFounders && entitlement.planoAssinado === plano.id;
           return (
             <Card
               key={plano.id}
@@ -113,7 +138,7 @@ function PlanosPage() {
                   className="w-full"
                   variant={plano.recomendado ? "default" : "outline"}
                   disabled={atual || mut.isPending || !stripeConfigurado}
-                  onClick={() => mut.mutate(plano.id)}
+                  onClick={() => mut.mutate({ plan: plano.id, founders: false })}
                 >
                   {atual
                     ? "Plano atual"
@@ -121,7 +146,7 @@ function PlanosPage() {
                       ? "Abrindo…"
                       : possuiAssinaturaStripe
                         ? "Gerenciar / trocar"
-                        : "Assinar"}
+                        : `Assinar ${plano.nome}`}
                 </Button>
               </CardContent>
             </Card>
