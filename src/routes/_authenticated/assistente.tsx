@@ -25,9 +25,7 @@ import MarkdownMessage from "@/components/markdown-message";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-// The generated route tree is refreshed by the TanStack Router Vite plugin during build.
-// The cast keeps standalone typecheck green in the short window before regeneration.
-export const Route = createFileRoute("/_authenticated/assistente" as any)({
+export const Route = createFileRoute("/_authenticated/assistente")({
   component: () => (
     <RequireRole roles={GESTAO}>
       <FeatureGate feature="ai_assistant">
