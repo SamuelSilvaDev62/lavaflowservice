@@ -4,6 +4,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const PLAN_IDS = ["essencial", "growth", "intelligence"] as const;
+const MANAGE_EXISTING_STATUSES = new Set(["active", "trialing", "past_due", "unpaid", "paused"]);
 
 function appOrigin(): string {
   const request = getRequest();
@@ -28,7 +29,11 @@ export const getMeuPlano = createServerFn({ method: "GET" })
     return { entitlement, role, stripeConfigurado: isStripeConfigured() };
   });
 
-/** Inicia o Checkout da Stripe (assinatura recorrente). Somente owner/admin. */
+/**
+ * Inicia o Checkout da Stripe para uma NOVA assinatura.
+ * Se o tenant já possui uma assinatura Stripe vigente, redireciona para o
+ * Customer Portal em vez de criar uma segunda assinatura para o mesmo cliente.
+ */
 export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ plan: z.enum(PLAN_IDS), founders: z.boolean().optional() }).parse(d))
@@ -43,9 +48,26 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sub } = await supabaseAdmin
       .from("tenant_subscriptions")
-      .select("stripe_customer_id, is_founders")
+      .select("stripe_customer_id, stripe_subscription_id, subscription_status, is_founders")
       .eq("owner_id", ownerId)
       .maybeSingle();
+
+    const origin = appOrigin();
+
+    // Uma assinatura Stripe existente deve ser alterada/gerenciada, nunca duplicada.
+    if (
+      sub?.stripe_customer_id &&
+      sub?.stripe_subscription_id &&
+      MANAGE_EXISTING_STATUSES.has(String(sub.subscription_status ?? ""))
+    ) {
+      const portal = await stripeRequest<{ url: string }>("/billing_portal/sessions", {
+        body: {
+          customer: sub.stripe_customer_id,
+          return_url: `${origin}/configuracoes?assinatura=gerenciada`,
+        },
+      });
+      return { url: portal.url, destination: "portal" as const };
+    }
 
     // Founders é oferta interna: só válida para quem já foi marcado no banco.
     const founders = !!sub?.is_founders && !!data.founders;
@@ -80,7 +102,6 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
         .upsert({ owner_id: ownerId, stripe_customer_id: customerId }, { onConflict: "owner_id" });
     }
 
-    const origin = appOrigin();
     const session = await stripeRequest<{ id: string; url: string }>("/checkout/sessions", {
       body: {
         mode: "subscription",
@@ -95,7 +116,7 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
       },
     });
 
-    return { url: session.url };
+    return { url: session.url, destination: "checkout" as const };
   });
 
 /** Abre o Customer Portal da Stripe para o tenant autenticado. */
