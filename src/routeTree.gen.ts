@@ -32,6 +32,7 @@ import { Route as AuthenticatedCampanhasRouteImport } from './routes/_authentica
 import { Route as AuthenticatedAssinaturasRouteImport } from './routes/_authenticated/assinaturas'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes/index'
+import { Route as ApiPublicStripeWebhookRouteImport } from './routes/api/public/stripe-webhook'
 import { Route as AuthenticatedClientesInativosRouteImport } from './routes/_authenticated/clientes/inativos'
 import { Route as AuthenticatedClientesIdRouteImport } from './routes/_authenticated/clientes/$id'
 
@@ -154,6 +155,11 @@ const AuthenticatedClientesIndexRoute =
     path: '/clientes/',
     getParentRoute: () => AuthenticatedRouteRoute,
   } as any)
+const ApiPublicStripeWebhookRoute = ApiPublicStripeWebhookRouteImport.update({
+  id: '/api/public/stripe-webhook',
+  path: '/api/public/stripe-webhook',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedClientesInativosRoute =
   AuthenticatedClientesInativosRouteImport.update({
     id: '/clientes/inativos',
@@ -190,6 +196,7 @@ export interface FileRoutesByFullPath {
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
+  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
   '/clientes/': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -216,6 +223,7 @@ export interface FileRoutesByTo {
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/clientes/inativos': typeof AuthenticatedClientesInativosRoute
+  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
   '/clientes': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRoutesById {
@@ -244,6 +252,7 @@ export interface FileRoutesById {
   '/plano/$slug': typeof PlanoSlugRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
   '/_authenticated/clientes/inativos': typeof AuthenticatedClientesInativosRoute
+  '/api/public/stripe-webhook': typeof ApiPublicStripeWebhookRoute
   '/_authenticated/clientes/': typeof AuthenticatedClientesIndexRoute
 }
 export interface FileRouteTypes {
@@ -272,6 +281,7 @@ export interface FileRouteTypes {
     | '/plano/$slug'
     | '/clientes/$id'
     | '/clientes/inativos'
+    | '/api/public/stripe-webhook'
     | '/clientes/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/plano/$slug'
     | '/clientes/$id'
     | '/clientes/inativos'
+    | '/api/public/stripe-webhook'
     | '/clientes'
   id:
     | '__root__'
@@ -325,6 +336,7 @@ export interface FileRouteTypes {
     | '/plano/$slug'
     | '/_authenticated/clientes/$id'
     | '/_authenticated/clientes/inativos'
+    | '/api/public/stripe-webhook'
     | '/_authenticated/clientes/'
   fileRoutesById: FileRoutesById
 }
@@ -339,6 +351,7 @@ export interface RootRouteChildren {
   AgendarSlugRoute: typeof AgendarSlugRoute
   EquipeSlugRoute: typeof EquipeSlugRoute
   PlanoSlugRoute: typeof PlanoSlugRoute
+  ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -504,6 +517,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedClientesIndexRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/stripe-webhook': {
+      id: '/api/public/stripe-webhook'
+      path: '/api/public/stripe-webhook'
+      fullPath: '/api/public/stripe-webhook'
+      preLoaderRoute: typeof ApiPublicStripeWebhookRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/clientes/inativos': {
       id: '/_authenticated/clientes/inativos'
       path: '/clientes/inativos'
@@ -571,17 +591,8 @@ const rootRouteChildren: RootRouteChildren = {
   AgendarSlugRoute: AgendarSlugRoute,
   EquipeSlugRoute: EquipeSlugRoute,
   PlanoSlugRoute: PlanoSlugRoute,
+  ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
