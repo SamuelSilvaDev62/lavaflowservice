@@ -114,7 +114,8 @@ async function saveRecommendations(supabase: any, ownerId: string, userId: strin
   if (error) console.warn("[assistente-recommendations]", error.message ?? error);
 }
 
-export const Route = createFileRoute("/api/assistente-chat")({
+// The route tree is regenerated during Vite build; keep standalone tsc tolerant beforehand.
+export const Route = createFileRoute("/api/assistente-chat" as any)({
   server: {
     handlers: {
       GET: async ({ request }) => {
