@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
-import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { requireSupabaseAuthOnly as requireSupabaseAuth } from "@/integrations/supabase/auth-only-middleware";
 
 const PLAN_IDS = ["essencial", "growth", "intelligence"] as const;
 const MANAGE_EXISTING_STATUSES = new Set(["active", "trialing", "past_due", "unpaid", "paused"]);
