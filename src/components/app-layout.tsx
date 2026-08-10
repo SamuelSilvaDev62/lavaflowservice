@@ -14,6 +14,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  Sparkles,
   Image as ImageIcon,
   Users,
   UsersRound,
