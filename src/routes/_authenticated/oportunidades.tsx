@@ -6,13 +6,15 @@ import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { RequireRole } from "@/components/require-role";
+import { GESTAO } from "@/lib/rbac";
 import { getOportunidades, getClientesComRecompensa } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import { waLink, getTemplate, renderTemplate, type WhatsAppTemplateKey } from "@/lib/whatsapp";
 import { MessageCircle, TrendingUp, Gift, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/oportunidades")({
-  component: () => <FeatureGate feature="oportunidades"><Page /></FeatureGate>,
+  component: () => <RequireRole roles={GESTAO}><FeatureGate feature="oportunidades"><Page /></FeatureGate></RequireRole>,
 });
 
 const prioColor: Record<number, string> = {
@@ -66,7 +68,6 @@ function Page() {
           <p className="text-sm text-muted-foreground mt-1">Nenhuma oportunidade pendente. Continue acompanhando.</p>
         </CardContent></Card>
       )}
-
 
       <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
         {data?.oportunidades.map((o) => {

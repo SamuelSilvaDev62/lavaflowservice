@@ -5,11 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/app-layout";
+import { useFeature } from "@/hooks/use-entitlement";
 import { getDashboardOperacional, getClienteInativos } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
 import {
   CalendarDays, Plus, UserPlus, Clock, AlertCircle, Play,
-  TrendingUp, Users, ArrowRight, CheckCircle2,
+  TrendingUp, Users, ArrowRight, CheckCircle2, Lock,
 } from "lucide-react";
 
 const KANBAN_COLS: { key: string; label: string }[] = [
@@ -29,6 +30,8 @@ function diffMin(hora: string) {
 export function Dashboard() {
   const fetchOps = useServerFn(getDashboardOperacional);
   const fetchInativos = useServerFn(getClienteInativos);
+  const { allowed: canUseInativos, isLoading: checkingInativos } = useFeature("clientes_inativos");
+
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-operacional"],
     queryFn: () => fetchOps(),
@@ -39,6 +42,9 @@ export function Dashboard() {
     queryKey: ["dashboard-inativos-30"],
     queryFn: () => fetchInativos({ data: { dias: 30 } }),
     staleTime: 5 * 60_000,
+    // Dashboard é Essencial; esta consulta é Growth. Nunca chamá-la antes de
+    // confirmar entitlement para não derrubar o dashboard com 403 esperado.
+    enabled: canUseInativos && !checkingInativos,
   });
 
   if (isLoading || !data) {
@@ -196,35 +202,56 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* 4. Reativação de clientes */}
-      <Card className="mt-4">
-        <CardContent className="p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            <h2 className="font-display font-semibold">Reativação de clientes</h2>
-          </div>
-          {totalReativar === 0 ? (
-            <div className="flex items-center gap-2 rounded-2xl bg-muted/30 p-3 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-success" />
-              Nenhum cliente inativo há mais de 30 dias. Bom trabalho.
+      {/* 4. Reativação de clientes — Growth */}
+      {checkingInativos ? (
+        <div className="mt-4 h-32 rounded-2xl skeleton-shimmer" />
+      ) : !canUseInativos ? (
+        <Card className="mt-4">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <div className="mb-1 flex items-center gap-2">
+                <Lock className="h-4 w-4 text-muted-foreground" />
+                <h2 className="font-display font-semibold">Reativação de clientes</h2>
+              </div>
+              <p className="text-sm text-muted-foreground">
+                Recuperação de clientes inativos faz parte do plano Growth.
+              </p>
             </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-3 gap-2">
-                <BucketCard label="+30 dias" value={bucket30} tone="warning" />
-                <BucketCard label="+60 dias" value={bucket60} tone="warning" />
-                <BucketCard label="+90 dias" value={bucket90} tone="destructive" />
+            <Button asChild size="sm" variant="outline" className="shrink-0">
+              <Link to="/planos">Ver planos <ArrowRight className="h-3 w-3" /></Link>
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <Card className="mt-4">
+          <CardContent className="p-4">
+            <div className="mb-3 flex items-center gap-2">
+              <Users className="h-4 w-4 text-primary" />
+              <h2 className="font-display font-semibold">Reativação de clientes</h2>
+            </div>
+            {totalReativar === 0 ? (
+              <div className="flex items-center gap-2 rounded-2xl bg-muted/30 p-3 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                Nenhum cliente inativo há mais de 30 dias. Bom trabalho.
               </div>
-              <div className="mt-3 flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">{totalReativar} clientes precisam de um empurrão.</p>
-                <Button asChild size="sm" variant="premium">
-                  <Link to="/clientes/inativos">Reativar clientes <ArrowRight className="h-3 w-3" /></Link>
-                </Button>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 gap-2">
+                  <BucketCard label="+30 dias" value={bucket30} tone="warning" />
+                  <BucketCard label="+60 dias" value={bucket60} tone="warning" />
+                  <BucketCard label="+90 dias" value={bucket90} tone="destructive" />
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <p className="text-xs text-muted-foreground">{totalReativar} clientes precisam de um empurrão.</p>
+                  <Button asChild size="sm" variant="premium">
+                    <Link to="/clientes/inativos">Reativar clientes <ArrowRight className="h-3 w-3" /></Link>
+                  </Button>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+      )}
     </>
   );
 }

@@ -37,6 +37,9 @@ export async function fetchEntitlement(supabase: any, ownerId: string): Promise<
 export class FeatureBlockedError extends Error {
   feature: FeatureKey;
   requiredPlan: string;
+  /** O middleware global preserva erros HTTP conhecidos em vez de renderizar HTML 500. */
+  statusCode = 403;
+
   constructor(feature: FeatureKey) {
     super(`Recurso não incluso no seu plano (${feature}). Faça upgrade para continuar.`);
     this.name = "FeatureBlockedError";

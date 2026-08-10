@@ -23,19 +23,16 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // Idempotência: evento já processado é ignorado.
-        const { error: dupErr } = await supabaseAdmin
+        // Idempotência: evento já processado é ignorado. Qualquer outro erro de
+        // banco retorna 500 para que a Stripe tente entregar o evento novamente.
+        const { error: eventInsertError } = await supabaseAdmin
           .from("stripe_webhook_events")
           .insert({ id: String(event.id), type: String(event.type ?? "unknown") });
-        if (dupErr) {
-          if ((dupErr as any).code === "23505" || String((dupErr as any).code) === "23505") {
-            return new Response("ok (duplicado)");
-          }
-          // 23505 = unique_violation; qualquer outro erro é real
-          if (String((dupErr as any).code) !== "23505") {
-            console.error("[stripe-webhook] falha ao registrar evento", dupErr);
-          }
-          return new Response("ok (duplicado)");
+        if (eventInsertError) {
+          const code = String((eventInsertError as any).code ?? "");
+          if (code === "23505") return new Response("ok (duplicado)");
+          console.error("[stripe-webhook] falha ao registrar evento", eventInsertError);
+          return new Response("Erro ao registrar evento", { status: 500 });
         }
 
         const prices = priceIdMap();
@@ -61,37 +58,44 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
         const applySubscription = async (subscription: any, ownerIdHint?: string | null) => {
           const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
           const ownerId = ownerIdHint ?? (await resolveOwnerId(subscription, customerId));
-          if (!ownerId) {
-            console.error("[stripe-webhook] owner_id não resolvido", subscription.id);
-            return;
-          }
+          if (!ownerId) throw new Error(`owner_id não resolvido para subscription ${subscription.id}`);
 
-          const priceId = subscription.items?.data?.[0]?.price?.id ?? null;
+          const item = subscription.items?.data?.[0];
+          const priceId = item?.price?.id ?? null;
           const mapped = priceId ? prices[priceId] : undefined;
-          const periodEndUnix = subscription.current_period_end ?? subscription.items?.data?.[0]?.current_period_end;
+          const periodEndUnix = subscription.current_period_end ?? item?.current_period_end;
           const status = String(subscription.status ?? "incomplete");
           // Cancelada/expirada: nunca apaga dados — apenas remove o entitlement.
           const encerrada = status === "canceled" || status === "incomplete_expired";
 
-          await supabaseAdmin.from("tenant_subscriptions").upsert(
+          // Em uma assinatura vigente, Price ID desconhecido é erro de configuração.
+          // Não removemos o plano silenciosamente: retornamos 500 para possibilitar
+          // correção dos secrets e retry do mesmo evento.
+          if (!encerrada && !mapped) {
+            throw new Error(`Stripe Price ID não reconhecido: ${priceId ?? "ausente"}`);
+          }
+
+          const { error } = await supabaseAdmin.from("tenant_subscriptions").upsert(
             {
               owner_id: ownerId,
               stripe_customer_id: customerId ?? null,
               stripe_subscription_id: subscription.id ?? null,
               stripe_price_id: priceId,
-              plan: encerrada ? null : (mapped?.plan ?? null),
-              is_founders: mapped?.founders ?? false,
+              plan: encerrada ? null : mapped!.plan,
+              is_founders: encerrada ? false : !!mapped?.founders,
               subscription_status: status,
               cancel_at_period_end: !!subscription.cancel_at_period_end,
               current_period_end: periodEndUnix ? new Date(Number(periodEndUnix) * 1000).toISOString() : null,
             },
             { onConflict: "owner_id" },
           );
+          if (error) throw error;
 
-          await supabaseAdmin
+          const { error: ownerEventError } = await supabaseAdmin
             .from("stripe_webhook_events")
             .update({ owner_id: ownerId })
             .eq("id", String(event.id));
+          if (ownerEventError) throw ownerEventError;
         };
 
         try {

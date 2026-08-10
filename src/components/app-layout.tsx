@@ -4,6 +4,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Award,
   BarChart3,
+  Bot,
   CalendarDays,
   Car,
   ClipboardList,
@@ -15,6 +16,7 @@ import {
   Menu,
   Settings,
   Sparkles,
+  TrendingUp,
   Image as ImageIcon,
   Users,
   UsersRound,
@@ -46,10 +48,14 @@ const groupsAll: NavGroup[] = [
     { to: "/fidelidade", label: "Fidelidade", icon: Award, roles: ADMINS, feature: "fidelidade" },
     { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: GESTAO, feature: "assinaturas" },
     { to: "/campanhas", label: "Campanhas", icon: Megaphone, roles: GESTAO, feature: "campanhas" },
+    { to: "/oportunidades", label: "Oportunidades", icon: TrendingUp, roles: GESTAO, feature: "oportunidades" },
+  ]},
+  { label: "Intelligence", items: [
+    { to: "/assistente", label: "Consultor IA", icon: Bot, roles: GESTAO, feature: "ai_assistant" },
   ]},
   { label: "Gestão", items: [
     { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },
-    { to: "/relatorios", label: "Relatórios", icon: BarChart3, roles: GESTAO },
+    { to: "/relatorios", label: "Relatórios", icon: BarChart3, roles: GESTAO, feature: "relatorios_avancados" },
     { to: "/planos", label: "Planos", icon: Sparkles, roles: ADMINS },
     { to: "/midia", label: "Mídia", icon: ImageIcon, roles: ADMINS },
     { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
@@ -187,7 +193,6 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </nav>
         );
       })()}
-
 
       <WelcomeModal />
       <GuidedTour />

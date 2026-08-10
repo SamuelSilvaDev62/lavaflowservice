@@ -1,0 +1,37 @@
+name: LavaFlow CI
+
+on:
+  push:
+    branches:
+      - main
+      - agent/**
+  pull_request:
+    branches:
+      - main
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # TanStack Router regenerates src/routeTree.gen.ts during Vite build.
+      # Build first so newly added file routes are present before standalone tsc.
+      - name: Production build
+        run: bun run build
+
+      - name: Typecheck
+        run: bunx tsc --noEmit
