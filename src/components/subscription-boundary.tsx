@@ -5,7 +5,7 @@ import { useEntitlement } from "@/hooks/use-entitlement";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 
-const BILLING_ROUTES = ["/planos", "/configuracoes"];
+const BILLING_ROUTES = ["/planos"];
 
 function isBillingRoute(pathname: string) {
   return BILLING_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
@@ -16,8 +16,8 @@ function isBillingRoute(pathname: string) {
  *
  * FeatureGate continua responsável por diferenciar Essencial/Growth/Intelligence.
  * Este boundary resolve uma camada anterior: sem assinatura/trial válido, nenhuma
- * operação paga deve renderizar. Planos e Configurações continuam acessíveis para
- * que o proprietário consiga assinar, corrigir cobrança ou gerenciar a conta.
+ * operação paga deve renderizar. A tela de Planos permanece acessível para que o
+ * proprietário consiga iniciar ou regularizar a assinatura.
  */
 export function SubscriptionBoundary({ children }: { children: ReactNode }) {
   const pathname = useRouterState({ select: (state) => state.location.pathname });
