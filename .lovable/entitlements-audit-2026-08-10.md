@@ -51,7 +51,7 @@ Acesso efetivo equivalente ao Intelligence enquanto a assinatura estiver válida
 | Acompanhamento do cliente | ❌ não foi localizada rota/experiência dedicada atual | ❌ não foi localizado enforcement de `acompanhamento_cliente` | Gap de produto |
 | Assistente com IA | ❌ feature declarada e migrations históricas existem, mas não há experiência atual localizada no app | ❌ não foi localizado enforcement de `ai_assistant` | Gap comercial — não prometer como pronto sem implementar |
 | Recomendações inteligentes | ⚠️ motor de upsell/regras existe em Configurações, porém não está protegido como Intelligence | ⚠️ `listUpsellRegras` / `upsertUpsellRegra` e `getSaudeNegocio` não possuem gate Intelligence | Gap de entitlement |
-| Founders | ✅ tratado como Intelligence | ✅ entitlement efetivo Intelligence | Fechado |
+| Founders | ✅ tratado como Intelligence e checkout separado dos cards públicos | ✅ oferta Founders só é aceita quando o tenant já está marcado no banco | Fechado |
 
 ---
 
@@ -75,7 +75,12 @@ Acesso efetivo equivalente ao Intelligence enquanto a assinatura estiver válida
    - Growth vê o relatório normal e um card de upgrade para Intelligence.
    - A consulta Intelligence só ocorre após confirmação do entitlement.
 
-5. CI validado após as alterações.
+5. Checkout Founders separado da seleção pública de planos.
+   - Essencial, Growth e Intelligence sempre enviam o plano que o usuário clicou.
+   - Uma conta elegível a Founders recebe um CTA próprio para o preço Founders.
+   - A oferta continua validada no backend pelo marcador `is_founders`; o cliente não consegue se autodeclarar Founder.
+
+6. CI validado após as alterações estruturais.
    - Typecheck ✅
    - Production build ✅
 
