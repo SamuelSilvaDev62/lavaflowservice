@@ -32,10 +32,13 @@ function PlanosPage() {
     mutationFn: (plan: PlanId) => checkout({ data: { plan, founders: entitlement.isFounders } }),
     onSuccess: (r: any) => {
       if (r?.url) window.location.href = r.url;
-      else toast.error("Não foi possível abrir o checkout.");
+      else toast.error("Não foi possível abrir a cobrança.");
     },
     onError: (e: any) => toast.error(e?.message ?? "Falha ao iniciar assinatura"),
   });
+
+  const possuiAssinaturaStripe =
+    entitlement.hasCustomer && !!entitlement.planoAssinado && entitlement.ativo;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
@@ -60,6 +63,15 @@ function PlanosPage() {
           <CardContent className="p-4 text-sm text-muted-foreground">
             A cobrança ainda não está configurada neste ambiente. Assim que as credenciais de
             pagamento forem adicionadas, o botão de assinatura funcionará normalmente.
+          </CardContent>
+        </Card>
+      )}
+
+      {possuiAssinaturaStripe && (
+        <Card>
+          <CardContent className="p-4 text-sm text-muted-foreground">
+            Você já possui uma assinatura Stripe. Alterações de plano e cobrança são feitas pelo
+            portal seguro da Stripe para evitar assinaturas duplicadas.
           </CardContent>
         </Card>
       )}
@@ -103,7 +115,13 @@ function PlanosPage() {
                   disabled={atual || mut.isPending || !stripeConfigurado}
                   onClick={() => mut.mutate(plano.id)}
                 >
-                  {atual ? "Plano atual" : mut.isPending ? "Abrindo…" : "Assinar"}
+                  {atual
+                    ? "Plano atual"
+                    : mut.isPending
+                      ? "Abrindo…"
+                      : possuiAssinaturaStripe
+                        ? "Gerenciar / trocar"
+                        : "Assinar"}
                 </Button>
               </CardContent>
             </Card>
@@ -112,8 +130,8 @@ function PlanosPage() {
       </div>
 
       <p className="text-xs text-muted-foreground">
-        Pagamento processado pela Stripe. Você pode cancelar ou trocar de plano quando quiser em
-        Configurações → Assinatura. Cancelamento nunca apaga seus dados.
+        Pagamento processado pela Stripe. Você pode cancelar ou trocar de plano pelo Customer Portal
+        em Configurações → Assinatura. Cancelamento nunca apaga seus dados.
       </p>
     </div>
   );
