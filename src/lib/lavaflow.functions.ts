@@ -2015,6 +2015,42 @@ export const updateEmpresa = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// Link público do estabelecimento (slug). Único por tenant, estável.
+function normalizeSlug(input: string) {
+  return input
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/-{2,}/g, "-")
+    .replace(/^-+|-+$/g, "");
+}
+
+export const atualizarSlugPublico = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ slug: z.string().min(3).max(60) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    assertTenantRole(role, ADMIN_ROLES, "Apenas o proprietario ou administrador pode alterar o link publico.");
+
+    const slug = normalizeSlug(data.slug);
+    if (slug.length < 3) throw new Error("Use ao menos 3 caracteres validos (letras, numeros e hifens).");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: existente } = await supabaseAdmin
+      .from("empresa")
+      .select("owner_id")
+      .eq("slug", slug)
+      .maybeSingle();
+    if (existente && existente.owner_id !== ownerId) {
+      throw new Error("Este link ja esta em uso por outro estabelecimento.");
+    }
+
+    const { error } = await context.supabase.from("empresa").update({ slug }).eq("owner_id", ownerId);
+    if (error) throw error;
+    return { slug };
+  });
+
 // ============ RELATÓRIOS ============
 export const getRelatorios = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
