@@ -16,7 +16,7 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/relatorios")({
-  component: () => <RequireRole roles={GESTAO}><Page /></RequireRole>,
+  component: () => <RequireRole roles={GESTAO}><FeatureGate feature="relatorios_avancados"><Page /></FeatureGate></RequireRole>,
 });
 
 function Page() {

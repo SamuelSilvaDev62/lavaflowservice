@@ -11,7 +11,7 @@ import { waLink, getTemplate, renderTemplate, type WhatsAppTemplateKey } from "@
 import { MessageCircle, TrendingUp, Gift, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/oportunidades")({
-  component: Page,
+  component: () => <FeatureGate feature="oportunidades"><Page /></FeatureGate>,
 });
 
 const prioColor: Record<number, string> = {
