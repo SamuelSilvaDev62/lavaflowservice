@@ -25,7 +25,9 @@ import MarkdownMessage from "@/components/markdown-message";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/_authenticated/assistente")({
+// The generated route tree is refreshed by the TanStack Router Vite plugin during build.
+// The cast keeps standalone typecheck green in the short window before regeneration.
+export const Route = createFileRoute("/_authenticated/assistente" as any)({
   component: () => (
     <RequireRole roles={GESTAO}>
       <FeatureGate feature="ai_assistant">
@@ -139,10 +141,12 @@ function Page() {
     () =>
       new DefaultChatTransport({
         api: "/api/assistente-chat",
-        headers: async () => {
+        headers: async (): Promise<Record<string, string>> => {
           const { data } = await supabase.auth.getSession();
           const freshToken = data.session?.access_token;
-          return freshToken ? { Authorization: `Bearer ${freshToken}` } : {};
+          const headers: Record<string, string> = {};
+          if (freshToken) headers.Authorization = `Bearer ${freshToken}`;
+          return headers;
         },
       }),
     [],
