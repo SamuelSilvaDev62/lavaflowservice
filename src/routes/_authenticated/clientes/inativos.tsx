@@ -15,7 +15,11 @@ import { MessageCircle, Settings2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 export const Route = createFileRoute("/_authenticated/clientes/inativos")({
-  component: Page,
+  component: () => (
+    <FeatureGate feature="clientes_inativos">
+      <Page />
+    </FeatureGate>
+  ),
 });
 
 const tabs = [
