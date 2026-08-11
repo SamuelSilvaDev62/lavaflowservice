@@ -2369,7 +2369,11 @@ async function assertPlanFeature(ownerId: string, feature: import("@/lib/plans")
   return assertFeature(ownerId, feature);
 }
 
-async function getOwnerScope(supabase: any, userId: string) {
+async function getOwnerScope(
+  supabase: any,
+  userId: string,
+  opts?: { skipSubscription?: boolean },
+) {
   const { data } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
   const priority: Record<TenantRole, number> = {
     owner: 1,
@@ -2391,8 +2395,16 @@ async function getOwnerScope(supabase: any, userId: string) {
       return String(a.owner_id).localeCompare(String(b.owner_id));
     });
   const current = selfOwner ?? sorted[0];
+  const ownerId = current?.owner_id ?? userId;
+
+  // Bloqueio de operação sem assinatura/trial válido (fail closed).
+  if (!opts?.skipSubscription) {
+    const { assertActiveSubscription } = await import("@/lib/entitlements.server");
+    await assertActiveSubscription(ownerId);
+  }
+
   return {
-    ownerId: current?.owner_id ?? userId,
+    ownerId,
     role: current?.role ?? "owner",
   };
 }
@@ -2400,9 +2412,11 @@ async function getOwnerScope(supabase: any, userId: string) {
 export const getMyRole = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const scope = await getOwnerScope(context.supabase, context.userId);
+    // Sempre disponível: a UI precisa do papel para renderizar o bloqueio.
+    const scope = await getOwnerScope(context.supabase, context.userId, { skipSubscription: true });
     return scope;
   });
+
 
 export const vincularColaborador = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
