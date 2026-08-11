@@ -31,6 +31,7 @@ import { Route as AuthenticatedEquipeRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCampanhasRouteImport } from './routes/_authenticated/campanhas'
+import { Route as AuthenticatedAssistenteRouteImport } from './routes/_authenticated/assistente'
 import { Route as AuthenticatedAssinaturasRouteImport } from './routes/_authenticated/assinaturas'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes/index'
@@ -149,6 +150,11 @@ const AuthenticatedCampanhasRoute = AuthenticatedCampanhasRouteImport.update({
   path: '/campanhas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAssistenteRoute = AuthenticatedAssistenteRouteImport.update({
+  id: '/assistente',
+  path: '/assistente',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAssinaturasRoute =
   AuthenticatedAssinaturasRouteImport.update({
     id: '/assinaturas',
@@ -193,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
+  '/assistente': typeof AuthenticatedAssistenteRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -222,6 +229,7 @@ export interface FileRoutesByTo {
   '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
+  '/assistente': typeof AuthenticatedAssistenteRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -253,6 +261,7 @@ export interface FileRoutesById {
   '/trust': typeof TrustRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/_authenticated/assinaturas': typeof AuthenticatedAssinaturasRoute
+  '/_authenticated/assistente': typeof AuthenticatedAssistenteRoute
   '/_authenticated/campanhas': typeof AuthenticatedCampanhasRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -284,6 +293,7 @@ export interface FileRouteTypes {
     | '/trust'
     | '/agendamentos'
     | '/assinaturas'
+    | '/assistente'
     | '/campanhas'
     | '/configuracoes'
     | '/dashboard'
@@ -313,6 +323,7 @@ export interface FileRouteTypes {
     | '/trust'
     | '/agendamentos'
     | '/assinaturas'
+    | '/assistente'
     | '/campanhas'
     | '/configuracoes'
     | '/dashboard'
@@ -343,6 +354,7 @@ export interface FileRouteTypes {
     | '/trust'
     | '/_authenticated/agendamentos'
     | '/_authenticated/assinaturas'
+    | '/_authenticated/assistente'
     | '/_authenticated/campanhas'
     | '/_authenticated/configuracoes'
     | '/_authenticated/dashboard'
@@ -535,6 +547,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCampanhasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/assistente': {
+      id: '/_authenticated/assistente'
+      path: '/assistente'
+      fullPath: '/assistente'
+      preLoaderRoute: typeof AuthenticatedAssistenteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/assinaturas': {
       id: '/_authenticated/assinaturas'
       path: '/assinaturas'
@@ -583,6 +602,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendamentosRoute: typeof AuthenticatedAgendamentosRoute
   AuthenticatedAssinaturasRoute: typeof AuthenticatedAssinaturasRoute
+  AuthenticatedAssistenteRoute: typeof AuthenticatedAssistenteRoute
   AuthenticatedCampanhasRoute: typeof AuthenticatedCampanhasRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -602,6 +622,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAgendamentosRoute: AuthenticatedAgendamentosRoute,
   AuthenticatedAssinaturasRoute: AuthenticatedAssinaturasRoute,
+  AuthenticatedAssistenteRoute: AuthenticatedAssistenteRoute,
   AuthenticatedCampanhasRoute: AuthenticatedCampanhasRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
