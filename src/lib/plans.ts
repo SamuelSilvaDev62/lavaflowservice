@@ -252,3 +252,26 @@ export const STATUS_LABELS: Record<string, string> = {
   paused: "Pausada",
   none: "Sem assinatura",
 };
+
+/**
+ * Status terminais na Stripe: a assinatura não pode mais ser reaproveitada,
+ * então um novo Checkout é permitido.
+ */
+export const TERMINAL_STRIPE_STATUSES = new Set([
+  "canceled",
+  "incomplete_expired",
+  "none",
+]);
+
+/**
+ * Já existe assinatura Stripe gerenciável? Nesse caso a troca de plano deve
+ * acontecer no Customer Portal — criar novo Checkout duplicaria a cobrança.
+ */
+export function hasManageableStripeSubscription(row: {
+  stripe_subscription_id?: string | null;
+  subscription_status?: string | null;
+} | null | undefined): boolean {
+  if (!row?.stripe_subscription_id) return false;
+  return !TERMINAL_STRIPE_STATUSES.has(String(row.subscription_status ?? "none"));
+}
+

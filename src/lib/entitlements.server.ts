@@ -45,6 +45,15 @@ export class FeatureBlockedError extends Error {
   }
 }
 
+export class SubscriptionInactiveError extends Error {
+  status: string;
+  constructor(status: string) {
+    super("Assinatura inativa. Reative seu plano em /planos para voltar a operar.");
+    this.name = "SubscriptionInactiveError";
+    this.status = status;
+  }
+}
+
 /**
  * Bloqueio real no backend: chame em toda server function/ação de recurso premium.
  * Usa o admin client para não depender de RLS de leitura por papel.
@@ -55,3 +64,21 @@ export async function assertFeature(ownerId: string, feature: FeatureKey): Promi
   if (!canUseFeature(entitlement, feature)) throw new FeatureBlockedError(feature);
   return entitlement;
 }
+
+/**
+ * Exige trial válido ou assinatura em dia para qualquer ação OPERACIONAL.
+ * Fail closed: falha na leitura do entitlement bloqueia a operação.
+ */
+export async function assertActiveSubscription(ownerId: string): Promise<Entitlement> {
+  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+  let entitlement: Entitlement;
+  try {
+    entitlement = await fetchEntitlement(supabaseAdmin, ownerId);
+  } catch (err) {
+    console.error("[entitlements] falha ao ler assinatura", err);
+    throw new SubscriptionInactiveError("unknown");
+  }
+  if (!entitlement.ativo) throw new SubscriptionInactiveError(entitlement.status);
+  return entitlement;
+}
+
