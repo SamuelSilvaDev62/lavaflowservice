@@ -18,6 +18,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlanoSlugRouteImport } from './routes/plano.$slug'
 import { Route as EquipeSlugRouteImport } from './routes/equipe.$slug'
+import { Route as ApiAssistenteChatRouteImport } from './routes/api/assistente-chat'
 import { Route as AgendarSlugRouteImport } from './routes/agendar.$slug'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedPlanosRouteImport } from './routes/_authenticated/planos'
@@ -30,6 +31,7 @@ import { Route as AuthenticatedEquipeRouteImport } from './routes/_authenticated
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCampanhasRouteImport } from './routes/_authenticated/campanhas'
+import { Route as AuthenticatedAssistenteRouteImport } from './routes/_authenticated/assistente'
 import { Route as AuthenticatedAssinaturasRouteImport } from './routes/_authenticated/assinaturas'
 import { Route as AuthenticatedAgendamentosRouteImport } from './routes/_authenticated/agendamentos'
 import { Route as AuthenticatedClientesIndexRouteImport } from './routes/_authenticated/clientes/index'
@@ -79,6 +81,11 @@ const PlanoSlugRoute = PlanoSlugRouteImport.update({
 const EquipeSlugRoute = EquipeSlugRouteImport.update({
   id: '/equipe/$slug',
   path: '/equipe/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAssistenteChatRoute = ApiAssistenteChatRouteImport.update({
+  id: '/api/assistente-chat',
+  path: '/api/assistente-chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgendarSlugRoute = AgendarSlugRouteImport.update({
@@ -143,6 +150,11 @@ const AuthenticatedCampanhasRoute = AuthenticatedCampanhasRouteImport.update({
   path: '/campanhas',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedAssistenteRoute = AuthenticatedAssistenteRouteImport.update({
+  id: '/assistente',
+  path: '/assistente',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedAssinaturasRoute =
   AuthenticatedAssinaturasRouteImport.update({
     id: '/assinaturas',
@@ -187,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
+  '/assistente': typeof AuthenticatedAssistenteRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -199,6 +212,7 @@ export interface FileRoutesByFullPath {
   '/planos': typeof AuthenticatedPlanosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
+  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
@@ -215,6 +229,7 @@ export interface FileRoutesByTo {
   '/trust': typeof TrustRoute
   '/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/assinaturas': typeof AuthenticatedAssinaturasRoute
+  '/assistente': typeof AuthenticatedAssistenteRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
@@ -227,6 +242,7 @@ export interface FileRoutesByTo {
   '/planos': typeof AuthenticatedPlanosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
+  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
@@ -245,6 +261,7 @@ export interface FileRoutesById {
   '/trust': typeof TrustRoute
   '/_authenticated/agendamentos': typeof AuthenticatedAgendamentosRoute
   '/_authenticated/assinaturas': typeof AuthenticatedAssinaturasRoute
+  '/_authenticated/assistente': typeof AuthenticatedAssistenteRoute
   '/_authenticated/campanhas': typeof AuthenticatedCampanhasRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
@@ -257,6 +274,7 @@ export interface FileRoutesById {
   '/_authenticated/planos': typeof AuthenticatedPlanosRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
+  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
@@ -275,6 +293,7 @@ export interface FileRouteTypes {
     | '/trust'
     | '/agendamentos'
     | '/assinaturas'
+    | '/assistente'
     | '/campanhas'
     | '/configuracoes'
     | '/dashboard'
@@ -287,6 +306,7 @@ export interface FileRouteTypes {
     | '/planos'
     | '/relatorios'
     | '/agendar/$slug'
+    | '/api/assistente-chat'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/clientes/$id'
@@ -303,6 +323,7 @@ export interface FileRouteTypes {
     | '/trust'
     | '/agendamentos'
     | '/assinaturas'
+    | '/assistente'
     | '/campanhas'
     | '/configuracoes'
     | '/dashboard'
@@ -315,6 +336,7 @@ export interface FileRouteTypes {
     | '/planos'
     | '/relatorios'
     | '/agendar/$slug'
+    | '/api/assistente-chat'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/clientes/$id'
@@ -332,6 +354,7 @@ export interface FileRouteTypes {
     | '/trust'
     | '/_authenticated/agendamentos'
     | '/_authenticated/assinaturas'
+    | '/_authenticated/assistente'
     | '/_authenticated/campanhas'
     | '/_authenticated/configuracoes'
     | '/_authenticated/dashboard'
@@ -344,6 +367,7 @@ export interface FileRouteTypes {
     | '/_authenticated/planos'
     | '/_authenticated/relatorios'
     | '/agendar/$slug'
+    | '/api/assistente-chat'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/_authenticated/clientes/$id'
@@ -361,6 +385,7 @@ export interface RootRouteChildren {
   PoliticaDePrivacidadeRoute: typeof PoliticaDePrivacidadeRoute
   TrustRoute: typeof TrustRoute
   AgendarSlugRoute: typeof AgendarSlugRoute
+  ApiAssistenteChatRoute: typeof ApiAssistenteChatRoute
   EquipeSlugRoute: typeof EquipeSlugRoute
   PlanoSlugRoute: typeof PlanoSlugRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
@@ -429,6 +454,13 @@ declare module '@tanstack/react-router' {
       path: '/equipe/$slug'
       fullPath: '/equipe/$slug'
       preLoaderRoute: typeof EquipeSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/assistente-chat': {
+      id: '/api/assistente-chat'
+      path: '/api/assistente-chat'
+      fullPath: '/api/assistente-chat'
+      preLoaderRoute: typeof ApiAssistenteChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agendar/$slug': {
@@ -515,6 +547,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedCampanhasRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/assistente': {
+      id: '/_authenticated/assistente'
+      path: '/assistente'
+      fullPath: '/assistente'
+      preLoaderRoute: typeof AuthenticatedAssistenteRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/assinaturas': {
       id: '/_authenticated/assinaturas'
       path: '/assinaturas'
@@ -563,6 +602,7 @@ declare module '@tanstack/react-router' {
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedAgendamentosRoute: typeof AuthenticatedAgendamentosRoute
   AuthenticatedAssinaturasRoute: typeof AuthenticatedAssinaturasRoute
+  AuthenticatedAssistenteRoute: typeof AuthenticatedAssistenteRoute
   AuthenticatedCampanhasRoute: typeof AuthenticatedCampanhasRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
@@ -582,6 +622,7 @@ interface AuthenticatedRouteRouteChildren {
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAgendamentosRoute: AuthenticatedAgendamentosRoute,
   AuthenticatedAssinaturasRoute: AuthenticatedAssinaturasRoute,
+  AuthenticatedAssistenteRoute: AuthenticatedAssistenteRoute,
   AuthenticatedCampanhasRoute: AuthenticatedCampanhasRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
@@ -610,6 +651,7 @@ const rootRouteChildren: RootRouteChildren = {
   PoliticaDePrivacidadeRoute: PoliticaDePrivacidadeRoute,
   TrustRoute: TrustRoute,
   AgendarSlugRoute: AgendarSlugRoute,
+  ApiAssistenteChatRoute: ApiAssistenteChatRoute,
   EquipeSlugRoute: EquipeSlugRoute,
   PlanoSlugRoute: PlanoSlugRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
@@ -617,13 +659,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}

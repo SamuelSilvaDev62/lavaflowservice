@@ -22,19 +22,35 @@ export const getMeuPlano = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     const { resolveOwnerScope, fetchEntitlement } = await import("@/lib/entitlements.server");
     const { isStripeConfigured } = await import("@/lib/stripe.server");
+    const { hasManageableStripeSubscription } = await import("@/lib/plans");
     const { ownerId, role } = await resolveOwnerScope(context.supabase, context.userId);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const entitlement = await fetchEntitlement(supabaseAdmin, ownerId);
-    return { entitlement, role, stripeConfigurado: isStripeConfigured() };
+    const { data: sub } = await supabaseAdmin
+      .from("tenant_subscriptions")
+      .select("stripe_subscription_id, subscription_status")
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+    return {
+      entitlement,
+      role,
+      stripeConfigurado: isStripeConfigured(),
+      assinaturaGerenciavel: hasManageableStripeSubscription(sub),
+    };
   });
 
-/** Inicia o Checkout da Stripe (assinatura recorrente). Somente owner/admin. */
+/**
+ * Inicia o Checkout da Stripe (assinatura recorrente). Somente owner/admin.
+ * Se já existir assinatura Stripe não-terminal, NÃO cria novo Checkout —
+ * devolve o Customer Portal para troca de plano (evita cobrança duplicada).
+ */
 export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ plan: z.enum(PLAN_IDS), founders: z.boolean().optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const { resolveOwnerScope } = await import("@/lib/entitlements.server");
     const { stripeRequest } = await import("@/lib/stripe.server");
+    const { hasManageableStripeSubscription } = await import("@/lib/plans");
     const { ownerId, role } = await resolveOwnerScope(context.supabase, context.userId);
     if (role !== "owner" && role !== "admin") {
       throw new Error("Apenas o proprietário ou um administrador pode contratar o plano.");
@@ -43,12 +59,23 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sub } = await supabaseAdmin
       .from("tenant_subscriptions")
-      .select("stripe_customer_id, is_founders")
+      .select("stripe_customer_id, stripe_subscription_id, subscription_status, is_founders")
       .eq("owner_id", ownerId)
       .maybeSingle();
 
-    // Founders é oferta interna: só válida para quem já foi marcado no banco.
-    const founders = !!sub?.is_founders && !!data.founders;
+    const origin = appOrigin();
+
+    // Anti-duplicação: assinatura Stripe ativa/pendente => gerenciar, não recriar.
+    if (hasManageableStripeSubscription(sub) && sub?.stripe_customer_id) {
+      const portal = await stripeRequest<{ url: string }>("/billing_portal/sessions", {
+        body: { customer: sub.stripe_customer_id, return_url: `${origin}/configuracoes` },
+      });
+      return { url: portal.url, modo: "portal" as const };
+    }
+
+    // Founders é oferta interna: só válida para quem já foi marcado no banco
+    // E somente quando o fluxo Founders é escolhido explicitamente.
+    const founders = !!sub?.is_founders && data.founders === true;
     const priceEnv = founders
       ? "STRIPE_PRICE_FOUNDERS"
       : data.plan === "essencial"
@@ -80,7 +107,6 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
         .upsert({ owner_id: ownerId, stripe_customer_id: customerId }, { onConflict: "owner_id" });
     }
 
-    const origin = appOrigin();
     const session = await stripeRequest<{ id: string; url: string }>("/checkout/sessions", {
       body: {
         mode: "subscription",
@@ -95,8 +121,9 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
       },
     });
 
-    return { url: session.url };
+    return { url: session.url, modo: "checkout" as const };
   });
+
 
 /** Abre o Customer Portal da Stripe para o tenant autenticado. */
 export const abrirPortalAssinatura = createServerFn({ method: "POST" })

@@ -4,6 +4,8 @@ import { useQueryClient } from "@tanstack/react-query";
 import {
   Award,
   BarChart3,
+  Bot,
+
   CalendarDays,
   Car,
   ClipboardList,
@@ -49,11 +51,13 @@ const groupsAll: NavGroup[] = [
   ]},
   { label: "Gestão", items: [
     { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },
-    { to: "/relatorios", label: "Relatórios", icon: BarChart3, roles: GESTAO },
+    { to: "/relatorios", label: "Relatórios", icon: BarChart3, roles: GESTAO, feature: "relatorios_avancados" },
+    { to: "/assistente", label: "Consultor IA", icon: Bot, roles: GESTAO, feature: "ai_assistant" },
     { to: "/planos", label: "Planos", icon: Sparkles, roles: ADMINS },
     { to: "/midia", label: "Mídia", icon: ImageIcon, roles: ADMINS },
     { to: "/configuracoes", label: "Configurações", icon: Settings, roles: ADMINS },
   ]},
+
 ];
 
 const BOTTOM_TAB_ROUTES = ["/dashboard", "/agendamentos", "/fila", "/ordens"] as const;

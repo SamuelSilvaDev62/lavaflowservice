@@ -13,17 +13,24 @@ export function useEntitlement() {
     queryFn: () => fn(),
     staleTime: 2 * 60_000,
     gcTime: 10 * 60_000,
+    retry: 1,
   });
 
+  // Fail closed: erro ao consultar entitlement nunca libera recurso premium.
+  const entitlement = (q.isError ? FALLBACK : (q.data?.entitlement ?? FALLBACK)) as Entitlement;
+
   return {
-    entitlement: (q.data?.entitlement ?? FALLBACK) as Entitlement,
+    entitlement,
     stripeConfigurado: q.data?.stripeConfigurado ?? false,
+    hasManagedSubscription: q.data?.assinaturaGerenciavel ?? false,
     isLoading: q.isLoading,
-    can: (feature: FeatureKey) => canUseFeature(q.data?.entitlement as Entitlement | undefined, feature),
+    isError: q.isError,
+    refetch: q.refetch,
+    can: (feature: FeatureKey) => (q.isError ? false : canUseFeature(entitlement, feature)),
   };
 }
 
 export function useFeature(feature: FeatureKey) {
-  const { entitlement, isLoading } = useEntitlement();
-  return { allowed: canUseFeature(entitlement, feature), isLoading, entitlement };
+  const { entitlement, isLoading, isError, can } = useEntitlement();
+  return { allowed: can(feature), isLoading, isError, entitlement };
 }
