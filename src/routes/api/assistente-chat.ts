@@ -85,7 +85,7 @@ export const Route = createFileRoute("/api/assistente-chat")({
           const result = streamText({
             model: gateway("google/gemini-3.5-flash"),
             system: consultorSystemPrompt(contexto),
-            messages: convertToModelMessages(messages as any),
+            messages: await convertToModelMessages(messages as any),
             abortSignal: request.signal,
           });
 

@@ -18,6 +18,7 @@ import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as PlanoSlugRouteImport } from './routes/plano.$slug'
 import { Route as EquipeSlugRouteImport } from './routes/equipe.$slug'
+import { Route as ApiAssistenteChatRouteImport } from './routes/api/assistente-chat'
 import { Route as AgendarSlugRouteImport } from './routes/agendar.$slug'
 import { Route as AuthenticatedRelatoriosRouteImport } from './routes/_authenticated/relatorios'
 import { Route as AuthenticatedPlanosRouteImport } from './routes/_authenticated/planos'
@@ -79,6 +80,11 @@ const PlanoSlugRoute = PlanoSlugRouteImport.update({
 const EquipeSlugRoute = EquipeSlugRouteImport.update({
   id: '/equipe/$slug',
   path: '/equipe/$slug',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ApiAssistenteChatRoute = ApiAssistenteChatRouteImport.update({
+  id: '/api/assistente-chat',
+  path: '/api/assistente-chat',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AgendarSlugRoute = AgendarSlugRouteImport.update({
@@ -199,6 +205,7 @@ export interface FileRoutesByFullPath {
   '/planos': typeof AuthenticatedPlanosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
+  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
@@ -227,6 +234,7 @@ export interface FileRoutesByTo {
   '/planos': typeof AuthenticatedPlanosRoute
   '/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
+  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/clientes/$id': typeof AuthenticatedClientesIdRoute
@@ -257,6 +265,7 @@ export interface FileRoutesById {
   '/_authenticated/planos': typeof AuthenticatedPlanosRoute
   '/_authenticated/relatorios': typeof AuthenticatedRelatoriosRoute
   '/agendar/$slug': typeof AgendarSlugRoute
+  '/api/assistente-chat': typeof ApiAssistenteChatRoute
   '/equipe/$slug': typeof EquipeSlugRoute
   '/plano/$slug': typeof PlanoSlugRoute
   '/_authenticated/clientes/$id': typeof AuthenticatedClientesIdRoute
@@ -287,6 +296,7 @@ export interface FileRouteTypes {
     | '/planos'
     | '/relatorios'
     | '/agendar/$slug'
+    | '/api/assistente-chat'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/clientes/$id'
@@ -315,6 +325,7 @@ export interface FileRouteTypes {
     | '/planos'
     | '/relatorios'
     | '/agendar/$slug'
+    | '/api/assistente-chat'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/clientes/$id'
@@ -344,6 +355,7 @@ export interface FileRouteTypes {
     | '/_authenticated/planos'
     | '/_authenticated/relatorios'
     | '/agendar/$slug'
+    | '/api/assistente-chat'
     | '/equipe/$slug'
     | '/plano/$slug'
     | '/_authenticated/clientes/$id'
@@ -361,6 +373,7 @@ export interface RootRouteChildren {
   PoliticaDePrivacidadeRoute: typeof PoliticaDePrivacidadeRoute
   TrustRoute: typeof TrustRoute
   AgendarSlugRoute: typeof AgendarSlugRoute
+  ApiAssistenteChatRoute: typeof ApiAssistenteChatRoute
   EquipeSlugRoute: typeof EquipeSlugRoute
   PlanoSlugRoute: typeof PlanoSlugRoute
   ApiPublicStripeWebhookRoute: typeof ApiPublicStripeWebhookRoute
@@ -429,6 +442,13 @@ declare module '@tanstack/react-router' {
       path: '/equipe/$slug'
       fullPath: '/equipe/$slug'
       preLoaderRoute: typeof EquipeSlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/assistente-chat': {
+      id: '/api/assistente-chat'
+      path: '/api/assistente-chat'
+      fullPath: '/api/assistente-chat'
+      preLoaderRoute: typeof ApiAssistenteChatRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/agendar/$slug': {
@@ -610,6 +630,7 @@ const rootRouteChildren: RootRouteChildren = {
   PoliticaDePrivacidadeRoute: PoliticaDePrivacidadeRoute,
   TrustRoute: TrustRoute,
   AgendarSlugRoute: AgendarSlugRoute,
+  ApiAssistenteChatRoute: ApiAssistenteChatRoute,
   EquipeSlugRoute: EquipeSlugRoute,
   PlanoSlugRoute: PlanoSlugRoute,
   ApiPublicStripeWebhookRoute: ApiPublicStripeWebhookRoute,
