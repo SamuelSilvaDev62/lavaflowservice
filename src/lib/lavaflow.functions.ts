@@ -1991,7 +1991,7 @@ export const upsertRecompensa = createServerFn({ method: "POST" })
 export const getEmpresa = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId, { skipSubscription: true });
     const { data } = await context.supabase.from("empresa").select("*").eq("owner_id", ownerId).maybeSingle();
     return { empresa: data, ownerId };
   });
