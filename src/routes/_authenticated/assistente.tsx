@@ -10,6 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { FeatureGate } from "@/components/feature-gate";
 import { RequireRole } from "@/components/require-role";
+import MarkdownMessage from "@/components/markdown-message";
 import { supabase } from "@/integrations/supabase/client";
 import { getConsultorContexto } from "@/lib/assistente.functions";
 
