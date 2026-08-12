@@ -1,5 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+/** Resumo sanitizado do erro do provider (sem chaves, tokens ou conteúdo da conversa). */
+function sanitizar(err: any): string {
+  const partes = [err?.name, err?.statusCode, err?.message]
+    .filter(Boolean)
+    .map((p) => String(p));
+  return partes.join(":").replace(/sb_[A-Za-z0-9_-]+|Bearer\s+\S+|sk_[A-Za-z0-9_-]+/g, "[redacted]").slice(0, 200);
+}
+
 /**
  * Chat do Consultor IA. Autentica pelo bearer do usuário, resolve o tenant
  * no servidor (nunca vem do cliente) e exige o plano Intelligence.
