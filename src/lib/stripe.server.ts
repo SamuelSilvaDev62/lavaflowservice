@@ -137,18 +137,38 @@ export type StripeSubscription = {
   items?: { data: Array<{ id: string; price?: { id: string } }> };
 };
 
-/**
- * Fonte da verdade anti-duplicação: consulta a Stripe pelo customer e devolve
- * a primeira assinatura não-terminal encontrada (mesmo que o banco local
- * esteja desatualizado ou aponte para outra subscription).
- */
-export async function findNonTerminalSubscription(customerId: string): Promise<StripeSubscription | null> {
+export const DUPLICADAS_MSG =
+  "Encontramos mais de uma assinatura ativa para esta conta. Para evitar cobrança ou alteração incorreta, regularize as assinaturas duplicadas antes de trocar de plano.";
+
+/** Todas as assinaturas não-terminais do customer (nunca escolhe uma). */
+export async function listNonTerminalSubscriptions(customerId: string): Promise<StripeSubscription[]> {
   const res = await stripeRequest<{ data: StripeSubscription[] }>("/subscriptions", {
     method: "GET",
     body: { customer: customerId, status: "all", limit: 100 },
   });
-  return (res.data ?? []).find((s) => NON_TERMINAL_STRIPE_STATUSES.has(String(s.status))) ?? null;
+  return (res.data ?? []).filter((s) => NON_TERMINAL_STRIPE_STATUSES.has(String(s.status)));
 }
+
+/**
+ * Resolve a assinatura viva de forma segura:
+ * 0 -> null; 1 -> a única; >1 -> bloqueia (duplicidade precisa de correção manual).
+ */
+export async function resolveUniqueLiveSubscription(
+  customerId: string,
+  ownerId: string,
+): Promise<StripeSubscription | null> {
+  const vivas = await listNonTerminalSubscriptions(customerId);
+  if (vivas.length > 1) {
+    console.error("[billing] assinaturas duplicadas não-terminais", {
+      ownerId,
+      customerId,
+      subscriptionIds: vivas.map((s) => s.id),
+    });
+    throw new Error(DUPLICADAS_MSG);
+  }
+  return vivas[0] ?? null;
+}
+
 
 export async function retrieveSubscription(id: string): Promise<StripeSubscription> {
   return stripeRequest<StripeSubscription>(`/subscriptions/${id}`, { method: "GET" });

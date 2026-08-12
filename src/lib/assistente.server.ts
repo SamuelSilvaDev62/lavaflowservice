@@ -15,12 +15,23 @@ export type ConsultorContexto = {
 
 const DIA = 86_400_000;
 
+function ymd(d: Date) {
+  return d.toISOString().slice(0, 10);
+}
+
+function assertOk(label: string, error: { message?: string } | null) {
+  if (error) {
+    console.error("[consultor] falha ao carregar contexto", { fonte: label });
+    throw new Error(`Contexto do consultor indisponível (${label}).`);
+  }
+}
+
 export async function buildConsultorContexto(ownerId: string): Promise<ConsultorContexto> {
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const desde30 = new Date(Date.now() - 30 * DIA).toISOString();
   const desde60 = new Date(Date.now() - 60 * DIA).toISOString();
-  const hoje = new Date().toISOString();
-  const daqui7 = new Date(Date.now() + 7 * DIA).toISOString();
+  const hoje = ymd(new Date());
+  const daqui7 = ymd(new Date(Date.now() + 7 * DIA));
 
   const [empresaRes, osRes, clientesRes, agRes, servicosRes] = await Promise.all([
     supabaseAdmin.from("empresa").select("nome_fantasia").eq("owner_id", ownerId).maybeSingle(),
@@ -32,12 +43,18 @@ export async function buildConsultorContexto(ownerId: string): Promise<Consultor
     supabaseAdmin.from("clientes").select("id, created_at").eq("owner_id", ownerId),
     supabaseAdmin
       .from("agendamentos")
-      .select("id, data_hora")
+      .select("id, data_agendada")
       .eq("owner_id", ownerId)
-      .gte("data_hora", hoje)
-      .lte("data_hora", daqui7),
+      .gte("data_agendada", hoje)
+      .lte("data_agendada", daqui7),
     supabaseAdmin.from("servicos").select("id, nome").eq("owner_id", ownerId),
   ]);
+
+  assertOk("empresa", empresaRes.error);
+  assertOk("ordens_servico", osRes.error);
+  assertOk("clientes", clientesRes.error);
+  assertOk("agendamentos", agRes.error);
+  assertOk("servicos", servicosRes.error);
 
   const os = (osRes.data ?? []) as any[];
   const entregues = os.filter((o) => o.status === "entregue");
@@ -60,13 +77,15 @@ export async function buildConsultorContexto(ownerId: string): Promise<Consultor
   }
 
   // Clientes sem OS nos últimos 60 dias.
-  const { data: osRecentes } = await supabaseAdmin
+  const { data: osRecentes, error: osRecentesErr } = await supabaseAdmin
     .from("ordens_servico")
     .select("cliente_id")
     .eq("owner_id", ownerId)
     .gte("created_at", desde60);
+  assertOk("ordens_servico_recentes", osRecentesErr);
   const ativos = new Set(((osRecentes ?? []) as any[]).map((o) => String(o.cliente_id)));
   const clientes = (clientesRes.data ?? []) as any[];
+
 
   return {
     empresa: (empresaRes.data as any)?.nome_fantasia ?? "Seu lava-rápido",
