@@ -67,7 +67,7 @@ function AssistentePage() {
     [],
   );
 
-  const { messages, sendMessage, status, error } = useChat({ transport });
+  const { messages, sendMessage, status, error, regenerate } = useChat({ transport });
   const [texto, setTexto] = useState("");
   const carregando = status === "submitted" || status === "streaming";
 
