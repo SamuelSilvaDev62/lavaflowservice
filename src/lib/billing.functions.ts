@@ -37,7 +37,7 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ plan: z.enum(PLAN_IDS), founders: z.boolean().optional() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { stripeRequest, findNonTerminalSubscription, priceIdForPlan } = await import("@/lib/stripe.server");
+    const { stripeRequest, resolveUniqueLiveSubscription, priceIdForPlan } = await import("@/lib/stripe.server");
     const { appOrigin, requireGestao } = await import("@/lib/billing.server");
     const ownerId = await requireGestao(context.supabase, context.userId);
 
@@ -52,7 +52,7 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
 
     // Verdade na Stripe: se já existe assinatura viva, nunca criar outra.
     if (sub?.stripe_customer_id) {
-      const existente = await findNonTerminalSubscription(sub.stripe_customer_id);
+      const existente = await resolveUniqueLiveSubscription(sub.stripe_customer_id, ownerId);
       if (existente) {
         if (sub.stripe_subscription_id && sub.stripe_subscription_id !== existente.id) {
           console.warn(
@@ -130,7 +130,7 @@ export const trocarPlanoAssinatura = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const {
       stripeRequest,
-      findNonTerminalSubscription,
+      resolveUniqueLiveSubscription,
       retrieveSubscription,
       priceIdForPlan,
       getPortalConfigurationId,
@@ -153,7 +153,7 @@ export const trocarPlanoAssinatura = createServerFn({ method: "POST" })
     if (!priceId) throw new Error(`Preço da Stripe não configurado (${env}).`);
 
     // A assinatura viva na Stripe manda — o registro local pode estar atrasado.
-    const viva = await findNonTerminalSubscription(sub.stripe_customer_id);
+    const viva = await resolveUniqueLiveSubscription(sub.stripe_customer_id, ownerId);
     if (!viva) throw new Error("Não há assinatura ativa para trocar. Assine um plano primeiro.");
     if (sub.stripe_subscription_id && sub.stripe_subscription_id !== viva.id) {
       console.warn("[billing] troca de plano em subscription divergente do banco", {
