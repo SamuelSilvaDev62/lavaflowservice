@@ -1,20 +1,8 @@
 import { createServerFn } from "@tanstack/react-start";
-import { getRequest } from "@tanstack/react-start/server";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const PLAN_IDS = ["essencial", "growth", "intelligence"] as const;
-
-function appOrigin(): string {
-  const request = getRequest();
-  const origin = request?.headers.get("origin");
-  if (origin) return origin;
-  const referer = request?.headers.get("referer");
-  if (referer) {
-    try { return new URL(referer).origin; } catch { /* ignore */ }
-  }
-  return process.env["APP_URL"] ?? "https://lavaflowservice.lovable.app";
-}
 
 /** Plano/assinatura do tenant atual (usado pela UI e pelos gates). */
 export const getMeuPlano = createServerFn({ method: "GET" })
@@ -39,16 +27,6 @@ export const getMeuPlano = createServerFn({ method: "GET" })
     };
   });
 
-/** Owner/admin do tenant atual, ou erro claro. */
-async function requireGestao(context: any) {
-  const { resolveOwnerScope } = await import("@/lib/entitlements.server");
-  const { ownerId, role } = await resolveOwnerScope(context.supabase, context.userId);
-  if (role !== "owner" && role !== "admin") {
-    throw new Error("Apenas o proprietário ou um administrador pode gerenciar a assinatura.");
-  }
-  return ownerId;
-}
-
 /**
  * Inicia o Checkout da Stripe (assinatura recorrente). Somente owner/admin.
  * Anti-duplicação: se existir QUALQUER assinatura não-terminal na Stripe para o
@@ -60,7 +38,8 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ plan: z.enum(PLAN_IDS), founders: z.boolean().optional() }).parse(d))
   .handler(async ({ data, context }) => {
     const { stripeRequest, findNonTerminalSubscription, priceIdForPlan } = await import("@/lib/stripe.server");
-    const ownerId = await requireGestao(context);
+    const { appOrigin, requireGestao } = await import("@/lib/billing.server");
+    const ownerId = await requireGestao(context.supabase, context.userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sub } = await supabaseAdmin
@@ -156,7 +135,8 @@ export const trocarPlanoAssinatura = createServerFn({ method: "POST" })
       priceIdForPlan,
       getPortalConfigurationId,
     } = await import("@/lib/stripe.server");
-    const ownerId = await requireGestao(context);
+    const { appOrigin, requireGestao } = await import("@/lib/billing.server");
+    const ownerId = await requireGestao(context.supabase, context.userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sub } = await supabaseAdmin
@@ -223,7 +203,8 @@ export const abrirPortalAssinatura = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { stripeRequest } = await import("@/lib/stripe.server");
-    const ownerId = await requireGestao(context);
+    const { appOrigin, requireGestao } = await import("@/lib/billing.server");
+    const ownerId = await requireGestao(context.supabase, context.userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sub } = await supabaseAdmin
