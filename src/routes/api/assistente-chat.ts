@@ -1,5 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 
+/** Resumo sanitizado do erro do provider (sem chaves, tokens ou conteúdo da conversa). */
+function sanitizar(err: any): string {
+  const partes = [err?.name, err?.statusCode, err?.message]
+    .filter(Boolean)
+    .map((p) => String(p));
+  return partes.join(":").replace(/sb_[A-Za-z0-9_-]+|Bearer\s+\S+|sk_[A-Za-z0-9_-]+/g, "[redacted]").slice(0, 200);
+}
+
 /**
  * Chat do Consultor IA. Autentica pelo bearer do usuário, resolve o tenant
  * no servidor (nunca vem do cliente) e exige o plano Intelligence.
@@ -76,29 +84,48 @@ export const Route = createFileRoute("/api/assistente-chat")({
           getLovableAiGatewayResponseHeaders,
           withLovableAiGatewayRunIdHeader,
         } = await import("@/lib/ai-gateway.server");
+        const { getAiModelId } = await import("@/lib/ai-config.server");
 
         const contexto = await buildConsultorContexto(ownerId);
         const initialRunId = getLovableAiGatewayRunId(request);
         const gateway = createLovableAiGatewayProvider(LOVABLE_API_KEY, initialRunId);
+        const modelId = getAiModelId();
+        const iniciado = Date.now();
+
+        // Log seguro: apenas metadados (sem chave, token, prompt ou dados pessoais).
+        const logar = (status: string, extra?: string) =>
+          console.info(
+            `[assistente-chat] owner=${ownerId} model=${modelId} status=${status} latency=${
+              Date.now() - iniciado
+            }ms run=${gateway.getRunId() ?? "-"}${extra ? ` cause=${extra}` : ""}`,
+          );
 
         try {
           const result = streamText({
-            model: gateway("google/gemini-3.5-flash"),
+            model: gateway(modelId),
             system: consultorSystemPrompt(contexto),
             messages: await convertToModelMessages(messages as any),
             abortSignal: request.signal,
+            onError: ({ error }: { error: unknown }) => {
+              const err = error as any;
+              logar("stream_error", sanitizar(err));
+            },
+            onFinish: () => logar("ok"),
           });
 
           const response = result.toUIMessageStreamResponse({
             headers: getLovableAiGatewayResponseHeaders(undefined, {
               ...(initialRunId ? { "X-Lovable-AIG-Run-ID": initialRunId } : {}),
             }),
+            // Nunca devolver uma resposta padrão como se fosse da IA:
+            // qualquer falha vira erro explícito para a UI.
+            onError: () => "Consultor IA temporariamente indisponível.",
           });
           return await withLovableAiGatewayRunIdHeader(response, gateway);
         } catch (err: any) {
           if (err?.name === "AbortError") return new Response(null, { status: 499 });
-          console.error("[assistente-chat] falha", err);
-          return new Response("Falha ao consultar o assistente", { status: 502 });
+          logar("exception", sanitizar(err));
+          return new Response("Consultor IA temporariamente indisponível", { status: 502 });
         }
       },
     },

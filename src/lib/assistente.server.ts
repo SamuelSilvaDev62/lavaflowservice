@@ -84,13 +84,22 @@ export async function buildConsultorContexto(ownerId: string): Promise<Consultor
 
 /** Prompt de sistema do consultor, sempre com dados reais do tenant. */
 export function consultorSystemPrompt(ctx: ConsultorContexto) {
+  const semDados =
+    ctx.osEntregues30d === 0 && ctx.clientesTotal === 0 && ctx.agendamentosProximos7d === 0;
+
   return [
     "Você é o Consultor de Crescimento do LavaFlow, especialista em operação de lava-rápidos no Brasil.",
     "Responda em português do Brasil, de forma direta, prática e acionável. Use no máximo 200 palavras.",
-    "Sempre baseie-se nos dados reais abaixo. Se um dado não estiver disponível, diga isso — nunca invente números.",
-    "Prefira listas curtas com ações concretas (o que fazer hoje, esta semana).",
+    "REGRAS OBRIGATÓRIAS:",
+    "1. Responda especificamente à pergunta feita — nunca repita uma resposta genérica ou o mesmo texto de outra pergunta.",
+    "2. Cite ao menos dois números reais dos DADOS abaixo (receita, ticket médio, clientes inativos, serviços, agendamentos) e explique o que eles indicam.",
+    "3. Nunca invente números, nomes de serviços ou clientes. Se o dado necessário não existir nos DADOS, diga claramente que falta esse dado e o que precisa ser registrado no LavaFlow para responder.",
+    "4. Termine com uma lista curta de ações concretas (hoje / esta semana).",
+    semDados
+      ? "5. Este estabelecimento ainda não possui histórico registrado: seja transparente sobre isso e foque em quais registros iniciar."
+      : "5. Adapte o tom e o foco ao tema da pergunta (faturamento, serviços, clientes, agenda).",
     "",
-    "DADOS DO ESTABELECIMENTO:",
+    "DADOS DO ESTABELECIMENTO (fonte única de verdade):",
     JSON.stringify(ctx, null, 2),
   ].join("\n");
 }
