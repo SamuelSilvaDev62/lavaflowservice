@@ -1,6 +1,5 @@
-import { streamText, convertToModelMessages } from "ai";
+import { streamText } from "ai";
 import { createLovableAiGatewayProvider } from "@/lib/ai-gateway.server";
 const gw = createLovableAiGatewayProvider(process.env.LOVABLE_API_KEY!);
-const ui=[{id:"1",role:"user",parts:[{type:"text",text:"Diga OK"}]}];
-const r = streamText({ model: gw("google/gemini-3.5-flash"), messages: convertToModelMessages(ui as any), onError: (e)=>console.log("ERR", JSON.stringify(e, null, 2).slice(0,1500)) });
-for await (const p of r.fullStream) console.log(p.type, JSON.stringify(p).slice(0,200));
+const r = streamText({ model: gw("google/gemini-3.5-flash"), prompt:"Diga OK", onError: (e:any)=>{const x=e.error; console.log("NAME",x?.name,"MSG",x?.message,"STATUS",x?.statusCode,"BODY",String(x?.responseBody).slice(0,500), "CAUSE", String(x?.cause).slice(0,300));} });
+for await (const p of r.fullStream) console.log(p.type);
