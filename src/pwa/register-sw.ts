@@ -36,12 +36,35 @@ async function unregisterMatching() {
   }
 }
 
+/** Caches legítimos deste build. Qualquer outro é shell/asset de deploy antigo. */
+const CACHE_ALLOWLIST = [/^workbox-precache/, /^static-assets$/, /^gstatic-fonts$/];
+
+/**
+ * Remove apenas Cache Storage obsoleto (app-shell/assets de deploys antigos).
+ * Nunca toca em localStorage/sessionStorage/IndexedDB — sessão e dados do
+ * usuário permanecem intactos.
+ */
+async function purgeStaleCaches() {
+  if (typeof caches === "undefined") return;
+  try {
+    const names = await caches.keys();
+    await Promise.all(
+      names
+        .filter((name) => !CACHE_ALLOWLIST.some((re) => re.test(name)))
+        .map((name) => caches.delete(name)),
+    );
+  } catch {
+    /* ignore */
+  }
+}
+
 export function registerServiceWorker() {
   if (typeof window === "undefined") return;
   if (!("serviceWorker" in navigator)) return;
 
   if (isRefusedContext()) {
     void unregisterMatching();
+    void purgeStaleCaches();
     return;
   }
 
@@ -64,6 +87,11 @@ export function registerServiceWorker() {
       .register(SW_URL, { scope: "/", updateViaCache: "none" })
       .then((reg) => {
         void reg.update();
+        void purgeStaleCaches();
+        // Checa atualização ao voltar para o app (deploy novo sem F5 manual).
+        document.addEventListener("visibilitychange", () => {
+          if (document.visibilityState === "visible") void reg.update();
+        });
       })
       .catch(() => {
         /* ignore */
