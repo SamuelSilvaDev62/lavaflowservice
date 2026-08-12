@@ -140,18 +140,33 @@ function AssistentePage() {
               >
                 {m.parts
                   .filter((p: any) => p.type === "text")
-                  .map((p: any, i: number) => (
-                    <p key={i} className="whitespace-pre-wrap break-words">
-                      {p.text}
-                    </p>
-                  ))}
+                  .map((p: any, i: number) =>
+                    m.role === "user" ? (
+                      <p key={i} className="whitespace-pre-wrap break-words">
+                        {p.text}
+                      </p>
+                    ) : (
+                      <div
+                        key={i}
+                        className="prose prose-sm max-w-none break-words dark:prose-invert [&_p]:my-1 [&_ul]:my-1 [&_ol]:my-1"
+                      >
+                        <MarkdownMessage>{p.text}</MarkdownMessage>
+                      </div>
+                    ),
+                  )}
               </div>
             ))}
             {carregando && <p className="text-sm text-muted-foreground">Analisando seus dados…</p>}
             {error && (
-              <p className="text-sm text-destructive">
-                Não foi possível falar com o consultor agora. Tente novamente em instantes.
-              </p>
+              <div className="space-y-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">
+                <p className="text-sm text-destructive">
+                  Consultor IA temporariamente indisponível. Nenhuma resposta genérica é exibida —
+                  tente novamente em instantes.
+                </p>
+                <Button variant="outline" size="sm" onClick={() => regenerate()} disabled={carregando}>
+                  Tentar novamente
+                </Button>
+              </div>
             )}
           </div>
 
