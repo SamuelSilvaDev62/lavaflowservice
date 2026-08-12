@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
+import { useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { Check, Crown, Sparkles } from "lucide-react";
 import { toast } from "sonner";
@@ -7,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useEntitlement } from "@/hooks/use-entitlement";
-import { criarCheckoutAssinatura } from "@/lib/billing.functions";
+import { abrirPortalAssinatura, criarCheckoutAssinatura, trocarPlanoAssinatura } from "@/lib/billing.functions";
 import { PLANS, STATUS_LABELS, planLabel, type PlanId } from "@/lib/plans";
 import { brl } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -25,17 +26,56 @@ export const Route = createFileRoute("/_authenticated/planos")({
 });
 
 function PlanosPage() {
-  const { entitlement, stripeConfigurado } = useEntitlement();
+  const { entitlement, stripeConfigurado, hasManagedSubscription, refetch } = useEntitlement();
+  const qc = useQueryClient();
   const checkout = useServerFn(criarCheckoutAssinatura);
+  const trocar = useServerFn(trocarPlanoAssinatura);
+  const portal = useServerFn(abrirPortalAssinatura);
 
-  const mut = useMutation({
-    mutationFn: (plan: PlanId) => checkout({ data: { plan, founders: entitlement.isFounders } }),
+  // Voltando da Stripe: revalida o entitlement para o menu/gates refletirem o plano novo.
+  useEffect(() => {
+    void qc.invalidateQueries({ queryKey: ["meu-plano"] });
+  }, [qc]);
+
+  const irPara = (url?: string | null) => {
+    if (url) window.location.href = url;
+    else toast.error("Não foi possível continuar. Tente novamente em instantes.");
+  };
+
+  const assinar = useMutation({
+    mutationFn: (plan: PlanId) => checkout({ data: { plan, founders: false } }),
     onSuccess: (r: any) => {
-      if (r?.url) window.location.href = r.url;
-      else toast.error("Não foi possível abrir o checkout.");
+      // Backend detectou assinatura viva na Stripe: nunca criar cobrança nova.
+      if (r?.modo === "trocar" && !r?.url) {
+        toast.info(r?.motivo ?? "Você já tem uma assinatura ativa. Use “Trocar plano”.");
+        void refetch();
+        return;
+      }
+      irPara(r?.url);
     },
     onError: (e: any) => toast.error(e?.message ?? "Falha ao iniciar assinatura"),
   });
+
+  const trocarPlano = useMutation({
+    mutationFn: (plan: PlanId) => trocar({ data: { plan } }),
+    onSuccess: (r: any) => {
+      if (r?.modo === "atual") {
+        toast.info("Este já é o plano da sua assinatura.");
+        void refetch();
+        return;
+      }
+      irPara(r?.url);
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao abrir a troca de plano"),
+  });
+
+  const gerenciar = useMutation({
+    mutationFn: () => portal(),
+    onSuccess: (r: any) => irPara(r?.url),
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao abrir o portal"),
+  });
+
+  const ocupado = assinar.isPending || trocarPlano.isPending || gerenciar.isPending;
 
   return (
     <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
@@ -97,19 +137,56 @@ function PlanosPage() {
                     </li>
                   ))}
                 </ul>
-                <Button
-                  className="w-full"
-                  variant={plano.recomendado ? "default" : "outline"}
-                  disabled={atual || mut.isPending || !stripeConfigurado}
-                  onClick={() => mut.mutate(plano.id)}
-                >
-                  {atual ? "Plano atual" : mut.isPending ? "Abrindo…" : "Assinar"}
-                </Button>
+                {atual ? (
+                  <div className="space-y-2">
+                    <Button className="w-full" variant="outline" disabled>
+                      Plano atual
+                    </Button>
+                    {entitlement.cancelAtPeriodEnd && (
+                      <p className="text-xs text-warning-foreground">
+                        Assinatura cancelando no fim do período. Reative em “Gerenciar assinatura”.
+                      </p>
+                    )}
+                  </div>
+                ) : hasManagedSubscription ? (
+                  <Button
+                    className="w-full"
+                    variant={plano.recomendado ? "default" : "outline"}
+                    disabled={ocupado || !stripeConfigurado}
+                    onClick={() => trocarPlano.mutate(plano.id)}
+                  >
+                    {trocarPlano.isPending ? "Abrindo…" : `Trocar para ${plano.nome}`}
+                  </Button>
+                ) : (
+                  <Button
+                    className="w-full"
+                    variant={plano.recomendado ? "default" : "outline"}
+                    disabled={ocupado || !stripeConfigurado}
+                    onClick={() => assinar.mutate(plano.id)}
+                  >
+                    {assinar.isPending ? "Abrindo…" : "Assinar"}
+                  </Button>
+                )}
               </CardContent>
             </Card>
           );
         })}
       </div>
+
+      {hasManagedSubscription && stripeConfigurado && (
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <Button
+            variant="outline"
+            disabled={ocupado}
+            onClick={() => gerenciar.mutate()}
+          >
+            {gerenciar.isPending ? "Abrindo…" : "Gerenciar assinatura"}
+          </Button>
+          <p className="text-xs text-muted-foreground">
+            Cartão, faturas, cancelamento e reativação ficam no portal de assinatura.
+          </p>
+        </div>
+      )}
 
       <p className="text-xs text-muted-foreground">
         Pagamento processado pela Stripe. Você pode cancelar ou trocar de plano quando quiser em
