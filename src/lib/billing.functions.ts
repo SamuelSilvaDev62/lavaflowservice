@@ -39,22 +39,28 @@ export const getMeuPlano = createServerFn({ method: "GET" })
     };
   });
 
+/** Owner/admin do tenant atual, ou erro claro. */
+async function requireGestao(context: any) {
+  const { resolveOwnerScope } = await import("@/lib/entitlements.server");
+  const { ownerId, role } = await resolveOwnerScope(context.supabase, context.userId);
+  if (role !== "owner" && role !== "admin") {
+    throw new Error("Apenas o proprietário ou um administrador pode gerenciar a assinatura.");
+  }
+  return ownerId;
+}
+
 /**
  * Inicia o Checkout da Stripe (assinatura recorrente). Somente owner/admin.
- * Se já existir assinatura Stripe não-terminal, NÃO cria novo Checkout —
- * devolve o Customer Portal para troca de plano (evita cobrança duplicada).
+ * Anti-duplicação: se existir QUALQUER assinatura não-terminal na Stripe para o
+ * customer (mesmo que o banco local esteja desatualizado), nenhum novo Checkout
+ * é criado — a troca de plano deve usar `trocarPlanoAssinatura`.
  */
 export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((d) => z.object({ plan: z.enum(PLAN_IDS), founders: z.boolean().optional() }).parse(d))
   .handler(async ({ data, context }) => {
-    const { resolveOwnerScope } = await import("@/lib/entitlements.server");
-    const { stripeRequest } = await import("@/lib/stripe.server");
-    const { hasManageableStripeSubscription } = await import("@/lib/plans");
-    const { ownerId, role } = await resolveOwnerScope(context.supabase, context.userId);
-    if (role !== "owner" && role !== "admin") {
-      throw new Error("Apenas o proprietário ou um administrador pode contratar o plano.");
-    }
+    const { stripeRequest, findNonTerminalSubscription, priceIdForPlan } = await import("@/lib/stripe.server");
+    const ownerId = await requireGestao(context);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sub } = await supabaseAdmin
@@ -65,24 +71,33 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
 
     const origin = appOrigin();
 
-    // Anti-duplicação: assinatura Stripe ativa/pendente => gerenciar, não recriar.
-    if (hasManageableStripeSubscription(sub) && sub?.stripe_customer_id) {
-      const portal = await stripeRequest<{ url: string }>("/billing_portal/sessions", {
-        body: { customer: sub.stripe_customer_id, return_url: `${origin}/configuracoes` },
-      });
-      return { url: portal.url, modo: "portal" as const };
+    // Verdade na Stripe: se já existe assinatura viva, nunca criar outra.
+    if (sub?.stripe_customer_id) {
+      const existente = await findNonTerminalSubscription(sub.stripe_customer_id);
+      if (existente) {
+        if (sub.stripe_subscription_id && sub.stripe_subscription_id !== existente.id) {
+          console.warn(
+            "[billing] inconsistência: banco aponta para",
+            sub.stripe_subscription_id,
+            "mas a Stripe tem",
+            existente.id,
+            "para o tenant",
+            ownerId,
+          );
+        }
+        return {
+          modo: "trocar" as const,
+          url: null,
+          motivo:
+            "Já existe uma assinatura ativa para este estabelecimento. Use a troca de plano para alterar o valor cobrado.",
+        };
+      }
     }
 
     // Founders é oferta interna: só válida para quem já foi marcado no banco
     // E somente quando o fluxo Founders é escolhido explicitamente.
     const founders = !!sub?.is_founders && data.founders === true;
-    const priceEnv = founders
-      ? "STRIPE_PRICE_FOUNDERS"
-      : data.plan === "essencial"
-        ? "STRIPE_PRICE_ESSENCIAL"
-        : data.plan === "growth"
-          ? "STRIPE_PRICE_GROWTH"
-          : "STRIPE_PRICE_INTELLIGENCE";
+    const priceEnv = founders ? "STRIPE_PRICE_FOUNDERS" : priceIdForPlan(data.plan).env;
     const priceId = process.env[priceEnv];
     if (!priceId) throw new Error(`Preço da Stripe não configurado (${priceEnv}).`);
 
@@ -121,7 +136,85 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
       },
     });
 
-    return { url: session.url, modo: "checkout" as const };
+    return { url: session.url, modo: "checkout" as const, motivo: null };
+  });
+
+/**
+ * Troca de plano de uma assinatura EXISTENTE (upgrade/downgrade).
+ * Usa o deep link do Customer Portal `subscription_update_confirm`, que mostra
+ * prorrata/próxima cobrança e trata falha de pagamento/3DS. Nunca cria nova
+ * assinatura — portanto nunca duplica cobrança.
+ */
+export const trocarPlanoAssinatura = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ plan: z.enum(PLAN_IDS) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const {
+      stripeRequest,
+      findNonTerminalSubscription,
+      retrieveSubscription,
+      priceIdForPlan,
+      getPortalConfigurationId,
+    } = await import("@/lib/stripe.server");
+    const ownerId = await requireGestao(context);
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: sub } = await supabaseAdmin
+      .from("tenant_subscriptions")
+      .select("stripe_customer_id, stripe_subscription_id")
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+
+    if (!sub?.stripe_customer_id) {
+      throw new Error("Nenhuma assinatura encontrada para este estabelecimento.");
+    }
+
+    const { env, id: priceId } = priceIdForPlan(data.plan);
+    if (!priceId) throw new Error(`Preço da Stripe não configurado (${env}).`);
+
+    // A assinatura viva na Stripe manda — o registro local pode estar atrasado.
+    const viva = await findNonTerminalSubscription(sub.stripe_customer_id);
+    if (!viva) throw new Error("Não há assinatura ativa para trocar. Assine um plano primeiro.");
+    if (sub.stripe_subscription_id && sub.stripe_subscription_id !== viva.id) {
+      console.warn("[billing] troca de plano em subscription divergente do banco", {
+        ownerId,
+        local: sub.stripe_subscription_id,
+        stripe: viva.id,
+      });
+    }
+
+    const full = viva.items?.data?.length ? viva : await retrieveSubscription(viva.id);
+    const item = full.items?.data?.[0];
+    if (!item) throw new Error("Não foi possível identificar o item da assinatura na Stripe.");
+    if (item.price?.id === priceId) {
+      return { url: null, modo: "atual" as const };
+    }
+
+    const configuration = getPortalConfigurationId();
+    const returnUrl = `${appOrigin()}/configuracoes?assinatura=processando`;
+
+    try {
+      const portal = await stripeRequest<{ url: string }>("/billing_portal/sessions", {
+        body: {
+          customer: sub.stripe_customer_id,
+          ...(configuration ? { configuration } : {}),
+          flow_data: {
+            type: "subscription_update_confirm",
+            subscription_update_confirm: {
+              subscription: full.id,
+              items: [{ id: item.id, price: priceId, quantity: 1 }],
+            },
+            after_completion: { type: "redirect", redirect: { return_url: returnUrl } },
+          },
+        },
+      });
+      return { url: portal.url, modo: "trocar" as const };
+    } catch (err: any) {
+      console.error("[billing] falha no deep link de troca de plano", err?.message);
+      throw new Error(
+        "Não foi possível abrir a troca de plano. Habilite “atualizar assinatura” na configuração do Customer Portal da Stripe (e informe STRIPE_PORTAL_CONFIGURATION_ID) e tente novamente.",
+      );
+    }
   });
 
 
@@ -129,12 +222,8 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
 export const abrirPortalAssinatura = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
-    const { resolveOwnerScope } = await import("@/lib/entitlements.server");
     const { stripeRequest } = await import("@/lib/stripe.server");
-    const { ownerId, role } = await resolveOwnerScope(context.supabase, context.userId);
-    if (role !== "owner" && role !== "admin") {
-      throw new Error("Apenas o proprietário ou um administrador pode gerenciar a assinatura.");
-    }
+    const ownerId = await requireGestao(context);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sub } = await supabaseAdmin
