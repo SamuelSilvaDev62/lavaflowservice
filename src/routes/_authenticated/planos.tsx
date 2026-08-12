@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { useEntitlement } from "@/hooks/use-entitlement";
 import { abrirPortalAssinatura, criarCheckoutAssinatura, trocarPlanoAssinatura } from "@/lib/billing.functions";
-import { PLANS, STATUS_LABELS, planLabel, type PlanId } from "@/lib/plans";
+import { FOUNDERS_OFFER, PLANS, STATUS_LABELS, planLabel, type PlanId } from "@/lib/plans";
 import { brl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
@@ -106,7 +106,10 @@ function PlanosPage() {
 
       <div className="grid gap-4 md:grid-cols-3">
         {PLANS.map((plano) => {
-          const atual = entitlement.planoAssinado === plano.id;
+          // Founders mantém acesso equivalente ao Intelligence: esse card conta como atual.
+          const atual =
+            entitlement.planoAssinado === plano.id ||
+            (entitlement.isFounders && plano.id === FOUNDERS_OFFER.planoEquivalente);
           return (
             <Card
               key={plano.id}
@@ -153,7 +156,18 @@ function PlanosPage() {
                     className="w-full"
                     variant={plano.recomendado ? "default" : "outline"}
                     disabled={ocupado || !stripeConfigurado}
-                    onClick={() => trocarPlano.mutate(plano.id)}
+                    onClick={() => {
+                      // Founder nunca perde o benefício por um clique comum.
+                      if (
+                        entitlement.isFounders &&
+                        !window.confirm(
+                          `Trocar para ${plano.nome} encerra a oferta Founders (R$ 99 com acesso completo). Deseja continuar?`,
+                        )
+                      ) {
+                        return;
+                      }
+                      trocarPlano.mutate(plano.id);
+                    }}
                   >
                     {trocarPlano.isPending ? "Abrindo…" : `Trocar para ${plano.nome}`}
                   </Button>
