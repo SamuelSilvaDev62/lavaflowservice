@@ -114,3 +114,53 @@ export function priceIdMap(): Record<string, { plan: "essencial" | "growth" | "i
   add("STRIPE_PRICE_FOUNDERS", "intelligence", true);
   return map;
 }
+
+/** Configuração opcional do Customer Portal (necessária para troca de plano). */
+export function getPortalConfigurationId(): string | undefined {
+  return process.env["STRIPE_PORTAL_CONFIGURATION_ID"] || undefined;
+}
+
+/** Status Stripe em que a assinatura AINDA existe (não pode ser duplicada). */
+export const NON_TERMINAL_STRIPE_STATUSES = new Set([
+  "active",
+  "trialing",
+  "past_due",
+  "unpaid",
+  "incomplete",
+  "paused",
+]);
+
+export type StripeSubscription = {
+  id: string;
+  status: string;
+  cancel_at_period_end?: boolean;
+  items?: { data: Array<{ id: string; price?: { id: string } }> };
+};
+
+/**
+ * Fonte da verdade anti-duplicação: consulta a Stripe pelo customer e devolve
+ * a primeira assinatura não-terminal encontrada (mesmo que o banco local
+ * esteja desatualizado ou aponte para outra subscription).
+ */
+export async function findNonTerminalSubscription(customerId: string): Promise<StripeSubscription | null> {
+  const res = await stripeRequest<{ data: StripeSubscription[] }>("/subscriptions", {
+    method: "GET",
+    body: { customer: customerId, status: "all", limit: 100 },
+  });
+  return (res.data ?? []).find((s) => NON_TERMINAL_STRIPE_STATUSES.has(String(s.status))) ?? null;
+}
+
+export async function retrieveSubscription(id: string): Promise<StripeSubscription> {
+  return stripeRequest<StripeSubscription>(`/subscriptions/${id}`, { method: "GET" });
+}
+
+/** Price ID do plano público (nunca Founders). */
+export function priceIdForPlan(plan: "essencial" | "growth" | "intelligence"): { env: string; id?: string } {
+  const env =
+    plan === "essencial"
+      ? "STRIPE_PRICE_ESSENCIAL"
+      : plan === "growth"
+        ? "STRIPE_PRICE_GROWTH"
+        : "STRIPE_PRICE_INTELLIGENCE";
+  return { env, id: process.env[env] };
+}
