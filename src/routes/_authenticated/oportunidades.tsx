@@ -10,9 +10,15 @@ import { getOportunidades, getClientesComRecompensa } from "@/lib/lavaflow.funct
 import { brl } from "@/lib/format";
 import { waLink, getTemplate, renderTemplate, type WhatsAppTemplateKey } from "@/lib/whatsapp";
 import { MessageCircle, TrendingUp, Gift, ArrowRight } from "lucide-react";
+import { RequireRole } from "@/components/require-role";
+import { GESTAO } from "@/lib/rbac";
 
 export const Route = createFileRoute("/_authenticated/oportunidades")({
-  component: () => <FeatureGate feature="oportunidades"><Page /></FeatureGate>,
+  component: () => (
+    <RequireRole roles={GESTAO}>
+      <FeatureGate feature="oportunidades"><Page /></FeatureGate>
+    </RequireRole>
+  ),
 });
 
 const prioColor: Record<number, string> = {

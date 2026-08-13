@@ -50,7 +50,7 @@ function Page() {
   if (error || !data) return <div className="min-h-screen grid place-items-center p-6"><Card><CardContent className="p-8 text-center"><p className="font-display text-xl font-bold mb-2">Plano não encontrado</p><p className="text-sm text-muted-foreground">Verifique o link com o estabelecimento.</p></CardContent></Card></div>;
 
   const { plano, empresa } = data;
-  const waMsg = `Olá! Acabei de assinar o plano *${plano.nome}* (${brl(plano.valor_mensal)}/mês). Vou fazer o pagamento via PIX.`;
+  const waMsg = `Olá! Acabei de solicitar o plano *${plano.nome}* (${brl(plano.valor_mensal)}/mês). Vou fazer o pagamento via PIX para confirmar a assinatura.`;
   const ownerWa = empresa?.whatsapp || empresa?.telefone || "";
 
   return (
@@ -80,7 +80,7 @@ function Page() {
             )}
 
             <Dialog open={open} onOpenChange={(o) => { setOpen(o); if (!o) setSent(false); }}>
-              <DialogTrigger asChild><Button size="lg" className="w-full font-display font-bold text-base h-12">Assinar agora</Button></DialogTrigger>
+              <DialogTrigger asChild><Button size="lg" className="w-full font-display font-bold text-base h-12">Solicitar assinatura</Button></DialogTrigger>
               <DialogContent>
                 {!sent ? (
                   <>
@@ -93,15 +93,15 @@ function Page() {
                         <div><Label>Placa</Label><Input placeholder="ABC1D23" value={f.placa} onChange={(e) => setF({ ...f, placa: e.target.value.toUpperCase() })} /></div>
                       </div>
                       <div><Label>Observações</Label><Textarea rows={2} value={f.observacoes} onChange={(e) => setF({ ...f, observacoes: e.target.value })} /></div>
-                      <Button type="submit" className="w-full" disabled={mut.isPending}>{mut.isPending ? "Enviando..." : "Confirmar assinatura"}</Button>
+                      <Button type="submit" className="w-full" disabled={mut.isPending}>{mut.isPending ? "Enviando..." : "Enviar solicitação"}</Button>
                     </form>
                   </>
                 ) : (
                   <div className="text-center py-4 space-y-4">
                     <CheckCircle2 className="h-14 w-14 text-success mx-auto" />
                     <div>
-                      <p className="font-display text-xl font-bold">Tudo certo!</p>
-                      <p className="text-sm text-muted-foreground mt-1">Falta só confirmar o pagamento via PIX.</p>
+                      <p className="font-display text-xl font-bold">Solicitação enviada</p>
+                      <p className="text-sm text-muted-foreground mt-1">Falta confirmar o pagamento via PIX. O estabelecimento ativa seu plano após a confirmação.</p>
                     </div>
                     {plano.chave_pix ? (
                       <div className="bg-accent/50 rounded-lg p-4 text-left">
@@ -122,6 +122,10 @@ function Page() {
                 )}
               </DialogContent>
             </Dialog>
+
+            <p className="text-[11px] text-muted-foreground text-center mt-2">
+              Pagamento via PIX • confirmação pelo estabelecimento
+            </p>
 
             <div className="mt-6 pt-5 border-t space-y-1.5 text-xs text-muted-foreground">
               {empresa?.endereco && <p className="flex gap-1.5 items-start"><MapPin className="h-3.5 w-3.5 mt-0.5 shrink-0" />{empresa.endereco}</p>}

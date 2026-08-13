@@ -16,6 +16,7 @@ import {
   LogOut,
   Menu,
   Settings,
+  Target,
   Sparkles,
   Image as ImageIcon,
   Users,
@@ -48,6 +49,7 @@ const groupsAll: NavGroup[] = [
     { to: "/fidelidade", label: "Fidelidade", icon: Award, roles: ADMINS, feature: "fidelidade" },
     { to: "/assinaturas", label: "Assinaturas", icon: CreditCard, tour: "assinaturas", roles: GESTAO, feature: "assinaturas" },
     { to: "/campanhas", label: "Campanhas", icon: Megaphone, roles: GESTAO, feature: "campanhas" },
+    { to: "/oportunidades", label: "Oportunidades", icon: Target, roles: GESTAO, feature: "oportunidades" },
   ]},
   { label: "Gestão", items: [
     { to: "/equipe", label: "Equipe", icon: UsersRound, roles: GESTAO },

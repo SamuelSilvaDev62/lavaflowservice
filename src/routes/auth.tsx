@@ -76,7 +76,7 @@ function AuthPage() {
           </p>
           <ul className="space-y-3 text-sm">
             <li className="flex gap-3"><TrendingUp className="h-5 w-5 shrink-0" /> Receita recorrente com assinaturas mensais</li>
-            <li className="flex gap-3"><Sparkles className="h-5 w-5 shrink-0" /> Oportunidades automáticas para vender mais</li>
+            <li className="flex gap-3"><Sparkles className="h-5 w-5 shrink-0" /> Oportunidades do dia para vender mais</li>
             <li className="flex gap-3"><Users className="h-5 w-5 shrink-0" /> Recuperação de clientes inativos por WhatsApp</li>
           </ul>
         </div>

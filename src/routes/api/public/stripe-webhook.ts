@@ -23,19 +23,16 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
 
         const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
-        // Idempotência: evento já processado é ignorado.
+        // Idempotência: só 23505 (unique_violation) é duplicado.
+        // Qualquer outro erro de banco é falha real => 500 para a Stripe reenviar.
         const { error: dupErr } = await supabaseAdmin
           .from("stripe_webhook_events")
           .insert({ id: String(event.id), type: String(event.type ?? "unknown") });
         if (dupErr) {
-          if ((dupErr as any).code === "23505" || String((dupErr as any).code) === "23505") {
-            return new Response("ok (duplicado)");
-          }
-          // 23505 = unique_violation; qualquer outro erro é real
-          if (String((dupErr as any).code) !== "23505") {
-            console.error("[stripe-webhook] falha ao registrar evento", dupErr);
-          }
-          return new Response("ok (duplicado)");
+          const code = String((dupErr as any).code ?? "");
+          if (code === "23505") return new Response("ok (duplicado)");
+          console.error("[stripe-webhook] falha ao registrar evento", { code, message: (dupErr as any).message });
+          return new Response("Erro ao registrar evento", { status: 500 });
         }
 
         const prices = priceIdMap();
@@ -62,8 +59,8 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
           const customerId = typeof subscription.customer === "string" ? subscription.customer : subscription.customer?.id;
           const ownerId = ownerIdHint ?? (await resolveOwnerId(subscription, customerId));
           if (!ownerId) {
-            console.error("[stripe-webhook] owner_id não resolvido", subscription.id);
-            return;
+            // Nunca sucesso silencioso: deixa a Stripe reenviar.
+            throw new Error(`owner_id não resolvido para subscription ${String(subscription?.id ?? "?")}`);
           }
 
           const priceId = subscription.items?.data?.[0]?.price?.id ?? null;
@@ -73,25 +70,48 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
           // Cancelada/expirada: nunca apaga dados — apenas remove o entitlement.
           const encerrada = status === "canceled" || status === "incomplete_expired";
 
-          await supabaseAdmin.from("tenant_subscriptions").upsert(
+          // Estado comercial atual (para preservar campos que não devemos perder).
+          const { data: atual, error: readErr } = await supabaseAdmin
+            .from("tenant_subscriptions")
+            .select("plan, is_founders")
+            .eq("owner_id", ownerId)
+            .maybeSingle();
+          if (readErr) throw new Error(`falha ao ler tenant_subscriptions: ${readErr.message}`);
+
+          // Price ID desconhecido em assinatura viva: falha explícita, sem zerar entitlement.
+          if (!encerrada && !mapped) {
+            throw new Error(
+              `Price ID não mapeado (${String(priceId)}) para subscription ${String(subscription?.id ?? "?")} — entitlement preservado`,
+            );
+          }
+
+          // Founders é elegibilidade histórica: nunca rebaixa por cancelamento
+          // nem por price desconhecido.
+          const isFounders = mapped ? (mapped.founders || !!atual?.is_founders) : !!atual?.is_founders;
+
+          const { error: upsertErr } = await supabaseAdmin.from("tenant_subscriptions").upsert(
             {
               owner_id: ownerId,
               stripe_customer_id: customerId ?? null,
               stripe_subscription_id: subscription.id ?? null,
               stripe_price_id: priceId,
-              plan: encerrada ? null : (mapped?.plan ?? null),
-              is_founders: mapped?.founders ?? false,
+              // Terminal: remove o plano (acesso cai por status/plan).
+              // Ativa: usa o plano mapeado.
+              plan: encerrada ? null : (mapped?.plan ?? atual?.plan ?? null),
+              is_founders: isFounders,
               subscription_status: status,
               cancel_at_period_end: !!subscription.cancel_at_period_end,
               current_period_end: periodEndUnix ? new Date(Number(periodEndUnix) * 1000).toISOString() : null,
             },
             { onConflict: "owner_id" },
           );
+          if (upsertErr) throw new Error(`falha ao gravar tenant_subscriptions: ${upsertErr.message}`);
 
-          await supabaseAdmin
+          const { error: linkErr } = await supabaseAdmin
             .from("stripe_webhook_events")
             .update({ owner_id: ownerId })
             .eq("id", String(event.id));
+          if (linkErr) throw new Error(`falha ao vincular evento ao owner: ${linkErr.message}`);
         };
 
         try {
@@ -128,7 +148,7 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
               break;
           }
         } catch (err) {
-          console.error("[stripe-webhook] erro ao processar", event.type, err);
+          console.error("[stripe-webhook] erro ao processar", event.type, err instanceof Error ? err.message : "erro");
           // Remove o registro de idempotência para permitir retry da Stripe.
           await supabaseAdmin.from("stripe_webhook_events").delete().eq("id", String(event.id));
           return new Response("Erro ao processar", { status: 500 });

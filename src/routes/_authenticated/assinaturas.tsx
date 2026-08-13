@@ -77,13 +77,13 @@ function Page() {
     navigator.clipboard.writeText(url); toast.success("Link copiado");
   };
   const compartilharWa = (slug: string, nome: string, valor: number) => {
-    const msg = `Conheça nosso plano *${nome}* por ${brl(valor)}/mês 🚗✨\nAssine pelo link: ${planoUrl(slug)}`;
+    const msg = `Conheça nosso plano *${nome}* por ${brl(valor)}/mês 🚗✨\nSolicite pelo link: ${planoUrl(slug)}`;
     window.open(`https://api.whatsapp.com/send?text=${encodeURIComponent(msg)}`, "_blank");
   };
 
   return (
     <>
-      <PageHeader title="Assinaturas" subtitle="Receita previsível mês a mês."
+      <PageHeader title="Assinaturas" subtitle="Receita previsível mês a mês. Pagamento via PIX confirmado por você."
         actions={
           <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-1" /> Novo plano</Button></DialogTrigger>
@@ -109,7 +109,7 @@ function Page() {
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground flex gap-1 items-center"><Repeat className="h-3 w-3" />MRR</p><p className="font-display text-2xl font-bold text-success">{brl(data?.mrr ?? 0)}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground flex gap-1 items-center"><Users className="h-3 w-3" />Assinantes</p><p className="font-display text-2xl font-bold">{data?.ativas ?? 0}</p></CardContent></Card>
         <Card className={data?.pendentesCount ? "border-warning/40" : ""}>
-          <CardContent className="p-4"><p className="text-xs text-muted-foreground flex gap-1 items-center"><Clock className="h-3 w-3" />Pendentes</p>
+          <CardContent className="p-4"><p className="text-xs text-muted-foreground flex gap-1 items-center"><Clock className="h-3 w-3" />Solicitações</p>
           <p className={`font-display text-2xl font-bold ${data?.pendentesCount ? "text-warning" : ""}`}>{data?.pendentesCount ?? 0}</p></CardContent>
         </Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground flex gap-1 items-center"><TrendingUp className="h-3 w-3" />ARR projetado</p><p className="font-display text-2xl font-bold text-primary">{brl((data?.mrr ?? 0) * 12)}</p></CardContent></Card>
@@ -166,6 +166,7 @@ function Page() {
           </TabsContent>
 
           <TabsContent value="pendentes">
+            <p className="text-xs text-muted-foreground mb-2">Solicitações de assinatura aguardando confirmação manual do pagamento (PIX). Confirme após receber o valor.</p>
             <Card><CardContent className="p-0"><div className="divide-y">
               {(data?.pendentes ?? []).map((a: any) => (
                 <div key={a.id} className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -180,7 +181,7 @@ function Page() {
                   </div>
                 </div>
               ))}
-              {data?.pendentes.length === 0 && <p className="p-10 text-center text-sm text-muted-foreground">Nenhuma assinatura pendente.</p>}
+              {data?.pendentes.length === 0 && <p className="p-10 text-center text-sm text-muted-foreground">Nenhuma solicitação aguardando confirmação.</p>}
             </div></CardContent></Card>
           </TabsContent>
 
