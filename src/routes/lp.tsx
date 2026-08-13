@@ -23,9 +23,9 @@ export const Route = createFileRoute("/lp")({
   head: () => ({
     meta: [
       { title: "LavaFlow — O sistema que faz seu lava-rápido faturar mais" },
-      { name: "description", content: "Recupere clientes, automatize o WhatsApp, crie assinaturas e acompanhe sua equipe. A plataforma de crescimento dos lava-rápidos." },
+      { name: "description", content: "Recupere clientes, use o WhatsApp a seu favor, crie assinaturas e acompanhe sua equipe. A plataforma de crescimento dos lava-rápidos." },
       { property: "og:title", content: "LavaFlow — Aumente o faturamento do seu lava-rápido" },
-      { property: "og:description", content: "Recupere clientes, automatize processos e crie receita recorrente com o LavaFlow." },
+      { property: "og:description", content: "Recupere clientes, organize a operação e crie receita recorrente com o LavaFlow." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
     ],
@@ -108,7 +108,7 @@ function Hero() {
             Aumente o <span className="text-primary">faturamento</span> do seu lava-rápido.
           </h1>
           <p className="mt-6 text-base sm:text-lg text-muted-foreground max-w-xl">
-            Recupere clientes, automatize o atendimento, acompanhe sua equipe e transforme sua operação em uma máquina de crescimento.
+            Recupere clientes, organize o atendimento, acompanhe sua equipe e transforme sua operação em uma máquina de crescimento.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg" className="shadow-lg shadow-primary/30">
@@ -205,8 +205,8 @@ function Benefits() {
     { e: "🚗", t: "Organize sua operação", d: "Controle veículos, clientes e serviços em tempo real." },
     { e: "💰", t: "Aumente seu faturamento", d: "Descubra oportunidades de crescimento automaticamente." },
     { e: "🔄", t: "Crie receita recorrente", d: "Venda planos de assinatura para seus clientes." },
-    { e: "🎯", t: "Fidelize clientes", d: "Programa de pontos integrado e automático." },
-    { e: "📱", t: "WhatsApp automatizado", d: "Avise clientes quando o veículo estiver pronto." },
+    { e: "🎯", t: "Fidelize clientes", d: "Programa de pontos integrado ao seu dia a dia." },
+    { e: "📱", t: "WhatsApp pronto para enviar", d: "Mensagens prontas para avisar que o veículo está pronto." },
     { e: "👥", t: "Controle sua equipe", d: "Acompanhe produtividade e desempenho." },
   ];
   return (
@@ -368,7 +368,7 @@ function Loyalty() {
   const items = [
     { i: Award, t: "Programa de pontos", d: "Cada lavagem credita pontos automaticamente." },
     { i: Repeat, t: "Assinaturas mensais", d: "Crie planos e ganhe receita previsível." },
-    { i: MessageCircle, t: "Recuperação por WhatsApp", d: "Mensagens automáticas para inativos." },
+    { i: MessageCircle, t: "Recuperação por WhatsApp", d: "Mensagens prontas para clientes inativos." },
   ];
   return (
     <section className="bg-muted/30 border-y">
@@ -431,7 +431,7 @@ function Testimonials() {
 function Pricing() {
   const plans = [
     { n: "Inicial", p: "49,90", d: "Para quem está começando.", f: ["Até 100 clientes", "1 colaborador", "Kanban e ordens", "Cadastro de serviços"], hl: false },
-    { n: "Growth", p: "99,90", d: "Para crescer com previsibilidade.", f: ["Clientes ilimitados", "Até 5 colaboradores", "Insights operacionais", "Programa de fidelidade", "WhatsApp automatizado"], hl: true },
+    { n: "Growth", p: "99,90", d: "Para crescer com previsibilidade.", f: ["Clientes ilimitados", "Até 5 colaboradores", "Insights operacionais", "Programa de fidelidade", "Mensagens prontas de WhatsApp"], hl: true },
     { n: "Pro", p: "149,90", d: "Para operações em alta escala.", f: ["Tudo do Growth", "Assinaturas mensais", "Relatórios avançados", "Multi-unidades", "Suporte prioritário"], hl: false },
   ];
   return (
@@ -472,7 +472,7 @@ function Faq() {
   const items = [
     { q: "O sistema funciona no celular?", a: "Sim. O LavaFlow é 100% responsivo e otimizado para smartphones, tablets e desktops." },
     { q: "Preciso instalar algo?", a: "Não. Tudo roda direto no navegador, sem download ou instalação." },
-    { q: "Posso usar WhatsApp?", a: "Sim. Avisos automáticos quando o veículo está pronto e campanhas de recuperação de inativos." },
+    { q: "Posso usar WhatsApp?", a: "Sim. Mensagens prontas para avisar que o veículo está pronto e campanhas de recuperação de inativos, enviadas com um toque pelo WhatsApp." },
     { q: "Meus funcionários podem acessar?", a: "Sim. Cada colaborador tem o próprio acesso ao app Meu Trabalho com produtividade e comissão." },
     { q: "Existe fidelidade?", a: "Não. Você pode cancelar quando quiser, sem multa." },
     { q: "Como funciona o teste?", a: "São 7 dias grátis com acesso a todas as funcionalidades, sem cobrança de cartão." },
