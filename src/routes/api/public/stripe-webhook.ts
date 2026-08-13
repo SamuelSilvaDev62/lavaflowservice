@@ -85,9 +85,10 @@ export const Route = createFileRoute("/api/public/stripe-webhook")({
             );
           }
 
-          // Founders é elegibilidade histórica: nunca rebaixa por cancelamento
-          // nem por price desconhecido.
-          const isFounders = mapped ? (mapped.founders || !!atual?.is_founders) : !!atual?.is_founders;
+          // Price mapeado é a fonte da verdade do plano atual: Founders Price => true,
+          // Price público => false (troca explícita confirmada rebaixa corretamente).
+          // Sem mapeamento (apenas cenário terminal desconhecido): preserva histórico.
+          const isFounders = mapped ? mapped.founders : !!atual?.is_founders;
 
           const { error: upsertErr } = await supabaseAdmin.from("tenant_subscriptions").upsert(
             {
