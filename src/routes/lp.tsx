@@ -82,7 +82,7 @@ function Nav() {
         </nav>
         <div className="flex items-center gap-2">
           <Button asChild variant="ghost" size="sm" className="hidden sm:inline-flex"><Link to="/auth">Entrar</Link></Button>
-          <Button asChild size="sm" className="shadow-sm"><a href="#planos">Começar grátis<ArrowRight className="h-3.5 w-3.5 ml-1" /></a></Button>
+          <Button asChild size="sm" className="shadow-sm"><a href="/auth">Começar grátis<ArrowRight className="h-3.5 w-3.5 ml-1" /></a></Button>
         </div>
       </div>
     </header>
@@ -108,18 +108,19 @@ function Hero() {
             Aumente o <span className="text-primary">faturamento</span> do seu lava-rápido.
           </h1>
           <p className="mt-6 text-base sm:text-lg text-muted-foreground max-w-xl">
-            Recupere clientes, organize o atendimento, acompanhe sua equipe e transforme sua operação em uma máquina de crescimento.
+            Organize clientes, agenda, ordens de serviço e equipe de graça para sempre. Quando quiser
+            crescer, o Growth mostra onde estão as oportunidades de receita.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <Button asChild size="lg" className="shadow-lg shadow-primary/30">
-              <a href="#contato">Solicitar Demonstração <ArrowRight className="h-4 w-4 ml-1" /></a>
+              <a href="/auth">Começar grátis <ArrowRight className="h-4 w-4 ml-1" /></a>
             </Button>
             <Button asChild size="lg" variant="outline">
               <a href="#beneficios">Conhecer o Sistema</a>
             </Button>
           </div>
           <div className="mt-8 flex items-center gap-6 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1"><Check className="h-4 w-4 text-primary" />7 dias grátis</div>
+            <div className="flex items-center gap-1"><Check className="h-4 w-4 text-primary" />Grátis para sempre</div>
             <div className="flex items-center gap-1"><Check className="h-4 w-4 text-primary" />Sem cartão</div>
             <div className="flex items-center gap-1"><Check className="h-4 w-4 text-primary" />Cancele quando quiser</div>
           </div>
@@ -430,18 +431,43 @@ function Testimonials() {
 /* ---------------- PRICING ---------------- */
 function Pricing() {
   const plans = [
-    { n: "Inicial", p: "49,90", d: "Para quem está começando.", f: ["Até 100 clientes", "1 colaborador", "Kanban e ordens", "Cadastro de serviços"], hl: false },
-    { n: "Growth", p: "99,90", d: "Para crescer com previsibilidade.", f: ["Clientes ilimitados", "Até 5 colaboradores", "Insights operacionais", "Programa de fidelidade", "Mensagens prontas de WhatsApp"], hl: true },
-    { n: "Pro", p: "149,90", d: "Para operações em alta escala.", f: ["Tudo do Growth", "Assinaturas mensais", "Relatórios avançados", "Multi-unidades", "Suporte prioritário"], hl: false },
+    {
+      n: "LavaFlow Free",
+      p: "0",
+      d: "Para organizar e operar seu lava-rápido.",
+      f: [
+        "Clientes e veículos",
+        "Serviços e agenda",
+        "Ordens de serviço e fila (Kanban)",
+        "Equipe e configurações",
+        "Painel operacional do dia",
+        "Grátis para sempre · sem cartão",
+      ],
+      hl: false,
+    },
+    {
+      n: "LavaFlow Growth",
+      p: "99",
+      d: "Para transformar seus dados em ações de crescimento.",
+      f: [
+        "Tudo do Free",
+        "Oportunidades do seu negócio",
+        "Recuperação de clientes inativos",
+        "Campanhas e mensagens de WhatsApp",
+        "Programa de fidelidade e assinaturas",
+        "Consultor IA e relatórios avançados",
+      ],
+      hl: true,
+    },
   ];
   return (
     <section id="planos" className="max-w-6xl mx-auto px-4 py-20 lg:py-28">
       <div className="text-center mb-12">
         <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Planos</p>
-        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Escolha o plano do seu crescimento.</h2>
-        <p className="mt-4 text-muted-foreground">Sempre atualizando com novas funcionalidades. Sem fidelidade.</p>
+        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Free organiza. Growth encontra oportunidades.</h2>
+        <p className="mt-4 text-muted-foreground">Comece grátis para sempre. Cresça quando fizer sentido — sem fidelidade.</p>
       </div>
-      <div className="grid md:grid-cols-3 gap-4 items-stretch">
+      <div className="grid gap-4 items-stretch md:grid-cols-2 md:max-w-3xl md:mx-auto">
         {plans.map((p) => (
           <Card key={p.n} className={`relative flex flex-col ${p.hl ? "border-primary shadow-2xl shadow-primary/20 lg:-translate-y-4 scale-[1.02]" : ""}`}>
             {p.hl && <Badge className="absolute -top-3 left-1/2 -translate-x-1/2 bg-primary text-primary-foreground">Mais popular</Badge>}
@@ -451,13 +477,13 @@ function Pricing() {
               <div className="my-5">
                 <span className="text-xs text-muted-foreground">R$</span>
                 <span className="font-display font-bold text-4xl">{p.p}</span>
-                <span className="text-xs text-muted-foreground">/mês</span>
+                <span className="text-xs text-muted-foreground">{p.p === "0" ? " para sempre" : "/mês"}</span>
               </div>
               <ul className="space-y-2 flex-1">
                 {p.f.map((f) => (<li key={f} className="flex items-start gap-2 text-sm"><Check className="h-4 w-4 text-primary mt-0.5 shrink-0" />{f}</li>))}
               </ul>
               <Button asChild className="mt-6 w-full" variant={p.hl ? "default" : "outline"}>
-                <a href="#contato">Começar agora</a>
+                <a href="/auth">{p.hl ? "Começar grátis e liberar o Growth depois" : "Começar grátis"}</a>
               </Button>
             </CardContent>
           </Card>
@@ -475,7 +501,7 @@ function Faq() {
     { q: "Posso usar WhatsApp?", a: "Sim. Mensagens prontas para avisar que o veículo está pronto e campanhas de recuperação de inativos, enviadas com um toque pelo WhatsApp." },
     { q: "Meus funcionários podem acessar?", a: "Sim. Cada colaborador tem o próprio acesso ao app Meu Trabalho com produtividade e comissão." },
     { q: "Existe fidelidade?", a: "Não. Você pode cancelar quando quiser, sem multa." },
-    { q: "Como funciona o teste?", a: "São 7 dias grátis com acesso a todas as funcionalidades, sem cobrança de cartão." },
+    { q: "O plano gratuito expira?", a: "Não. O LavaFlow Free é grátis para sempre e nunca bloqueia sua operação: clientes, agenda, ordens de serviço, fila e equipe seguem funcionando. O Growth (R$ 99/mês) é opcional e libera as ações de crescimento." },
   ];
   return (
     <section id="faq" className="bg-muted/30 border-y">
