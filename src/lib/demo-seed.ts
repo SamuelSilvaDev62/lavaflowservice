@@ -29,7 +29,7 @@ export const SERVICOS_DEMO = [
 ];
 
 export const FUNCIONARIOS_DEMO = [
-  { nome: "Marcos Pereira", cargo: "Lavador chefe" },
+  { nome: "Colaborador Demonstração", cargo: "Lavador chefe" },
   { nome: "João Vitor", cargo: "Lavador" },
   { nome: "Rodrigo Alves", cargo: "Lavador" },
   { nome: "Lucia Fernandes", cargo: "Atendente" },

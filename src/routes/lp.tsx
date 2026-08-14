@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Car, TrendingUp, Sparkles, MessageCircle, Award, Repeat, Users,
-  Check, X, ArrowRight, Star, BarChart3, Trophy, Clock, DollarSign,
+  Check, X, ArrowRight, BarChart3, Trophy, Clock, DollarSign,
   Instagram, Phone, ChevronRight, Smartphone,
 } from "lucide-react";
 import dashboardAsset from "@/assets/landing/app-dashboard.webp.asset.json";
@@ -145,7 +145,7 @@ function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dash
           <CardContent className="p-3 flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-success/15 text-success grid place-content-center"><TrendingUp className="h-4 w-4" /></div>
             <div>
-              <p className="text-[10px] text-muted-foreground">Receita hoje</p>
+              <p className="text-[10px] text-muted-foreground">Receita hoje · exemplo</p>
               <p className="font-display font-bold text-sm">R$ 1.840</p>
             </div>
           </CardContent>
@@ -156,7 +156,7 @@ function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dash
           <CardContent className="p-3 flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary/15 text-primary grid place-content-center"><Sparkles className="h-4 w-4" /></div>
             <div>
-              <p className="text-[10px] text-muted-foreground">Oportunidades</p>
+              <p className="text-[10px] text-muted-foreground">Oportunidades · exemplo</p>
               <p className="font-medium text-xs">12 hoje</p>
             </div>
           </CardContent>
@@ -205,7 +205,7 @@ function Benefits() {
   const items = [
     { e: "🚗", t: "Organize sua operação", d: "Controle veículos, clientes e serviços em tempo real." },
     { e: "💰", t: "Aumente seu faturamento", d: "Descubra oportunidades de crescimento automaticamente." },
-    { e: "🔄", t: "Crie receita recorrente", d: "Venda planos de assinatura para seus clientes." },
+    { e: "🔄", t: "Crie receita recorrente", d: "Monte planos de assinatura para seus clientes e acompanhe as renovações." },
     { e: "🎯", t: "Fidelize clientes", d: "Programa de pontos integrado ao seu dia a dia." },
     { e: "📱", t: "WhatsApp pronto para enviar", d: "Mensagens prontas para avisar que o veículo está pronto." },
     { e: "👥", t: "Controle sua equipe", d: "Acompanhe produtividade e desempenho." },
@@ -247,6 +247,7 @@ function MockupShowcase() {
         <div className="text-center mb-12">
           <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Demonstração</p>
           <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Visualize o LavaFlow em ação</h2>
+          <p className="mt-3 text-xs text-muted-foreground">Telas de demonstração com dados fictícios — exemplo ilustrativo da interface.</p>
         </div>
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div className="flex justify-center order-2 lg:order-1">
@@ -323,7 +324,11 @@ function TeamSection() {
     <section className="max-w-6xl mx-auto px-4 py-20 lg:py-28 grid lg:grid-cols-2 gap-12 items-center">
       <Card className="shadow-xl border-primary/10 order-2 lg:order-1">
         <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-4"><Trophy className="h-5 w-5 text-warning" /><p className="font-display font-bold">Ranking da equipe</p></div>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2"><Trophy className="h-5 w-5 text-warning" /><p className="font-display font-bold">Ranking da equipe</p></div>
+            <Badge variant="outline" className="text-[10px]">Exemplo ilustrativo</Badge>
+          </div>
+          <p className="text-[11px] text-muted-foreground mb-3">Demonstração da interface com dados fictícios — não representa resultados de clientes.</p>
           <div className="space-y-2">
             {ranking.map((r, i) => (
               <div key={r.n} className="flex items-center gap-3 p-3 rounded-xl border bg-card">
@@ -368,7 +373,7 @@ function TeamSection() {
 function Loyalty() {
   const items = [
     { i: Award, t: "Programa de pontos", d: "Cada lavagem credita pontos automaticamente." },
-    { i: Repeat, t: "Assinaturas mensais", d: "Crie planos e ganhe receita previsível." },
+    { i: Repeat, t: "Planos de assinatura para clientes", d: "Monte planos mensais e controle as renovações. A cobrança do cliente é combinada por você (PIX/manual) — o LavaFlow organiza, não cobra automaticamente." },
     { i: MessageCircle, t: "Recuperação por WhatsApp", d: "Mensagens prontas para clientes inativos." },
   ];
   return (
@@ -394,32 +399,32 @@ function Loyalty() {
   );
 }
 
-/* ---------------- TESTIMONIALS ---------------- */
+/* ---------------- PROVA DENTRO DO PRODUTO ---------------- */
 function Testimonials() {
-  const t = [
-    { n: "Marcos Pereira", c: "São Paulo · SP", e: "Lava Express", q: "Em 2 meses recuperei 38 clientes inativos. O sistema se pagou na primeira semana." },
-    { n: "Juliana Santos", c: "Belo Horizonte · MG", e: "Brilho Auto Estética", q: "As assinaturas mudaram meu negócio. Hoje tenho previsibilidade de receita todo mês." },
-    { n: "Rafael Costa", c: "Curitiba · PR", e: "Costa Detalhamento", q: "Meu time virou outro depois que cada um passou a ver sua própria produção e comissão." },
+  const itens = [
+    { i: Clock, t: "Operação registrada", d: "Lavagens, tempo por etapa e faturamento do dia, direto do que sua equipe executa." },
+    { i: Users, t: "Clientes em risco", d: "Quem parou de voltar dentro do intervalo típico do seu próprio histórico." },
+    { i: Repeat, t: "Candidatos a recorrência", d: "Clientes com frequência suficiente para entrar em fidelidade ou plano de assinatura." },
+    { i: DollarSign, t: "Potencial estimado", d: "Estimativa a partir do seu ticket médio real — projeção, não promessa." },
+    { i: TrendingUp, t: "Receita Influenciada", d: "Só aparece quando houver eventos atribuídos reais na sua operação." },
+    { i: Check, t: "Sem números inventados", d: "Todo indicador vem dos seus dados. Se ainda não há histórico, o LavaFlow diz isso." },
   ];
   return (
     <section className="max-w-6xl mx-auto px-4 py-20 lg:py-28">
       <div className="text-center mb-12">
-        <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Quem usa, recomenda</p>
-        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Resultados reais.</h2>
+        <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Prova dentro do produto</p>
+        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">O que o LavaFlow consegue medir.</h2>
+        <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
+          A prova é o seu próprio painel: cada número abaixo é calculado com os dados da sua operação.
+        </p>
       </div>
       <div className="grid md:grid-cols-3 gap-4">
-        {t.map((it) => (
-          <Card key={it.n}>
+        {itens.map((it) => (
+          <Card key={it.t}>
             <CardContent className="p-6">
-              <div className="flex gap-0.5 mb-3">{[0,1,2,3,4].map((s) => <Star key={s} className="h-4 w-4 fill-warning text-warning" />)}</div>
-              <p className="text-sm leading-relaxed">"{it.q}"</p>
-              <div className="mt-5 flex items-center gap-3 pt-4 border-t">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/40 grid place-content-center text-primary-foreground font-display font-bold">{it.n[0]}</div>
-                <div>
-                  <p className="font-semibold text-sm">{it.n}</p>
-                  <p className="text-[11px] text-muted-foreground">{it.e} · {it.c}</p>
-                </div>
-              </div>
+              <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-content-center mb-4"><it.i className="h-6 w-6" /></div>
+              <h3 className="font-display font-semibold">{it.t}</h3>
+              <p className="text-sm text-muted-foreground mt-1">{it.d}</p>
             </CardContent>
           </Card>
         ))}
@@ -500,7 +505,7 @@ function Faq() {
     { q: "Preciso instalar algo?", a: "Não. Tudo roda direto no navegador, sem download ou instalação." },
     { q: "Posso usar WhatsApp?", a: "Sim. Mensagens prontas para avisar que o veículo está pronto e campanhas de recuperação de inativos, enviadas com um toque pelo WhatsApp." },
     { q: "Meus funcionários podem acessar?", a: "Sim. Cada colaborador tem o próprio acesso com permissões por perfil, e você acompanha produtividade e comissão." },
-    { q: "Existe fidelidade?", a: "Não. Você pode cancelar quando quiser, sem multa." },
+    { q: "Existe fidelidade contratual?", a: "Não. Não há contrato de fidelidade nem multa: você pode cancelar quando quiser. (O programa de fidelidade do produto é outra coisa: são pontos e recorrência para os seus clientes.)" },
     { q: "O plano gratuito expira?", a: "Não. O LavaFlow Free é grátis para sempre e nunca bloqueia sua operação: clientes, agenda, ordens de serviço, fila e equipe seguem funcionando. O Growth (R$ 99/mês) é opcional e libera as ações de crescimento." },
   ];
   return (
@@ -531,10 +536,10 @@ function FinalCta() {
         <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_30%,white,transparent_60%)]" />
         <div className="relative">
           <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight max-w-2xl mx-auto">Pronto para aumentar o faturamento do seu lava-rápido?</h2>
-          <p className="mt-4 opacity-90 max-w-xl mx-auto">Comece hoje. Em poucos minutos seu lava-rápido está digital.</p>
+          <p className="mt-4 opacity-90 max-w-xl mx-auto">Comece grátis no LavaFlow Free. Sem cartão, sem contrato — em poucos minutos seu lava-rápido está digital.</p>
           <div className="mt-8 flex flex-wrap gap-3 justify-center">
             <Button asChild size="lg" variant="secondary" className="shadow-lg">
-              <Link to="/auth">Solicitar Demonstração <ArrowRight className="h-4 w-4 ml-1" /></Link>
+              <Link to="/auth">Criar conta grátis <ArrowRight className="h-4 w-4 ml-1" /></Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10">
               <a href="https://wa.me/" target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />Falar no WhatsApp</a>

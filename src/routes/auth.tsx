@@ -72,12 +72,13 @@ function AuthPage() {
             O sistema que aumenta o faturamento do seu lava-rápido.
           </h1>
           <p className="text-primary-foreground/85 text-lg">
-            Recupere clientes, fidelize com pontos, crie receita recorrente e tome decisões com dados.
+            Comece no <strong>LavaFlow Free</strong>: clientes, agenda, ordens de serviço, fila e equipe.
+            Grátis para sempre, sem cartão.
           </p>
           <ul className="space-y-3 text-sm">
-            <li className="flex gap-3"><TrendingUp className="h-5 w-5 shrink-0" /> Receita recorrente com assinaturas mensais</li>
-            <li className="flex gap-3"><Sparkles className="h-5 w-5 shrink-0" /> Oportunidades do dia para vender mais</li>
-            <li className="flex gap-3"><Users className="h-5 w-5 shrink-0" /> Recuperação de clientes inativos por WhatsApp</li>
+            <li className="flex gap-3"><Users className="h-5 w-5 shrink-0" /> Free organiza sua operação do dia</li>
+            <li className="flex gap-3"><Sparkles className="h-5 w-5 shrink-0" /> Growth (opcional, R$ 99/mês) encontra oportunidades nos seus dados</li>
+            <li className="flex gap-3"><TrendingUp className="h-5 w-5 shrink-0" /> Você decide quando evoluir — nada é ativado no cadastro</li>
           </ul>
         </div>
         <p className="text-xs text-primary-foreground/70">© LavaFlow · feito para crescer com você</p>
@@ -116,6 +117,12 @@ function AuthPage() {
                 </form>
               </TabsContent>
               <TabsContent value="signup">
+                <div className="mb-4 rounded-xl border bg-muted/40 p-3">
+                  <p className="text-sm font-semibold">Comece no LavaFlow Free.</p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Grátis para sempre, sem cartão. O Growth é uma evolução opcional e não é ativado no cadastro.
+                  </p>
+                </div>
                 <form onSubmit={signUpEmail} className="space-y-3">
                   <div><Label>Nome</Label><Input required value={nome} onChange={(e) => setNome(e.target.value)} /></div>
                   <div><Label>Email</Label><Input type="email" required value={email} onChange={(e) => setEmail(e.target.value)} /></div>

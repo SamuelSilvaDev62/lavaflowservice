@@ -115,7 +115,11 @@ export function priceIdMap(): Record<string, { plan: "essencial" | "growth" | "i
   return map;
 }
 
-/** Configuração opcional do Customer Portal (necessária para troca de plano). */
+/**
+ * Configuração opcional do Customer Portal (legado).
+ * NÃO é requisito no modelo atual: com um único plano público pago, o portal
+ * genérico já cobre cartão, faturas e cancelamento. Troca de plano não existe.
+ */
 export function getPortalConfigurationId(): string | undefined {
   return process.env["STRIPE_PORTAL_CONFIGURATION_ID"] || undefined;
 }

@@ -52,7 +52,7 @@ export const Route = createFileRoute("/api/assistente-chat")({
           await assertFeature(ownerId, "ai_assistant");
         } catch (err) {
           if (err instanceof FeatureBlockedError) {
-            return new Response("Recurso disponível no plano Growth", { status: 402 });
+            return new Response("Recurso disponível no plano Growth", { status: err.statusCode });
           }
           throw err;
         }

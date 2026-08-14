@@ -47,14 +47,36 @@ export function GrowthEngineCard() {
     return (
       <Card className="mt-4">
         <CardContent className="p-4">
-          <div className="mb-3 flex items-center gap-2">
+          <div className="mb-3 flex flex-wrap items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
             <h2 className="font-display font-semibold">Oportunidades de crescimento</h2>
+            {data.isTrial && data.trialDiasRestantes !== null && (
+              <Badge variant="secondary" className="text-[10px] font-normal">
+                Teste Growth · {data.trialDiasRestantes}{" "}
+                {data.trialDiasRestantes === 1 ? "dia restante" : "dias restantes"}
+              </Badge>
+            )}
           </div>
+          {data.isTrial && data.receitaInfluenciada > 0 && (
+            <p className="mb-3 rounded-2xl bg-primary/5 p-3 text-sm">
+              <strong className="font-display tabular-nums">{brl(data.receitaInfluenciada)}</strong>{" "}
+              de receita influenciada/atribuída no período disponível no sistema.{" "}
+              <span className="text-muted-foreground">
+                Atribuição por janela de 14 dias após a ação — indicador de acompanhamento, não de causalidade.
+              </span>
+            </p>
+          )}
           {op.total === 0 ? (
-            <div className="flex items-center gap-2 rounded-2xl bg-muted/30 p-3 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-success" />
-              Nenhuma oportunidade pendente agora. Sua base está em dia.
+            <div className="space-y-2">
+              <div className="flex items-center gap-2 rounded-2xl bg-muted/30 p-3 text-sm text-muted-foreground">
+                <CheckCircle2 className="h-4 w-4 text-success" />
+                Nenhuma oportunidade pendente agora. Sua base está em dia.
+              </div>
+              <Button asChild size="sm" variant="outline">
+                <Link to="/oportunidades">
+                  Abrir oportunidades <ArrowRight className="h-3 w-3" />
+                </Link>
+              </Button>
             </div>
           ) : (
             <>
