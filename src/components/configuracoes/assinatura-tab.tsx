@@ -44,7 +44,7 @@ export function AssinaturaTab() {
             <div className="min-w-0 space-y-1">
               <p className="text-xs uppercase tracking-wide text-muted-foreground">Plano atual</p>
               <h2 className="font-display text-xl font-bold">
-                {isLoading ? "…" : planLabel(entitlement.plan, entitlement.isFounders)}
+                {isLoading ? "…" : tierLabel(entitlement)}
               </h2>
               <p className="text-sm text-muted-foreground">
                 {STATUS_LABELS[entitlement.status] ?? entitlement.status}
@@ -63,7 +63,7 @@ export function AssinaturaTab() {
             <div>
               <dt className="text-xs text-muted-foreground">Preço</dt>
               <dd className="font-display font-semibold tabular-nums">
-                {entitlement.isFounders ? `${brl(99)}/mês` : planoAtual ? `${brl(planoAtual.precoMensal)}/mês` : "—"}
+                {entitlement.isFounders ? `${brl(GROWTH_PRICE_BRL)}/mês` : tierAtual ? (tierAtual.precoMensal === 0 ? "R$ 0" : `${brl(tierAtual.precoMensal)}/mês`) : "—"}
               </dd>
             </div>
             <div>
@@ -91,7 +91,7 @@ export function AssinaturaTab() {
             <Button asChild className="w-full sm:w-auto">
               <Link to="/planos">
                 <Sparkles className="mr-2 h-4 w-4" />
-                {entitlement.planoAssinado ? "Trocar de plano" : "Escolher plano"}
+                {entitlement.tier === "growth" ? "Ver planos" : "Conhecer o Growth"}
               </Link>
             </Button>
           </div>
@@ -110,22 +110,22 @@ export function AssinaturaTab() {
         </CardContent>
       </Card>
 
-      <ComparacaoPlanos planoAtual={entitlement.plan} />
+      <ComparacaoPlanos tierAtual={entitlement.tier} />
       <LinkPublicoCard />
     </div>
   );
 }
 
-function ComparacaoPlanos({ planoAtual }: { planoAtual: string | null }) {
+function ComparacaoPlanos({ tierAtual }: { tierAtual: string }) {
   return (
-    <div className="grid gap-3 md:grid-cols-3">
-      {PLANS.map((p) => (
+    <div className="grid gap-3 md:grid-cols-2">
+      {TIERS.map((p) => (
         <Card
           key={p.id}
           className={cn(
             "relative",
             p.recomendado && "border-primary/60 ring-1 ring-primary/30",
-            planoAtual === p.id && "bg-muted/40",
+            tierAtual === p.id && "bg-muted/40",
           )}
         >
           {p.recomendado && (
@@ -136,10 +136,12 @@ function ComparacaoPlanos({ planoAtual }: { planoAtual: string | null }) {
           <CardContent className="space-y-2 p-4">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <h3 className="font-display font-bold">{p.nome}</h3>
-              <span className="font-display font-semibold tabular-nums">{brl(p.precoMensal)}/mês</span>
+              <span className="font-display font-semibold tabular-nums">
+                {p.precoMensal === 0 ? "R$ 0" : `${brl(p.precoMensal)}/mês`}
+              </span>
             </div>
             <ul className="space-y-1.5 text-sm">
-              {p.destaques.map((d) => (
+              {p.destaques.map((d: string) => (
                 <li key={d} className="flex gap-2">
                   <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                   <span className="min-w-0 break-words">{d}</span>
