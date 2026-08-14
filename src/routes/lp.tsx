@@ -205,7 +205,7 @@ function Benefits() {
   const items = [
     { e: "🚗", t: "Organize sua operação", d: "Controle veículos, clientes e serviços em tempo real." },
     { e: "💰", t: "Aumente seu faturamento", d: "Descubra oportunidades de crescimento automaticamente." },
-    { e: "🔄", t: "Crie receita recorrente", d: "Venda planos de assinatura para seus clientes." },
+    { e: "🔄", t: "Crie receita recorrente", d: "Monte planos de assinatura para seus clientes e acompanhe as renovações." },
     { e: "🎯", t: "Fidelize clientes", d: "Programa de pontos integrado ao seu dia a dia." },
     { e: "📱", t: "WhatsApp pronto para enviar", d: "Mensagens prontas para avisar que o veículo está pronto." },
     { e: "👥", t: "Controle sua equipe", d: "Acompanhe produtividade e desempenho." },
@@ -373,7 +373,7 @@ function TeamSection() {
 function Loyalty() {
   const items = [
     { i: Award, t: "Programa de pontos", d: "Cada lavagem credita pontos automaticamente." },
-    { i: Repeat, t: "Assinaturas mensais", d: "Crie planos e ganhe receita previsível." },
+    { i: Repeat, t: "Planos de assinatura para clientes", d: "Monte planos mensais e controle as renovações. A cobrança do cliente é combinada por você (PIX/manual) — o LavaFlow organiza, não cobra automaticamente." },
     { i: MessageCircle, t: "Recuperação por WhatsApp", d: "Mensagens prontas para clientes inativos." },
   ];
   return (
