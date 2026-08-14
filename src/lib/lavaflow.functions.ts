@@ -2397,11 +2397,9 @@ async function getOwnerScope(
   const current = selfOwner ?? sorted[0];
   const ownerId = current?.owner_id ?? userId;
 
-  // Bloqueio de operação sem assinatura/trial válido (fail closed).
-  if (!opts?.skipSubscription) {
-    const { assertActiveSubscription } = await import("@/lib/entitlements.server");
-    await assertActiveSubscription(ownerId);
-  }
+  // Free organiza: a operação núcleo NUNCA depende de assinatura.
+  // Recursos Growth continuam protegidos por assertPlanFeature/assertFeature.
+  void opts;
 
   return {
     ownerId,
