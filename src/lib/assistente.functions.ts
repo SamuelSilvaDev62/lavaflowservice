@@ -1,7 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
-/** Resumo executivo do Consultor IA (plano Intelligence). */
+/** Resumo executivo do Consultor IA (Growth). */
 export const getConsultorContexto = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
@@ -15,7 +15,7 @@ export const getConsultorContexto = createServerFn({ method: "GET" })
     return { contexto: await buildConsultorContexto(ownerId) };
   });
 
-/** Análises inteligentes usadas nos relatórios (plano Intelligence). */
+/** Análises inteligentes usadas nos relatórios (Growth). */
 export const getAnalisesInteligentes = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
