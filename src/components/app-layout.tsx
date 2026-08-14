@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Lock,
   Menu,
   Settings,
   Target,
