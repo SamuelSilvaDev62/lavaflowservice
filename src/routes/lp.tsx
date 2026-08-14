@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import {
   Car, TrendingUp, Sparkles, MessageCircle, Award, Repeat, Users,
-  Check, X, ArrowRight, Star, BarChart3, Trophy, Clock, DollarSign,
+  Check, X, ArrowRight, BarChart3, Trophy, Clock, DollarSign,
   Instagram, Phone, ChevronRight, Smartphone,
 } from "lucide-react";
 import dashboardAsset from "@/assets/landing/app-dashboard.webp.asset.json";
@@ -323,7 +323,11 @@ function TeamSection() {
     <section className="max-w-6xl mx-auto px-4 py-20 lg:py-28 grid lg:grid-cols-2 gap-12 items-center">
       <Card className="shadow-xl border-primary/10 order-2 lg:order-1">
         <CardContent className="p-6">
-          <div className="flex items-center gap-2 mb-4"><Trophy className="h-5 w-5 text-warning" /><p className="font-display font-bold">Ranking da equipe</p></div>
+          <div className="flex items-center justify-between gap-2 mb-4">
+            <div className="flex items-center gap-2"><Trophy className="h-5 w-5 text-warning" /><p className="font-display font-bold">Ranking da equipe</p></div>
+            <Badge variant="outline" className="text-[10px]">Exemplo ilustrativo</Badge>
+          </div>
+          <p className="text-[11px] text-muted-foreground mb-3">Demonstração da interface com dados fictícios — não representa resultados de clientes.</p>
           <div className="space-y-2">
             {ranking.map((r, i) => (
               <div key={r.n} className="flex items-center gap-3 p-3 rounded-xl border bg-card">
@@ -500,7 +504,7 @@ function Faq() {
     { q: "Preciso instalar algo?", a: "Não. Tudo roda direto no navegador, sem download ou instalação." },
     { q: "Posso usar WhatsApp?", a: "Sim. Mensagens prontas para avisar que o veículo está pronto e campanhas de recuperação de inativos, enviadas com um toque pelo WhatsApp." },
     { q: "Meus funcionários podem acessar?", a: "Sim. Cada colaborador tem o próprio acesso com permissões por perfil, e você acompanha produtividade e comissão." },
-    { q: "Existe fidelidade?", a: "Não. Você pode cancelar quando quiser, sem multa." },
+    { q: "Existe fidelidade contratual?", a: "Não. Não há contrato de fidelidade nem multa: você pode cancelar quando quiser. (O programa de fidelidade do produto é outra coisa: são pontos e recorrência para os seus clientes.)" },
     { q: "O plano gratuito expira?", a: "Não. O LavaFlow Free é grátis para sempre e nunca bloqueia sua operação: clientes, agenda, ordens de serviço, fila e equipe seguem funcionando. O Growth (R$ 99/mês) é opcional e libera as ações de crescimento." },
   ];
   return (
@@ -531,10 +535,10 @@ function FinalCta() {
         <div className="absolute inset-0 opacity-20 bg-[radial-gradient(circle_at_30%_30%,white,transparent_60%)]" />
         <div className="relative">
           <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight max-w-2xl mx-auto">Pronto para aumentar o faturamento do seu lava-rápido?</h2>
-          <p className="mt-4 opacity-90 max-w-xl mx-auto">Comece hoje. Em poucos minutos seu lava-rápido está digital.</p>
+          <p className="mt-4 opacity-90 max-w-xl mx-auto">Comece grátis no LavaFlow Free. Sem cartão, sem contrato — em poucos minutos seu lava-rápido está digital.</p>
           <div className="mt-8 flex flex-wrap gap-3 justify-center">
             <Button asChild size="lg" variant="secondary" className="shadow-lg">
-              <Link to="/auth">Solicitar Demonstração <ArrowRight className="h-4 w-4 ml-1" /></Link>
+              <Link to="/auth">Criar conta grátis <ArrowRight className="h-4 w-4 ml-1" /></Link>
             </Button>
             <Button asChild size="lg" variant="outline" className="bg-transparent border-primary-foreground/40 text-primary-foreground hover:bg-primary-foreground/10">
               <a href="https://wa.me/" target="_blank" rel="noreferrer"><MessageCircle className="h-4 w-4 mr-1" />Falar no WhatsApp</a>
