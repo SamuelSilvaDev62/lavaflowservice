@@ -1,185 +1,226 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { useEffect } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Crown, Sparkles } from "lucide-react";
+import { Check, CreditCard, Crown, Sparkles, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import { RequireRole } from "@/components/require-role";
+import { GESTAO } from "@/lib/rbac";
 import { useEntitlement } from "@/hooks/use-entitlement";
-import { abrirPortalAssinatura, criarCheckoutAssinatura, trocarPlanoAssinatura } from "@/lib/billing.functions";
-import { FOUNDERS_OFFER, PLANS, STATUS_LABELS, planLabel, type PlanId } from "@/lib/plans";
+import { abrirPortalAssinatura, criarCheckoutAssinatura } from "@/lib/billing.functions";
+import { ativarTrialGrowth, getGrowthPreview } from "@/lib/growth.functions";
+import { GROWTH_TRIAL_DAYS, STATUS_LABELS, TIERS, tierLabel } from "@/lib/plans";
 import { brl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/planos")({
-  component: PlanosPage,
   head: () => ({
     meta: [
-      { title: "Planos e assinatura — LavaFlow" },
-      { name: "description", content: "Escolha o plano do seu lava-rápido: Essencial, Growth ou Intelligence." },
-      { property: "og:title", content: "Planos e assinatura — LavaFlow" },
-      { property: "og:description", content: "Escolha o plano do seu lava-rápido: Essencial, Growth ou Intelligence." },
+      { title: "Planos LavaFlow — Free organiza, Growth cresce" },
+      {
+        name: "description",
+        content:
+          "LavaFlow Free é grátis para sempre para operar seu lava-rápido. Growth por R$ 99/mês transforma seus dados em ações de crescimento.",
+      },
+      { property: "og:title", content: "Planos LavaFlow — Free e Growth" },
+      {
+        property: "og:description",
+        content: "Free organiza sua operação. Growth encontra as oportunidades de receita.",
+      },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary_large_image" },
     ],
   }),
+  component: () => (
+    <RequireRole roles={GESTAO}>
+      <PlanosPage />
+    </RequireRole>
+  ),
 });
 
+function dataBr(iso?: string | null) {
+  return iso ? new Date(iso).toLocaleDateString("pt-BR") : "—";
+}
+
 function PlanosPage() {
-  const { entitlement, stripeConfigurado, hasManagedSubscription, refetch } = useEntitlement();
   const qc = useQueryClient();
-  const checkout = useServerFn(criarCheckoutAssinatura);
-  const trocar = useServerFn(trocarPlanoAssinatura);
-  const portal = useServerFn(abrirPortalAssinatura);
+  const { entitlement, stripeConfigurado, hasManagedSubscription, isLoading } = useEntitlement();
 
-  // Voltando da Stripe: revalida o entitlement para o menu/gates refletirem o plano novo.
-  useEffect(() => {
-    void qc.invalidateQueries({ queryKey: ["meu-plano"] });
-  }, [qc]);
-
-  const irPara = (url?: string | null) => {
-    if (url) window.location.href = url;
-    else toast.error("Não foi possível continuar. Tente novamente em instantes.");
-  };
-
-  const assinar = useMutation({
-    mutationFn: (plan: PlanId) => checkout({ data: { plan, founders: false } }),
-    onSuccess: (r: any) => {
-      // Backend detectou assinatura viva na Stripe: nunca criar cobrança nova.
-      if (r?.modo === "trocar" && !r?.url) {
-        toast.info(r?.motivo ?? "Você já tem uma assinatura ativa. Use “Trocar plano”.");
-        void refetch();
-        return;
-      }
-      irPara(r?.url);
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Falha ao iniciar assinatura"),
+  const previewFn = useServerFn(getGrowthPreview);
+  const preview = useQuery({
+    queryKey: ["growth-preview"],
+    queryFn: () => previewFn(),
+    staleTime: 5 * 60_000,
+    retry: 0,
   });
 
-  const trocarPlano = useMutation({
-    mutationFn: (plan: PlanId) => trocar({ data: { plan } }),
+  const checkoutFn = useServerFn(criarCheckoutAssinatura);
+  const portalFn = useServerFn(abrirPortalAssinatura);
+  const trialFn = useServerFn(ativarTrialGrowth);
+
+  const checkout = useMutation({
+    mutationFn: () => checkoutFn(),
     onSuccess: (r: any) => {
-      if (r?.modo === "atual") {
-        toast.info("Este já é o plano da sua assinatura.");
-        void refetch();
-        return;
-      }
-      irPara(r?.url);
+      if (r?.url) window.location.href = r.url;
+      else toast.error(r?.motivo ?? "Não foi possível iniciar a assinatura.");
     },
-    onError: (e: any) => toast.error(e?.message ?? "Falha ao abrir a troca de plano"),
+    onError: (e: any) => toast.error(e?.message ?? "Falha ao iniciar a assinatura"),
   });
 
-  const gerenciar = useMutation({
-    mutationFn: () => portal(),
-    onSuccess: (r: any) => irPara(r?.url),
+  const portal = useMutation({
+    mutationFn: () => portalFn(),
+    onSuccess: (r: any) => {
+      if (r?.url) window.location.href = r.url;
+      else toast.error("Não foi possível abrir o portal.");
+    },
     onError: (e: any) => toast.error(e?.message ?? "Falha ao abrir o portal"),
   });
 
-  const ocupado = assinar.isPending || trocarPlano.isPending || gerenciar.isPending;
+  const trial = useMutation({
+    mutationFn: () => trialFn(),
+    onSuccess: (r: any) => {
+      toast.success(`Growth liberado por ${r?.dias ?? GROWTH_TRIAL_DAYS} dias. Sem cartão.`);
+      qc.invalidateQueries({ queryKey: ["meu-plano"] });
+      qc.invalidateQueries({ queryKey: ["growth-preview"] });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Não foi possível ativar o teste"),
+  });
+
+  const noGrowth = entitlement.tier === "growth";
+  const trialElegivel = !noGrowth && !entitlement.trialUsado && !!preview.data?.growthReady;
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-6 px-4 py-6">
-      <header className="space-y-2">
+    <div className="space-y-5">
+      <header className="space-y-1.5">
+        <p className="text-[11px] font-semibold uppercase tracking-widest text-primary">
+          Free organiza. Growth encontra oportunidades.
+        </p>
         <h1 className="font-display text-2xl font-bold">Planos</h1>
         <p className="text-sm text-muted-foreground">
-          Plano atual: <strong>{planLabel(entitlement.plan, entitlement.isFounders)}</strong> ·{" "}
-          {STATUS_LABELS[entitlement.status] ?? entitlement.status}
-          {entitlement.isTrial && entitlement.trialEndsAt
-            ? ` · teste até ${new Date(entitlement.trialEndsAt).toLocaleDateString("pt-BR")}`
-            : ""}
+          {isLoading
+            ? "Carregando seu plano…"
+            : `Seu plano atual: ${tierLabel(entitlement)} · ${STATUS_LABELS[entitlement.status] ?? entitlement.status}`}
         </p>
-        {entitlement.isFounders && (
-          <Badge className="gap-1">
-            <Crown className="h-3.5 w-3.5" /> Oferta Founders — acesso completo
-          </Badge>
-        )}
       </header>
 
-      {!stripeConfigurado && (
-        <Card>
-          <CardContent className="p-4 text-sm text-muted-foreground">
-            A cobrança ainda não está configurada neste ambiente. Assim que as credenciais de
-            pagamento forem adicionadas, o botão de assinatura funcionará normalmente.
+      {preview.data?.oportunidades?.total ? (
+        <Card className="border-primary/40">
+          <CardContent className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5">
+            <div className="min-w-0 space-y-1">
+              <p className="inline-flex items-center gap-1.5 text-sm font-semibold">
+                <TrendingUp className="h-4 w-4 text-primary" />
+                {preview.data.oportunidades.total} oportunidades identificadas na sua operação
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Potencial estimado de {brl(preview.data.oportunidades.potencialEstimado)} — estimativa
+                a partir do seu ticket médio e histórico, não é receita garantida.
+              </p>
+            </div>
           </CardContent>
         </Card>
-      )}
+      ) : null}
 
-      <div className="grid gap-4 md:grid-cols-3">
-        {PLANS.map((plano) => {
-          // Founders mantém acesso equivalente ao Intelligence: esse card conta como atual.
-          const atual =
-            entitlement.planoAssinado === plano.id ||
-            (entitlement.isFounders && plano.id === FOUNDERS_OFFER.planoEquivalente);
+      <div className="grid gap-3 md:grid-cols-2">
+        {TIERS.map((t) => {
+          const atual = entitlement.tier === t.id;
           return (
             <Card
-              key={plano.id}
+              key={t.id}
               className={cn(
-                "relative flex h-full flex-col",
-                plano.recomendado && "border-primary/60 ring-1 ring-primary/30",
+                "relative flex flex-col",
+                t.recomendado && "border-primary/60 ring-1 ring-primary/30",
+                atual && "bg-muted/40",
               )}
             >
-              {plano.recomendado && (
+              {t.recomendado && (
                 <Badge className="absolute -top-2 left-4 gap-1">
                   <Sparkles className="h-3 w-3" /> Recomendado
                 </Badge>
               )}
-              <CardContent className="flex flex-1 flex-col gap-4 p-5">
+              <CardContent className="flex flex-1 flex-col gap-3 p-4 sm:p-5">
                 <div className="space-y-1">
-                  <h2 className="font-display text-lg font-bold">{plano.nome}</h2>
-                  <p className="font-display text-2xl font-bold tabular-nums">
-                    {brl(plano.precoMensal)}
-                    <span className="text-sm font-normal text-muted-foreground">/mês</span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">{plano.resumo}</p>
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <h2 className="font-display text-lg font-bold">{t.nome}</h2>
+                    <span className="font-display font-semibold tabular-nums">
+                      {t.precoMensal === 0 ? "R$ 0" : `${brl(t.precoMensal)}/mês`}
+                    </span>
+                  </div>
+                  <p className="text-sm text-muted-foreground">{t.resumo}</p>
                 </div>
-                <ul className="flex-1 space-y-2 text-sm">
-                  {plano.destaques.map((d) => (
+
+                <ul className="flex-1 space-y-1.5 text-sm">
+                  {t.destaques.map((d: string) => (
                     <li key={d} className="flex gap-2">
                       <Check className="mt-0.5 h-4 w-4 shrink-0 text-success" />
                       <span className="min-w-0 break-words">{d}</span>
                     </li>
                   ))}
                 </ul>
-                {atual ? (
+
+                {t.id === "free" ? (
+                  <Button variant="outline" disabled className="w-full">
+                    {entitlement.tier === "free" ? "Seu plano atual" : "Incluído no Growth"}
+                  </Button>
+                ) : atual ? (
                   <div className="space-y-2">
-                    <Button className="w-full" variant="outline" disabled>
-                      Plano atual
+                    <Button variant="outline" disabled className="w-full">
+                      <Crown className="mr-2 h-4 w-4" />
+                      {entitlement.isFounders
+                        ? "Founders · acesso completo"
+                        : entitlement.isTrial
+                          ? `Em teste até ${dataBr(entitlement.trialEndsAt)}`
+                          : "Plano atual"}
                     </Button>
+                    {entitlement.isTrial && !entitlement.isFounders && (
+                      <Button className="w-full" disabled={checkout.isPending} onClick={() => checkout.mutate()}>
+                        <CreditCard className="mr-2 h-4 w-4" />
+                        {checkout.isPending ? "Abrindo…" : "Assinar Growth agora"}
+                      </Button>
+                    )}
+                    {hasManagedSubscription && stripeConfigurado && (
+                      <Button
+                        variant="ghost"
+                        className="w-full"
+                        disabled={portal.isPending}
+                        onClick={() => portal.mutate()}
+                      >
+                        {portal.isPending ? "Abrindo…" : "Gerenciar assinatura"}
+                      </Button>
+                    )}
                     {entitlement.cancelAtPeriodEnd && (
                       <p className="text-xs text-warning-foreground">
-                        Assinatura cancelando no fim do período. Reative em “Gerenciar assinatura”.
+                        Cancelamento agendado — acesso Growth até {dataBr(entitlement.currentPeriodEnd)}.
                       </p>
                     )}
                   </div>
-                ) : hasManagedSubscription ? (
-                  <Button
-                    className="w-full"
-                    variant={plano.recomendado ? "default" : "outline"}
-                    disabled={ocupado || !stripeConfigurado}
-                    onClick={() => {
-                      // Founder nunca perde o benefício por um clique comum.
-                      if (
-                        entitlement.isFounders &&
-                        !window.confirm(
-                          `Trocar para ${plano.nome} encerra a oferta Founders (R$ 99 com acesso completo). Deseja continuar?`,
-                        )
-                      ) {
-                        return;
-                      }
-                      trocarPlano.mutate(plano.id);
-                    }}
-                  >
-                    {trocarPlano.isPending ? "Abrindo…" : `Trocar para ${plano.nome}`}
-                  </Button>
                 ) : (
-                  <Button
-                    className="w-full"
-                    variant={plano.recomendado ? "default" : "outline"}
-                    disabled={ocupado || !stripeConfigurado}
-                    onClick={() => assinar.mutate(plano.id)}
-                  >
-                    {assinar.isPending ? "Abrindo…" : "Assinar"}
-                  </Button>
+                  <div className="space-y-2">
+                    <Button
+                      className="w-full"
+                      disabled={checkout.isPending || !stripeConfigurado}
+                      onClick={() => checkout.mutate()}
+                    >
+                      <Sparkles className="mr-2 h-4 w-4" />
+                      {checkout.isPending ? "Abrindo…" : `Assinar Growth · ${brl(t.precoMensal)}/mês`}
+                    </Button>
+                    {trialElegivel && (
+                      <Button
+                        variant="outline"
+                        className="w-full"
+                        disabled={trial.isPending}
+                        onClick={() => trial.mutate()}
+                      >
+                        {trial.isPending ? "Ativando…" : `Testar ${GROWTH_TRIAL_DAYS} dias sem cartão`}
+                      </Button>
+                    )}
+                    {!stripeConfigurado && (
+                      <p className="text-xs text-muted-foreground">
+                        A cobrança recorrente ainda não está configurada neste ambiente.
+                      </p>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>
@@ -187,24 +228,12 @@ function PlanosPage() {
         })}
       </div>
 
-      {hasManagedSubscription && stripeConfigurado && (
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
-          <Button
-            variant="outline"
-            disabled={ocupado}
-            onClick={() => gerenciar.mutate()}
-          >
-            {gerenciar.isPending ? "Abrindo…" : "Gerenciar assinatura"}
-          </Button>
-          <p className="text-xs text-muted-foreground">
-            Cartão, faturas, cancelamento e reativação ficam no portal de assinatura.
-          </p>
-        </div>
-      )}
-
       <p className="text-xs text-muted-foreground">
-        Pagamento processado pela Stripe. Você pode cancelar ou trocar de plano quando quiser em
-        Configurações → Assinatura. Cancelamento nunca apaga seus dados.
+        O plano Free é grátis para sempre e nunca bloqueia sua operação. Precisa de ajuda com cobrança?{" "}
+        <Link to="/configuracoes" className="underline">
+          Configurações → Assinatura
+        </Link>
+        .
       </p>
     </div>
   );
