@@ -14,6 +14,7 @@ import {
   LayoutDashboard,
   ListChecks,
   LogOut,
+  Lock,
   Menu,
   Settings,
   Target,
@@ -34,7 +35,7 @@ import { ADMINS, GESTAO, OPERACIONAL, type AppRole, ROLE_LABELS } from "@/lib/rb
 import { useEntitlement } from "@/hooks/use-entitlement";
 import type { FeatureKey } from "@/lib/plans";
 
-type NavItem = { to: string; label: string; icon: any; tour?: string; roles: AppRole[]; feature?: FeatureKey };
+type NavItem = { to: string; label: string; icon: any; tour?: string; roles: AppRole[]; feature?: FeatureKey; bloqueado?: boolean };
 type NavGroup = { label: string; items: NavItem[] };
 
 const groupsAll: NavGroup[] = [
@@ -77,11 +78,13 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const groups: NavGroup[] = groupsAll
     .map((g) => ({
       ...g,
-      items: g.items.filter(
-        (it) =>
-          (!role || it.roles.includes(role)) &&
-          (!it.feature || loadingPlano || can(it.feature)),
-      ),
+      // Recursos Growth nunca desaparecem: aparecem com cadeado (motor de conversão).
+      items: g.items
+        .filter((it) => !role || it.roles.includes(role))
+        .map((it) => ({
+          ...it,
+          bloqueado: !!it.feature && !loadingPlano && !can(it.feature),
+        })),
     }))
     .filter((g) => g.items.length > 0);
 
@@ -143,7 +146,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
                       )}>
                         {active && <span className="absolute left-0 top-1/2 -translate-y-1/2 h-6 w-1 rounded-r-full bg-primary" />}
                         <Icon className={cn("h-5 w-5 transition-transform duration-200 group-hover:scale-110", active && "text-primary")} />
-                        <span>{it.label}</span>
+                        <span className="flex-1">{it.label}</span>
+                        {(it as any).bloqueado && (
+                          <Lock className="h-3.5 w-3.5 text-primary/70" aria-label="Recurso Growth" />
+                        )}
                       </Link>
                     </li>
                   );

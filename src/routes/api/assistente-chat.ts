@@ -10,7 +10,7 @@ function sanitizar(err: any): string {
 
 /**
  * Chat do Consultor IA. Autentica pelo bearer do usuário, resolve o tenant
- * no servidor (nunca vem do cliente) e exige o plano Intelligence.
+ * no servidor (nunca vem do cliente) e exige o Growth.
  */
 export const Route = createFileRoute("/api/assistente-chat")({
   server: {
@@ -52,7 +52,7 @@ export const Route = createFileRoute("/api/assistente-chat")({
           await assertFeature(ownerId, "ai_assistant");
         } catch (err) {
           if (err instanceof FeatureBlockedError) {
-            return new Response("Recurso disponível no plano Intelligence", { status: 402 });
+            return new Response("Recurso disponível no plano Growth", { status: 402 });
           }
           throw err;
         }

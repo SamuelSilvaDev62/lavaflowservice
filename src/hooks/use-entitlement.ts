@@ -3,9 +3,10 @@ import { useServerFn } from "@tanstack/react-start";
 import { getMeuPlano } from "@/lib/billing.functions";
 import { canUseFeature, getEntitlement, type Entitlement, type FeatureKey } from "@/lib/plans";
 
+/** Estado seguro: Free. Operação núcleo continua liberada. */
 const FALLBACK: Entitlement = getEntitlement(null);
 
-/** Plano vigente do estabelecimento (cacheado). */
+/** Tier vigente do estabelecimento (cacheado). */
 export function useEntitlement() {
   const fn = useServerFn(getMeuPlano);
   const q = useQuery({
@@ -16,17 +17,20 @@ export function useEntitlement() {
     retry: 1,
   });
 
-  // Fail closed: erro ao consultar entitlement nunca libera recurso premium.
+  // Fail closed apenas para Growth: erro de leitura nunca libera premium,
+  // mas também não bloqueia o núcleo Free (features Free passam sempre).
   const entitlement = (q.isError ? FALLBACK : (q.data?.entitlement ?? FALLBACK)) as Entitlement;
 
   return {
     entitlement,
+    tier: entitlement.tier,
+    growthActive: entitlement.growthActive,
     stripeConfigurado: q.data?.stripeConfigurado ?? false,
     hasManagedSubscription: q.data?.assinaturaGerenciavel ?? false,
     isLoading: q.isLoading,
     isError: q.isError,
     refetch: q.refetch,
-    can: (feature: FeatureKey) => (q.isError ? false : canUseFeature(entitlement, feature)),
+    can: (feature: FeatureKey) => canUseFeature(entitlement, feature),
   };
 }
 

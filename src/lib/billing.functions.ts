@@ -1,8 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-
-const PLAN_IDS = ["essencial", "growth", "intelligence"] as const;
 
 /** Plano/assinatura do tenant atual (usado pela UI e pelos gates). */
 export const getMeuPlano = createServerFn({ method: "GET" })
@@ -28,17 +25,18 @@ export const getMeuPlano = createServerFn({ method: "GET" })
   });
 
 /**
- * Inicia o Checkout da Stripe (assinatura recorrente). Somente owner/admin.
- * Anti-duplicação: se existir QUALQUER assinatura não-terminal na Stripe para o
- * customer (mesmo que o banco local esteja desatualizado), nenhum novo Checkout
- * é criado — a troca de plano deve usar `trocarPlanoAssinatura`.
+ * Checkout do ÚNICO plano pago público: Growth R$ 99/mês.
+ * - Valida o Price na Stripe (read-only) antes de abrir sessão: nunca cobra valor errado.
+ * - Anti-duplicação: qualquer assinatura viva impede novo Checkout; >1 bloqueia.
  */
 export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ plan: z.enum(PLAN_IDS), founders: z.boolean().optional() }).parse(d))
-  .handler(async ({ data, context }) => {
-    const { stripeRequest, resolveUniqueLiveSubscription, priceIdForPlan } = await import("@/lib/stripe.server");
+  .handler(async ({ context }) => {
+    const { stripeRequest, resolveUniqueLiveSubscription, assertGrowthPriceValido } = await import(
+      "@/lib/stripe.server"
+    );
     const { appOrigin, requireGestao } = await import("@/lib/billing.server");
+    const { trackGrowthEvent } = await import("@/lib/growth.server");
     const ownerId = await requireGestao(context.supabase, context.userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -55,30 +53,27 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
       const existente = await resolveUniqueLiveSubscription(sub.stripe_customer_id, ownerId);
       if (existente) {
         if (sub.stripe_subscription_id && sub.stripe_subscription_id !== existente.id) {
-          console.warn(
-            "[billing] inconsistência: banco aponta para",
-            sub.stripe_subscription_id,
-            "mas a Stripe tem",
-            existente.id,
-            "para o tenant",
+          console.warn("[billing] banco divergente da Stripe", {
             ownerId,
-          );
+            local: sub.stripe_subscription_id,
+            stripe: existente.id,
+          });
         }
         return {
-          modo: "trocar" as const,
+          modo: "gerenciar" as const,
           url: null,
           motivo:
-            "Já existe uma assinatura ativa para este estabelecimento. Use a troca de plano para alterar o valor cobrado.",
+            "Já existe uma assinatura ativa para este estabelecimento. Use “Gerenciar assinatura” para cartão, faturas ou cancelamento.",
         };
       }
     }
 
-    // Founders é oferta interna: só válida para quem já foi marcado no banco
-    // E somente quando o fluxo Founders é escolhido explicitamente.
-    const founders = !!sub?.is_founders && data.founders === true;
-    const priceEnv = founders ? "STRIPE_PRICE_FOUNDERS" : priceIdForPlan(data.plan).env;
-    const priceId = process.env[priceEnv];
-    if (!priceId) throw new Error(`Preço da Stripe não configurado (${priceEnv}).`);
+    // Founders mantém o Price histórico; todos os demais assinam o Growth R$ 99.
+    const founders = !!sub?.is_founders;
+    const priceId = founders
+      ? process.env["STRIPE_PRICE_FOUNDERS"]
+      : await assertGrowthPriceValido();
+    if (!priceId) throw new Error("Preço da Stripe não configurado para esta conta.");
 
     let customerId = sub?.stripe_customer_id ?? null;
     if (!customerId) {
@@ -109,96 +104,17 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
         allow_promotion_codes: true,
         line_items: [{ price: priceId, quantity: 1 }],
         subscription_data: { metadata: { owner_id: ownerId } },
-        metadata: { owner_id: ownerId, plan: data.plan, founders: String(founders) },
+        metadata: { owner_id: ownerId, plan: "growth", founders: String(founders) },
         success_url: `${origin}/configuracoes?assinatura=processando`,
         cancel_url: `${origin}/planos?checkout=cancelado`,
       },
     });
 
+    trackGrowthEvent("growth_checkout_started", ownerId, { founders });
     return { url: session.url, modo: "checkout" as const, motivo: null };
   });
 
-/**
- * Troca de plano de uma assinatura EXISTENTE (upgrade/downgrade).
- * Usa o deep link do Customer Portal `subscription_update_confirm`, que mostra
- * prorrata/próxima cobrança e trata falha de pagamento/3DS. Nunca cria nova
- * assinatura — portanto nunca duplica cobrança.
- */
-export const trocarPlanoAssinatura = createServerFn({ method: "POST" })
-  .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({ plan: z.enum(PLAN_IDS) }).parse(d))
-  .handler(async ({ data, context }) => {
-    const {
-      stripeRequest,
-      resolveUniqueLiveSubscription,
-      retrieveSubscription,
-      priceIdForPlan,
-      getPortalConfigurationId,
-    } = await import("@/lib/stripe.server");
-    const { appOrigin, requireGestao } = await import("@/lib/billing.server");
-    const ownerId = await requireGestao(context.supabase, context.userId);
-
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: sub } = await supabaseAdmin
-      .from("tenant_subscriptions")
-      .select("stripe_customer_id, stripe_subscription_id")
-      .eq("owner_id", ownerId)
-      .maybeSingle();
-
-    if (!sub?.stripe_customer_id) {
-      throw new Error("Nenhuma assinatura encontrada para este estabelecimento.");
-    }
-
-    const { env, id: priceId } = priceIdForPlan(data.plan);
-    if (!priceId) throw new Error(`Preço da Stripe não configurado (${env}).`);
-
-    // A assinatura viva na Stripe manda — o registro local pode estar atrasado.
-    const viva = await resolveUniqueLiveSubscription(sub.stripe_customer_id, ownerId);
-    if (!viva) throw new Error("Não há assinatura ativa para trocar. Assine um plano primeiro.");
-    if (sub.stripe_subscription_id && sub.stripe_subscription_id !== viva.id) {
-      console.warn("[billing] troca de plano em subscription divergente do banco", {
-        ownerId,
-        local: sub.stripe_subscription_id,
-        stripe: viva.id,
-      });
-    }
-
-    const full = viva.items?.data?.length ? viva : await retrieveSubscription(viva.id);
-    const item = full.items?.data?.[0];
-    if (!item) throw new Error("Não foi possível identificar o item da assinatura na Stripe.");
-    if (item.price?.id === priceId) {
-      return { url: null, modo: "atual" as const };
-    }
-
-    const configuration = getPortalConfigurationId();
-    const returnUrl = `${appOrigin()}/configuracoes?assinatura=processando`;
-
-    try {
-      const portal = await stripeRequest<{ url: string }>("/billing_portal/sessions", {
-        body: {
-          customer: sub.stripe_customer_id,
-          ...(configuration ? { configuration } : {}),
-          flow_data: {
-            type: "subscription_update_confirm",
-            subscription_update_confirm: {
-              subscription: full.id,
-              items: [{ id: item.id, price: priceId, quantity: 1 }],
-            },
-            after_completion: { type: "redirect", redirect: { return_url: returnUrl } },
-          },
-        },
-      });
-      return { url: portal.url, modo: "trocar" as const };
-    } catch (err: any) {
-      console.error("[billing] falha no deep link de troca de plano", err?.message);
-      throw new Error(
-        "Não foi possível abrir a troca de plano. Habilite “atualizar assinatura” na configuração do Customer Portal da Stripe (e informe STRIPE_PORTAL_CONFIGURATION_ID) e tente novamente.",
-      );
-    }
-  });
-
-
-/** Abre o Customer Portal da Stripe para o tenant autenticado. */
+/** Abre o Customer Portal da Stripe (cartão, faturas, cancelamento, reativação). */
 export const abrirPortalAssinatura = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {

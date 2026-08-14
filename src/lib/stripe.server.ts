@@ -184,3 +184,42 @@ export function priceIdForPlan(plan: "essencial" | "growth" | "intelligence"): {
         : "STRIPE_PRICE_INTELLIGENCE";
   return { env, id: process.env[env] };
 }
+
+/**
+ * Valida (read-only) o Price do Growth antes de qualquer Checkout:
+ * precisa existir, estar ativo, ser recorrente mensal em BRL e valer R$ 99,00.
+ * Evita cobrar valor divergente da promessa pública.
+ */
+export async function assertGrowthPriceValido(): Promise<string> {
+  const id = process.env["STRIPE_PRICE_GROWTH"];
+  if (!id) {
+    throw new Error("Assinatura indisponível: preço do Growth não configurado neste ambiente.");
+  }
+  const price = await stripeRequest<{
+    id: string;
+    active?: boolean;
+    currency?: string;
+    unit_amount?: number | null;
+    recurring?: { interval?: string } | null;
+  }>(`/prices/${id}`, { method: "GET" });
+
+  const ok =
+    price.active !== false &&
+    price.currency === "brl" &&
+    price.recurring?.interval === "month" &&
+    price.unit_amount === 9900;
+
+  if (!ok) {
+    console.error("[billing] Price do Growth divergente", {
+      priceId: `${id.slice(0, 12)}…`,
+      active: price.active,
+      currency: price.currency,
+      unitAmount: price.unit_amount,
+      interval: price.recurring?.interval,
+    });
+    throw new Error(
+      "Assinatura temporariamente indisponível: o preço configurado não corresponde ao Growth de R$ 99/mês. Nada foi cobrado.",
+    );
+  }
+  return id;
+}

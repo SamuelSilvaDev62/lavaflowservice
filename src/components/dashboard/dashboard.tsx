@@ -5,11 +5,12 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/app-layout";
-import { getDashboardOperacional, getClienteInativos } from "@/lib/lavaflow.functions";
+import { getDashboardOperacional } from "@/lib/lavaflow.functions";
+import { GrowthEngineCard } from "@/components/dashboard/growth-engine-card";
 import { brl } from "@/lib/format";
 import {
   CalendarDays, Plus, UserPlus, Clock, AlertCircle, Play,
-  TrendingUp, Users, ArrowRight, CheckCircle2,
+  TrendingUp, ArrowRight,
 } from "lucide-react";
 
 const KANBAN_COLS: { key: string; label: string }[] = [
@@ -28,17 +29,11 @@ function diffMin(hora: string) {
 
 export function Dashboard() {
   const fetchOps = useServerFn(getDashboardOperacional);
-  const fetchInativos = useServerFn(getClienteInativos);
   const { data, isLoading } = useQuery({
     queryKey: ["dashboard-operacional"],
     queryFn: () => fetchOps(),
     refetchInterval: 60_000,
     staleTime: 30_000,
-  });
-  const { data: inativosData } = useQuery({
-    queryKey: ["dashboard-inativos-30"],
-    queryFn: () => fetchInativos({ data: { dias: 30 } }),
-    staleTime: 5 * 60_000,
   });
 
   if (isLoading || !data) {
@@ -58,14 +53,6 @@ export function Dashboard() {
   const potencial = Number(cards.potencialFaturamento ?? 0);
   const expedienteEncerrado = Boolean(cards.expedienteEncerrado);
   const fechadoHoje = Boolean(cards.fechadoHoje);
-
-  // Buckets de reativação a partir dos inativos 30+
-  const inativos = ((inativosData?.inativos ?? []) as any[])
-    .filter((c) => c.ultima_visita); // ignora "999 dias" (nunca voltou)
-  const bucket30 = inativos.filter((c) => c.dias_inativo >= 30 && c.dias_inativo < 60).length;
-  const bucket60 = inativos.filter((c) => c.dias_inativo >= 60 && c.dias_inativo < 90).length;
-  const bucket90 = inativos.filter((c) => c.dias_inativo >= 90).length;
-  const totalReativar = bucket30 + bucket60 + bucket90;
 
   const kanbanCount = KANBAN_COLS.map((c) => ({
     ...c,
@@ -196,45 +183,8 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* 4. Reativação de clientes */}
-      <Card className="mt-4">
-        <CardContent className="p-4">
-          <div className="mb-3 flex items-center gap-2">
-            <Users className="h-4 w-4 text-primary" />
-            <h2 className="font-display font-semibold">Reativação de clientes</h2>
-          </div>
-          {totalReativar === 0 ? (
-            <div className="flex items-center gap-2 rounded-2xl bg-muted/30 p-3 text-sm text-muted-foreground">
-              <CheckCircle2 className="h-4 w-4 text-success" />
-              Nenhum cliente inativo há mais de 30 dias. Bom trabalho.
-            </div>
-          ) : (
-            <>
-              <div className="grid grid-cols-3 gap-2">
-                <BucketCard label="+30 dias" value={bucket30} tone="warning" />
-                <BucketCard label="+60 dias" value={bucket60} tone="warning" />
-                <BucketCard label="+90 dias" value={bucket90} tone="destructive" />
-              </div>
-              <div className="mt-3 flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">{totalReativar} clientes precisam de um empurrão.</p>
-                <Button asChild size="sm" variant="premium">
-                  <Link to="/clientes/inativos">Reativar clientes <ArrowRight className="h-3 w-3" /></Link>
-                </Button>
-              </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+      {/* 4. Growth Engine — oportunidades agregadas (Free e Growth) */}
+      <GrowthEngineCard />
     </>
-  );
-}
-
-function BucketCard({ label, value, tone }: { label: string; value: number; tone: "warning" | "destructive" }) {
-  const color = tone === "destructive" ? "text-destructive" : "text-warning";
-  return (
-    <div className="rounded-2xl border bg-card p-3 text-center">
-      <p className={`font-display text-2xl font-bold tabular-nums ${color}`}>{value}</p>
-      <p className="mt-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
-    </div>
   );
 }
