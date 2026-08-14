@@ -34,7 +34,7 @@ export function AssinaturaTab() {
     onError: (e: any) => toast.error(e?.message ?? "Falha ao abrir o portal"),
   });
 
-  const planoAtual = PLANS.find((p) => p.id === entitlement.plan);
+  const tierAtual = TIERS.find((t) => t.id === entitlement.tier);
 
   return (
     <div className="space-y-4">
