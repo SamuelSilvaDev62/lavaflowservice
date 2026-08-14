@@ -145,7 +145,7 @@ function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dash
           <CardContent className="p-3 flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-success/15 text-success grid place-content-center"><TrendingUp className="h-4 w-4" /></div>
             <div>
-              <p className="text-[10px] text-muted-foreground">Receita hoje</p>
+              <p className="text-[10px] text-muted-foreground">Receita hoje · exemplo</p>
               <p className="font-display font-bold text-sm">R$ 1.840</p>
             </div>
           </CardContent>
@@ -156,7 +156,7 @@ function PhoneMockup({ variant = "dashboard", eager = false }: { variant?: "dash
           <CardContent className="p-3 flex items-center gap-2">
             <div className="h-8 w-8 rounded-lg bg-primary/15 text-primary grid place-content-center"><Sparkles className="h-4 w-4" /></div>
             <div>
-              <p className="text-[10px] text-muted-foreground">Oportunidades</p>
+              <p className="text-[10px] text-muted-foreground">Oportunidades · exemplo</p>
               <p className="font-medium text-xs">12 hoje</p>
             </div>
           </CardContent>
@@ -247,6 +247,7 @@ function MockupShowcase() {
         <div className="text-center mb-12">
           <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Demonstração</p>
           <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Visualize o LavaFlow em ação</h2>
+          <p className="mt-3 text-xs text-muted-foreground">Telas de demonstração com dados fictícios — exemplo ilustrativo da interface.</p>
         </div>
         <div className="grid lg:grid-cols-2 gap-12 items-center">
           <div className="flex justify-center order-2 lg:order-1">
