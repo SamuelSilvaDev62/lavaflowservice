@@ -12,7 +12,7 @@ import { Label } from "@/components/ui/label";
 import { useEntitlement } from "@/hooks/use-entitlement";
 import { abrirPortalAssinatura } from "@/lib/billing.functions";
 import { atualizarSlugPublico, getEmpresa } from "@/lib/lavaflow.functions";
-import { PLANS, STATUS_LABELS, planLabel } from "@/lib/plans";
+import { GROWTH_PRICE_BRL, STATUS_LABELS, TIERS, tierLabel } from "@/lib/plans";
 import { brl } from "@/lib/format";
 import { cn } from "@/lib/utils";
 
