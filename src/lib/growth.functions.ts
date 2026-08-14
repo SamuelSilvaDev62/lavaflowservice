@@ -72,7 +72,9 @@ export const ativarTrialGrowth = createServerFn({ method: "POST" })
       );
     }
 
-    const trialEndsAt = new Date(Date.now() + GROWTH_TRIAL_DAYS * 86_400_000).toISOString();
+    // `updated_at` explícito marca a janela do trial contextual (7 dias) sem schema novo.
+    const agora = new Date();
+    const trialEndsAt = new Date(agora.getTime() + GROWTH_TRIAL_DAYS * 86_400_000).toISOString();
     const { error } = await supabaseAdmin
       .from("tenant_subscriptions")
       .upsert(
@@ -81,6 +83,7 @@ export const ativarTrialGrowth = createServerFn({ method: "POST" })
           plan: "growth",
           subscription_status: "trialing",
           trial_ends_at: trialEndsAt,
+          updated_at: agora.toISOString(),
         },
         { onConflict: "owner_id" },
       );
