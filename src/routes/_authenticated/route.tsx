@@ -1,7 +1,6 @@
 import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
 import { supabase } from "@/integrations/supabase/client";
 import { AppLayout } from "@/components/app-layout";
-import { SubscriptionBoundary } from "@/components/subscription-boundary";
 
 export const Route = createFileRoute("/_authenticated")({
   ssr: false,
@@ -15,12 +14,11 @@ export const Route = createFileRoute("/_authenticated")({
     return { user };
   },
 
+  // Sem bloqueio global de assinatura: o tier Free opera normalmente.
+  // Recursos Growth são protegidos por <FeatureGate> na UI e assertFeature no backend.
   component: () => (
     <AppLayout>
-      <SubscriptionBoundary>
-        <Outlet />
-      </SubscriptionBoundary>
+      <Outlet />
     </AppLayout>
   ),
 });
-
