@@ -394,32 +394,32 @@ function Loyalty() {
   );
 }
 
-/* ---------------- TESTIMONIALS ---------------- */
+/* ---------------- PROVA DENTRO DO PRODUTO ---------------- */
 function Testimonials() {
-  const t = [
-    { n: "Marcos Pereira", c: "São Paulo · SP", e: "Lava Express", q: "Em 2 meses recuperei 38 clientes inativos. O sistema se pagou na primeira semana." },
-    { n: "Juliana Santos", c: "Belo Horizonte · MG", e: "Brilho Auto Estética", q: "As assinaturas mudaram meu negócio. Hoje tenho previsibilidade de receita todo mês." },
-    { n: "Rafael Costa", c: "Curitiba · PR", e: "Costa Detalhamento", q: "Meu time virou outro depois que cada um passou a ver sua própria produção e comissão." },
+  const itens = [
+    { i: Clock, t: "Operação registrada", d: "Lavagens, tempo por etapa e faturamento do dia, direto do que sua equipe executa." },
+    { i: Users, t: "Clientes em risco", d: "Quem parou de voltar dentro do intervalo típico do seu próprio histórico." },
+    { i: Repeat, t: "Candidatos a recorrência", d: "Clientes com frequência suficiente para entrar em fidelidade ou plano de assinatura." },
+    { i: DollarSign, t: "Potencial estimado", d: "Estimativa a partir do seu ticket médio real — projeção, não promessa." },
+    { i: TrendingUp, t: "Receita Influenciada", d: "Só aparece quando houver eventos atribuídos reais na sua operação." },
+    { i: Check, t: "Sem números inventados", d: "Todo indicador vem dos seus dados. Se ainda não há histórico, o LavaFlow diz isso." },
   ];
   return (
     <section className="max-w-6xl mx-auto px-4 py-20 lg:py-28">
       <div className="text-center mb-12">
-        <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Quem usa, recomenda</p>
-        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">Resultados reais.</h2>
+        <p className="text-primary text-xs font-semibold uppercase tracking-wider mb-3">Prova dentro do produto</p>
+        <h2 className="font-display text-3xl lg:text-5xl font-bold tracking-tight">O que o LavaFlow consegue medir.</h2>
+        <p className="mt-4 text-muted-foreground max-w-2xl mx-auto">
+          A prova é o seu próprio painel: cada número abaixo é calculado com os dados da sua operação.
+        </p>
       </div>
       <div className="grid md:grid-cols-3 gap-4">
-        {t.map((it) => (
-          <Card key={it.n}>
+        {itens.map((it) => (
+          <Card key={it.t}>
             <CardContent className="p-6">
-              <div className="flex gap-0.5 mb-3">{[0,1,2,3,4].map((s) => <Star key={s} className="h-4 w-4 fill-warning text-warning" />)}</div>
-              <p className="text-sm leading-relaxed">"{it.q}"</p>
-              <div className="mt-5 flex items-center gap-3 pt-4 border-t">
-                <div className="h-10 w-10 rounded-full bg-gradient-to-br from-primary to-primary/40 grid place-content-center text-primary-foreground font-display font-bold">{it.n[0]}</div>
-                <div>
-                  <p className="font-semibold text-sm">{it.n}</p>
-                  <p className="text-[11px] text-muted-foreground">{it.e} · {it.c}</p>
-                </div>
-              </div>
+              <div className="h-12 w-12 rounded-xl bg-primary/10 text-primary grid place-content-center mb-4"><it.i className="h-6 w-6" /></div>
+              <h3 className="font-display font-semibold">{it.t}</h3>
+              <p className="text-sm text-muted-foreground mt-1">{it.d}</p>
             </CardContent>
           </Card>
         ))}
