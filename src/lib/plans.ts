@@ -198,13 +198,17 @@ export type Entitlement = {
 
 const GRACE_STATUSES = new Set(["past_due", "unpaid"]);
 const GRACE_DAYS = 7;
+/** Tolerância técnica na janela do trial contextual (relógio/latência). */
+const TRIAL_WINDOW_TOLERANCE_MS = 10 * 60_000;
 
 /**
  * Mapeamento de compatibilidade (sem migration):
  * - sem row / canceled / incomplete_expired / none  => free
- * - trialing + plan growth + trial_ends_at futuro   => growth (trial contextual)
+ * - trialing + plan growth + trial_ends_at futuro + janela <= 7d => growth (trial contextual)
  * - trialing legado (essencial/intelligence/null)   => free
+ * - trial growth de 14 dias (histórico de teste)    => free (trialUsado = true)
  * - trial growth expirado                           => free
+ * - active/past_due/unpaid exigem `plan` não nulo   => row malformada cai para free
  * - active (qualquer plano legado)                  => growth (compat quando não-growth)
  * - Founders ativo                                  => growth + badge
  * - past_due/unpaid dentro da carência              => growth; fora => free
@@ -217,15 +221,28 @@ export function getEntitlement(row: SubscriptionRow | null | undefined): Entitle
   const currentPeriodEnd = row?.current_period_end ?? null;
   const now = Date.now();
 
+  // Janela coerente com o trial contextual de 7 dias: distingue o trial novo do
+  // trial histórico de 14 dias sem precisar de coluna nova.
+  const trialWindowMs =
+    trialEndsAt && row?.updated_at
+      ? new Date(trialEndsAt).getTime() - new Date(row.updated_at).getTime()
+      : null;
+  const janelaContextual =
+    trialWindowMs !== null &&
+    trialWindowMs > 0 &&
+    trialWindowMs <= GROWTH_TRIAL_DAYS * 86_400_000 + TRIAL_WINDOW_TOLERANCE_MS;
+
   const trialGrowthValido =
     status === "trialing" &&
     planoAssinado === "growth" &&
     !!trialEndsAt &&
-    new Date(trialEndsAt).getTime() > now;
+    new Date(trialEndsAt).getTime() > now &&
+    janelaContextual;
 
-  const pagoAtivo = status === "active";
+  const pagoAtivo = status === "active" && planoAssinado !== null;
   const dentroDaCarencia =
     GRACE_STATUSES.has(status) &&
+    planoAssinado !== null &&
     !!currentPeriodEnd &&
     new Date(currentPeriodEnd).getTime() + GRACE_DAYS * 86_400_000 > now;
 
