@@ -30,7 +30,7 @@ export async function resolveOwnerScope(supabase: any, userId: string) {
 export async function fetchEntitlement(supabase: any, ownerId: string): Promise<Entitlement> {
   const { data } = await supabase
     .from("tenant_subscriptions")
-    .select("plan, subscription_status, is_founders, stripe_price_id, current_period_end, trial_ends_at, cancel_at_period_end, stripe_customer_id")
+    .select("plan, subscription_status, is_founders, stripe_price_id, current_period_end, trial_ends_at, cancel_at_period_end, stripe_customer_id, updated_at")
     .eq("owner_id", ownerId)
     .maybeSingle();
 
@@ -44,6 +44,8 @@ export async function fetchEntitlement(supabase: any, ownerId: string): Promise<
 export class FeatureBlockedError extends Error {
   feature: FeatureKey;
   requiredTier: string;
+  /** HTTP status usado por rotas que expõem o bloqueio (hardening: 403). */
+  statusCode = 403;
   constructor(feature: FeatureKey) {
     super(`Recurso disponível no plano Growth (${feature}). Assine o Growth para continuar.`);
     this.name = "FeatureBlockedError";

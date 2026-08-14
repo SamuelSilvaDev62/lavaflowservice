@@ -148,7 +148,7 @@ export const FEATURE_LABELS: Record<FeatureKey, string> = {
   campanhas: "Campanhas",
   whatsapp_automacoes: "Comunicação via WhatsApp",
   acompanhamento_cliente: "Acompanhamento do cliente",
-  assinaturas: "Assinaturas recorrentes",
+  assinaturas: "Planos de assinatura para clientes",
   oportunidades: "Oportunidades",
   relatorios_avancados: "Relatórios avançados",
   receita_influenciada: "Receita Influenciada",
