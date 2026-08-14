@@ -1,5 +1,12 @@
 // Helpers de entitlement no SERVIDOR. Nunca importado pelo cliente.
-import { getEntitlement, canUseFeature, requiredPlanFor, type Entitlement, type FeatureKey } from "@/lib/plans";
+import {
+  getEntitlement,
+  canUseFeature,
+  isFreeFeature,
+  requiredTierFor,
+  type Entitlement,
+  type FeatureKey,
+} from "@/lib/plans";
 
 type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
 
@@ -36,49 +43,30 @@ export async function fetchEntitlement(supabase: any, ownerId: string): Promise<
 
 export class FeatureBlockedError extends Error {
   feature: FeatureKey;
-  requiredPlan: string;
+  requiredTier: string;
   constructor(feature: FeatureKey) {
-    super(`Recurso não incluso no seu plano (${feature}). Faça upgrade para continuar.`);
+    super(`Recurso disponível no plano Growth (${feature}). Assine o Growth para continuar.`);
     this.name = "FeatureBlockedError";
     this.feature = feature;
-    this.requiredPlan = requiredPlanFor(feature);
-  }
-}
-
-export class SubscriptionInactiveError extends Error {
-  status: string;
-  constructor(status: string) {
-    super("Assinatura inativa. Reative seu plano em /planos para voltar a operar.");
-    this.name = "SubscriptionInactiveError";
-    this.status = status;
+    this.requiredTier = requiredTierFor(feature);
   }
 }
 
 /**
- * Bloqueio real no backend: chame em toda server function/ação de recurso premium.
- * Usa o admin client para não depender de RLS de leitura por papel.
+ * Bloqueio real no backend para recursos Growth.
+ * - Features Free passam sempre (operação nunca é bloqueada por cobrança).
+ * - Features Growth são fail closed: erro de leitura do entitlement bloqueia.
  */
-export async function assertFeature(ownerId: string, feature: FeatureKey): Promise<Entitlement> {
-  const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-  const entitlement = await fetchEntitlement(supabaseAdmin, ownerId);
-  if (!canUseFeature(entitlement, feature)) throw new FeatureBlockedError(feature);
-  return entitlement;
-}
-
-/**
- * Exige trial válido ou assinatura em dia para qualquer ação OPERACIONAL.
- * Fail closed: falha na leitura do entitlement bloqueia a operação.
- */
-export async function assertActiveSubscription(ownerId: string): Promise<Entitlement> {
+export async function assertFeature(ownerId: string, feature: FeatureKey): Promise<Entitlement | null> {
+  if (isFreeFeature(feature)) return null;
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   let entitlement: Entitlement;
   try {
     entitlement = await fetchEntitlement(supabaseAdmin, ownerId);
   } catch (err) {
-    console.error("[entitlements] falha ao ler assinatura", err);
-    throw new SubscriptionInactiveError("unknown");
+    console.error("[entitlements] falha ao ler assinatura (fail closed em Growth)", err);
+    throw new FeatureBlockedError(feature);
   }
-  if (!entitlement.ativo) throw new SubscriptionInactiveError(entitlement.status);
+  if (!canUseFeature(entitlement, feature)) throw new FeatureBlockedError(feature);
   return entitlement;
 }
-
