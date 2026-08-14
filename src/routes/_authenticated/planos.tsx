@@ -197,24 +197,31 @@ function PlanosPage() {
                   </div>
                 ) : (
                   <div className="space-y-2">
-                    <Button
-                      className="w-full"
-                      disabled={checkout.isPending || !stripeConfigurado}
-                      onClick={() => checkout.mutate()}
-                    >
-                      <Sparkles className="mr-2 h-4 w-4" />
-                      {checkout.isPending ? "Abrindo…" : `Assinar Growth · ${brl(t.precoMensal)}/mês`}
-                    </Button>
                     {trialElegivel && (
                       <Button
-                        variant="outline"
                         className="w-full"
                         disabled={trial.isPending}
                         onClick={() => trial.mutate()}
                       >
-                        {trial.isPending ? "Ativando…" : `Testar ${GROWTH_TRIAL_DAYS} dias sem cartão`}
+                        <Sparkles className="mr-2 h-4 w-4" />
+                        {trial.isPending
+                          ? "Ativando…"
+                          : `Testar Growth por ${GROWTH_TRIAL_DAYS} dias sem cartão`}
                       </Button>
                     )}
+                    <Button
+                      className="w-full"
+                      variant={trialElegivel ? "outline" : "default"}
+                      disabled={checkout.isPending || !stripeConfigurado}
+                      onClick={() => checkout.mutate()}
+                    >
+                      {!trialElegivel && <Sparkles className="mr-2 h-4 w-4" />}
+                      {checkout.isPending
+                        ? "Abrindo…"
+                        : trialElegivel
+                          ? "Assinar Growth agora"
+                          : `Assinar Growth · ${brl(t.precoMensal)}/mês`}
+                    </Button>
                     {!stripeConfigurado && (
                       <p className="text-xs text-muted-foreground">
                         A cobrança recorrente ainda não está configurada neste ambiente.
