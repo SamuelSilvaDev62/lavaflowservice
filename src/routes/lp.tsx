@@ -499,7 +499,7 @@ function Faq() {
     { q: "O sistema funciona no celular?", a: "Sim. O LavaFlow é 100% responsivo e otimizado para smartphones, tablets e desktops." },
     { q: "Preciso instalar algo?", a: "Não. Tudo roda direto no navegador, sem download ou instalação." },
     { q: "Posso usar WhatsApp?", a: "Sim. Mensagens prontas para avisar que o veículo está pronto e campanhas de recuperação de inativos, enviadas com um toque pelo WhatsApp." },
-    { q: "Meus funcionários podem acessar?", a: "Sim. Cada colaborador tem o próprio acesso ao app Meu Trabalho com produtividade e comissão." },
+    { q: "Meus funcionários podem acessar?", a: "Sim. Cada colaborador tem o próprio acesso com permissões por perfil, e você acompanha produtividade e comissão." },
     { q: "Existe fidelidade?", a: "Não. Você pode cancelar quando quiser, sem multa." },
     { q: "O plano gratuito expira?", a: "Não. O LavaFlow Free é grátis para sempre e nunca bloqueia sua operação: clientes, agenda, ordens de serviço, fila e equipe seguem funcionando. O Growth (R$ 99/mês) é opcional e libera as ações de crescimento." },
   ];
