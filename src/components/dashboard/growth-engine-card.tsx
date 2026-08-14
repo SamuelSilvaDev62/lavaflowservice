@@ -61,7 +61,7 @@ export function GrowthEngineCard() {
               <div className="grid grid-cols-3 gap-2">
                 <Metric label="Retorno" value={op.candidatosRetorno} />
                 <Metric label="Recorrência" value={op.candidatosAssinatura} />
-                <Metric label="Fidelidade" value={op.recompensasProximas} />
+                <Metric label="Categorias" value={op.categorias.length} />
               </div>
               <div className="mt-3 flex flex-wrap items-center justify-between gap-2">
                 <p className="text-xs text-muted-foreground">
@@ -113,7 +113,7 @@ export function GrowthEngineCard() {
         <div className="grid grid-cols-3 gap-2">
           <Metric label="Podem voltar" value={op.candidatosRetorno} />
           <Metric label="Perfil de plano" value={op.candidatosAssinatura} />
-          <Metric label="Perto do prêmio" value={op.recompensasProximas} />
+          <Metric label="Frentes de ação" value={op.categorias.length} />
         </div>
 
         <p className="mt-3 text-sm">
