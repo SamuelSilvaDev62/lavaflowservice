@@ -10,7 +10,7 @@ import { GrowthEngineCard } from "@/components/dashboard/growth-engine-card";
 import { brl } from "@/lib/format";
 import {
   CalendarDays, Plus, UserPlus, Clock, AlertCircle, Play,
-  TrendingUp, Users, ArrowRight, CheckCircle2,
+  TrendingUp, ArrowRight,
 } from "lucide-react";
 
 const KANBAN_COLS: { key: string; label: string }[] = [
