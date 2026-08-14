@@ -170,6 +170,8 @@ export type SubscriptionRow = {
   stripe_price_id?: string | null;
   current_period_end?: string | null;
   trial_ends_at?: string | null;
+  /** Marcador do trial contextual (sem schema novo): quando a row foi gravada. */
+  updated_at?: string | null;
   cancel_at_period_end?: boolean | null;
   has_customer?: boolean | null;
 };
