@@ -9,8 +9,9 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import { getEquipeGanhos } from "@/lib/equipe-worker.functions";
 import { equipeConcluirChecklistInicial, equipeFinalizarAtendimento, equipeIniciarAtendimento, equipePularChecklistInicial, getModoEquipe } from "@/lib/lavaflow.functions";
-import { Car, CheckCircle2, ClipboardCheck, Clock, LogOut, Play, UserRound, Wrench } from "lucide-react";
+import { Banknote, Car, CheckCircle2, ClipboardCheck, Clock, DollarSign, LogOut, Play, TrendingUp, UserRound, Wrench } from "lucide-react";
 import { toast } from "sonner";
 
 export const Route = createFileRoute("/modo-equipe")({
@@ -27,6 +28,10 @@ function initials(name?: string) {
   return (name ?? "LF").split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase();
 }
 
+function brl(value?: number | null) {
+  return Number(value ?? 0).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+}
+
 function statusLabel(status: string) {
   if (status === "aguardando") return "Aguardando";
   if (status === "em_lavagem") return "Em lavagem";
@@ -35,22 +40,22 @@ function statusLabel(status: string) {
 }
 
 function checklistLabel(status?: string | null) {
-  if (status === "concluido") return "Checklist concluido";
+  if (status === "concluido") return "Checklist concluído";
   if (status === "pulado") return "Checklist pulado";
   return "Checklist pendente";
 }
 
 const checklistItems = [
-  ["riscos_visiveis", "Riscos visiveis"],
+  ["riscos_visiveis", "Riscos visíveis"],
   ["amassados", "Amassados"],
   ["vidro_trincado", "Vidro trincado"],
   ["retrovisor_danificado", "Retrovisor danificado"],
   ["farol_lanterna_danificado", "Farol ou lanterna danificado"],
   ["rodas_avarias", "Rodas com avarias"],
   ["bancos_manchados", "Bancos manchados"],
-  ["objetos_pessoais", "Objetos pessoais no veiculo"],
+  ["objetos_pessoais", "Objetos pessoais no veículo"],
   ["chave_recebida", "Chave recebida"],
-  ["arranhoes_superficiais", "Arranhoes superficiais"],
+  ["arranhoes_superficiais", "Arranhões superficiais"],
   ["pintura_opaca", "Pintura opaca"],
   ["farol_amarelado", "Farol amarelado"],
   ["mau_cheiro_interno", "Mau cheiro interno"],
@@ -75,6 +80,7 @@ function Page() {
   const navigate = useNavigate();
   const qc = useQueryClient();
   const modoFn = useServerFn(getModoEquipe);
+  const ganhosFn = useServerFn(getEquipeGanhos);
   const iniciarFn = useServerFn(equipeIniciarAtendimento);
   const concluirChecklistFn = useServerFn(equipeConcluirChecklistInicial);
   const pularChecklistFn = useServerFn(equipePularChecklistInicial);
@@ -125,6 +131,14 @@ function Page() {
     retry: false,
   });
 
+  const { data: ganhos, isLoading: ganhosLoading, isError: ganhosError } = useQuery({
+    queryKey: ["modo-equipe-ganhos", token],
+    queryFn: () => ganhosFn({ data: { token } }),
+    enabled: !!token,
+    refetchInterval: 15000,
+    retry: false,
+  });
+
   const iniciar = useMutation({
     mutationFn: (ordem_id: string) => iniciarFn({ data: { token, ordem_id } }),
     onSuccess: () => {
@@ -141,7 +155,7 @@ function Page() {
       setChecklistOrdem(null);
       setChecklist(emptyChecklist);
       setChecklistObs("");
-      toast.success("Checklist concluido e atendimento iniciado");
+      toast.success("Checklist concluído e atendimento iniciado");
     },
     onError: (e: any) => toast.error(e?.message ?? "Falhou"),
   });
@@ -162,9 +176,10 @@ function Page() {
     mutationFn: () => finalizarFn({ data: { token, ordem_id: finalizar.id, observacoes: obs || undefined } }),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["modo-equipe"] });
+      qc.invalidateQueries({ queryKey: ["modo-equipe-ganhos"] });
       setFinalizar(null);
       setObs("");
-      toast.success("Veiculo marcado como pronto");
+      toast.success("Veículo marcado como pronto. A comissão entra nos ganhos após a entrega.");
     },
     onError: (e: any) => toast.error(e?.message ?? "Falhou"),
   });
@@ -173,7 +188,7 @@ function Page() {
     return (
       <div className="grid min-h-screen place-content-center bg-background px-4 text-center">
         <Card><CardContent className="space-y-4 p-6">
-          <p className="font-semibold">Sessao expirada</p>
+          <p className="font-semibold">Sessão expirada</p>
           <Button onClick={trocarColaborador}>Voltar ao acesso da equipe</Button>
         </CardContent></Card>
       </div>
@@ -210,7 +225,7 @@ function Page() {
             </Avatar>
             <div className="min-w-0">
               <p className="truncate font-display text-lg font-bold">Meu Trabalho</p>
-              <p className="truncate text-xs text-muted-foreground">{funcionario?.nome ?? "Equipe"} · {funcionario?.cargo ?? "Operacao"}</p>
+              <p className="truncate text-xs text-muted-foreground">{funcionario?.nome ?? "Equipe"} · {funcionario?.cargo ?? "Operação"}</p>
             </div>
           </div>
           <Button variant="outline" size="sm" onClick={trocarColaborador} className="h-10 rounded-lg bg-card shadow-soft">
@@ -224,17 +239,70 @@ function Page() {
 
         {data && (
           <>
+            <section className="grid gap-3 lg:grid-cols-[1.35fr_1fr]">
+              <Card className="overflow-hidden border-primary/20 bg-primary text-primary-foreground shadow-glow">
+                <CardContent className="flex min-h-40 flex-col justify-between p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-sm font-medium text-primary-foreground/80">Ganhos hoje</p>
+                      {ganhosLoading ? (
+                        <div className="mt-2 h-10 w-36 animate-pulse rounded-lg bg-primary-foreground/15" />
+                      ) : (
+                        <p className="mt-1 font-display text-4xl font-bold tabular-nums">{brl(ganhos?.ganhosHoje)}</p>
+                      )}
+                    </div>
+                    <div className="grid h-11 w-11 place-content-center rounded-xl bg-primary-foreground/15">
+                      <DollarSign className="h-6 w-6" />
+                    </div>
+                  </div>
+                  <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-primary-foreground/80">
+                    <span>{ganhos?.servicosHoje ?? 0} {ganhos?.servicosHoje === 1 ? "serviço entregue" : "serviços entregues"}</span>
+                    <span>{brl(ganhos?.faturamentoHoje)} faturados hoje</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <div className="grid grid-cols-2 gap-3">
+                <MoneyMetric
+                  icon={Banknote}
+                  label="A receber"
+                  value={ganhosError ? "—" : brl(ganhos?.aReceber)}
+                  hint="Comissões ainda não pagas"
+                />
+                <MoneyMetric
+                  icon={TrendingUp}
+                  label="Recebido no mês"
+                  value={ganhosError ? "—" : brl(ganhos?.recebidoMes)}
+                  hint={ganhos?.regraLabel ?? "Regra de comissão"}
+                />
+              </div>
+            </section>
+
+            <p className="-mt-1 px-1 text-[11px] text-muted-foreground">
+              Valores atualizados automaticamente. A comissão passa a contar como ganho quando a OS é entregue.
+            </p>
+
             <section className="grid grid-cols-2 gap-2 lg:grid-cols-4">
-              <Metric icon={Car} label="Atribuidos" value={String(data.cards.veiculosAtribuidos)} />
+              <Metric icon={Car} label="Atribuídos" value={String(data.cards.veiculosAtribuidos)} />
               <Metric icon={Wrench} label="Em atendimento" value={String(data.cards.emAtendimento)} />
-              <Metric icon={Clock} label="Proximo servico" value={data.cards.proximoServico} />
-              <Metric icon={CheckCircle2} label="Concluidos hoje" value={String(data.cards.concluidosHoje)} />
+              <Metric icon={Clock} label="Próximo serviço" value={data.cards.proximoServico} />
+              <Metric icon={CheckCircle2} label="Concluídos hoje" value={String(data.cards.concluidosHoje)} />
             </section>
 
             <section>
-              <h2 className="mb-2 font-display text-lg font-semibold">Proximos veiculos</h2>
+              <h2 className="mb-2 font-display text-lg font-semibold">Próximos veículos</h2>
               {fila.length === 0 && (
-                <Card><CardContent className="p-6 text-center text-sm text-muted-foreground">Nenhum veiculo aguardando agora.</CardContent></Card>
+                <Card className="border-dashed">
+                  <CardContent className="flex min-h-40 flex-col items-center justify-center p-6 text-center">
+                    <div className="mb-3 grid h-11 w-11 place-content-center rounded-xl bg-muted text-muted-foreground">
+                      <Car className="h-5 w-5" />
+                    </div>
+                    <p className="font-medium">Nenhum veículo atribuído agora</p>
+                    <p className="mt-1 max-w-md text-sm text-muted-foreground">
+                      Quando um novo serviço for direcionado para você, ele aparecerá aqui automaticamente.
+                    </p>
+                  </CardContent>
+                </Card>
               )}
               <div className="space-y-2">
                 {fila.map((o: any) => {
@@ -252,7 +320,7 @@ function Page() {
                               </Badge>
                             </div>
                             <p className="text-sm text-muted-foreground">
-                              {o.veiculos?.modelo ?? "Veiculo"} {o.veiculos?.placa ? `· ${o.veiculos.placa}` : ""} · {o.servicos?.nome ?? "Servico"}
+                              {o.veiculos?.modelo ?? "Veículo"} {o.veiculos?.placa ? `· ${o.veiculos.placa}` : ""} · {o.servicos?.nome ?? "Serviço"}
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">
                               {new Date(o.created_at).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" })}
@@ -260,7 +328,7 @@ function Page() {
                             </p>
                             {(o.upsell_oportunidades?.length ?? 0) > 0 && (
                               <div className="mt-2 rounded-md border border-primary/20 bg-primary/5 px-2 py-1 text-xs text-primary">
-                                Possivel servico adicional identificado.
+                                Possível serviço adicional identificado.
                               </div>
                             )}
                           </div>
@@ -286,9 +354,9 @@ function Page() {
                                 type="button"
                                 variant="secondary"
                                 className="col-span-2 h-10"
-                                onClick={() => toast.success("Recepcao avisada sobre a oportunidade")}
+                                onClick={() => toast.success("Recepção avisada sobre a oportunidade")}
                               >
-                                Avisar recepcao
+                                Avisar recepção
                               </Button>
                             )}
                           </div>
@@ -311,8 +379,8 @@ function Page() {
         <DialogContent className="max-w-md rounded-2xl">
           <DialogHeader><DialogTitle>Finalizar atendimento</DialogTitle></DialogHeader>
           <div className="space-y-3">
-            <p className="text-sm text-muted-foreground">Adicione uma observacao final, se necessario.</p>
-            <Textarea rows={4} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex: cliente pediu atencao no porta-malas" />
+            <p className="text-sm text-muted-foreground">Adicione uma observação final, se necessário.</p>
+            <Textarea rows={4} value={obs} onChange={(e) => setObs(e.target.value)} placeholder="Ex: cliente pediu atenção no porta-malas" />
             <Button className="h-12 w-full" onClick={() => finalizarMut.mutate()} disabled={finalizarMut.isPending}>
               Marcar como pronto
             </Button>
@@ -327,7 +395,7 @@ function Page() {
             <div className="rounded-lg bg-muted p-3">
               <p className="font-semibold">{checklistOrdem?.clientes?.nome ?? "Cliente"}</p>
               <p className="text-xs text-muted-foreground">
-                {checklistOrdem?.veiculos?.modelo ?? "Veiculo"} {checklistOrdem?.veiculos?.placa ? `- ${checklistOrdem.veiculos.placa}` : ""}
+                {checklistOrdem?.veiculos?.modelo ?? "Veículo"} {checklistOrdem?.veiculos?.placa ? `- ${checklistOrdem.veiculos.placa}` : ""}
               </p>
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
@@ -338,7 +406,7 @@ function Page() {
                 </label>
               ))}
             </div>
-            <Textarea rows={3} value={checklistObs} onChange={(e) => setChecklistObs(e.target.value)} placeholder="Observacoes do checklist" />
+            <Textarea rows={3} value={checklistObs} onChange={(e) => setChecklistObs(e.target.value)} placeholder="Observações do checklist" />
             <div className="grid gap-2 sm:grid-cols-2">
               {!exigirChecklist && (
                 <Button variant="outline" className="h-12" onClick={() => pularChecklist.mutate()} disabled={pularChecklist.isPending || concluirChecklist.isPending}>
@@ -353,6 +421,23 @@ function Page() {
         </DialogContent>
       </Dialog>
     </div>
+  );
+}
+
+function MoneyMetric({ icon: Icon, label, value, hint }: { icon: any; label: string; value: string; hint: string }) {
+  return (
+    <Card>
+      <CardContent className="flex h-full min-h-40 flex-col justify-between p-4">
+        <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+          <span>{label}</span>
+          <Icon className="h-4 w-4" />
+        </div>
+        <div>
+          <p className="font-display text-xl font-bold tabular-nums sm:text-2xl">{value}</p>
+          <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">{hint}</p>
+        </div>
+      </CardContent>
+    </Card>
   );
 }
 
