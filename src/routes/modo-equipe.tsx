@@ -135,7 +135,7 @@ function Page() {
     queryKey: ["modo-equipe-ganhos", token],
     queryFn: () => ganhosFn({ data: { token } }),
     enabled: !!token,
-    refetchInterval: 15000,
+    refetchInterval: 30000,
     retry: false,
   });
 
@@ -248,17 +248,21 @@ function Page() {
                       {ganhosLoading ? (
                         <div className="mt-2 h-10 w-36 animate-pulse rounded-lg bg-primary-foreground/15" />
                       ) : (
-                        <p className="mt-1 font-display text-4xl font-bold tabular-nums">{brl(ganhos?.ganhosHoje)}</p>
+                        <p className="mt-1 font-display text-4xl font-bold tabular-nums">{ganhosError ? "—" : brl(ganhos?.ganhosHoje)}</p>
                       )}
                     </div>
                     <div className="grid h-11 w-11 place-content-center rounded-xl bg-primary-foreground/15">
                       <DollarSign className="h-6 w-6" />
                     </div>
                   </div>
-                  <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-primary-foreground/80">
-                    <span>{ganhos?.servicosHoje ?? 0} {ganhos?.servicosHoje === 1 ? "serviço entregue" : "serviços entregues"}</span>
-                    <span>{brl(ganhos?.faturamentoHoje)} faturados hoje</span>
-                  </div>
+                  {ganhosError ? (
+                    <p className="mt-5 text-xs text-primary-foreground/80">Resumo financeiro temporariamente indisponível.</p>
+                  ) : (
+                    <div className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-primary-foreground/80">
+                      <span>{ganhos?.servicosHoje ?? 0} {ganhos?.servicosHoje === 1 ? "serviço entregue" : "serviços entregues"}</span>
+                      <span>{brl(ganhos?.faturamentoHoje)} faturados hoje</span>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
@@ -273,7 +277,7 @@ function Page() {
                   icon={TrendingUp}
                   label="Recebido no mês"
                   value={ganhosError ? "—" : brl(ganhos?.recebidoMes)}
-                  hint={ganhos?.regraLabel ?? "Regra de comissão"}
+                  hint={ganhosError ? "Resumo financeiro indisponível" : (ganhos?.regraLabel ?? "Regra de comissão")}
                 />
               </div>
             </section>
