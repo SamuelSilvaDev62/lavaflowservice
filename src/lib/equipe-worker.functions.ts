@@ -30,6 +30,10 @@ function roundMoney(value: number) {
   return Math.round((Number.isFinite(value) ? value : 0) * 100) / 100;
 }
 
+function ordemComissaoDate(ordem: any) {
+  return ordem.entregue_em ?? ordem.created_at;
+}
+
 function calcComissaoOrdem(
   ordem: any,
   funcionario: any,
@@ -104,18 +108,18 @@ export const getEquipeGanhos = createServerFn({ method: "POST" })
     ] = await Promise.all([
       supabaseAdmin
         .from("ordens_servico")
-        .select("id, valor, servico_id, entregue_em")
+        .select("id, valor, servico_id, entregue_em, created_at")
         .eq("owner_id", sessao.owner_id)
         .eq("funcionario_id", funcionario.id)
         .eq("status", "entregue")
-        .gte("entregue_em", inicioMes),
+        .or(`entregue_em.gte.${inicioMes},created_at.gte.${inicioMes}`),
       supabaseAdmin
         .from("ordens_servico")
-        .select("id, valor, servico_id, entregue_em")
+        .select("id, valor, servico_id, entregue_em, created_at")
         .eq("owner_id", sessao.owner_id)
         .eq("funcionario_id", funcionario.id)
         .eq("status", "entregue")
-        .gte("entregue_em", inicioHistorico),
+        .or(`entregue_em.gte.${inicioHistorico},created_at.gte.${inicioHistorico}`),
       supabaseAdmin
         .from("comissoes_servico")
         .select("servico_id, tipo, valor")
@@ -148,8 +152,16 @@ export const getEquipeGanhos = createServerFn({ method: "POST" })
     );
 
     const ganhoPorOrdem = (ordem: any) => calcComissaoOrdem(ordem, funcionario, regrasByServico);
-    const mes = ordensMes ?? [];
-    const hoje = mes.filter((o: any) => o.entregue_em && new Date(o.entregue_em).getTime() >= new Date(inicioHoje).getTime());
+    const inicioMesMs = new Date(inicioMes).getTime();
+    const inicioHojeMs = new Date(inicioHoje).getTime();
+    const mes = (ordensMes ?? []).filter((o: any) => {
+      const ref = ordemComissaoDate(o);
+      return ref && new Date(ref).getTime() >= inicioMesMs;
+    });
+    const hoje = mes.filter((o: any) => {
+      const ref = ordemComissaoDate(o);
+      return ref && new Date(ref).getTime() >= inicioHojeMs;
+    });
 
     const ganhosHoje = roundMoney(hoje.reduce((sum: number, o: any) => sum + ganhoPorOrdem(o), 0));
     const ganhoMes = roundMoney(mes.reduce((sum: number, o: any) => sum + ganhoPorOrdem(o), 0));
