@@ -100,19 +100,11 @@ export const getEquipeGanhos = createServerFn({ method: "POST" })
     const inicioHistorico = new Date(Date.now() - 180 * 86_400_000).toISOString();
 
     const [
-      { data: ordensMes, error: ordensMesError },
       { data: ordensHistorico, error: ordensHistoricoError },
       { data: regras, error: regrasError },
       { data: comissoes, error: comissoesError },
       { data: pagamentos, error: pagamentosError },
     ] = await Promise.all([
-      supabaseAdmin
-        .from("ordens_servico")
-        .select("id, valor, servico_id, entregue_em, created_at")
-        .eq("owner_id", sessao.owner_id)
-        .eq("funcionario_id", funcionario.id)
-        .eq("status", "entregue")
-        .or(`entregue_em.gte.${inicioMes},created_at.gte.${inicioMes}`),
       supabaseAdmin
         .from("ordens_servico")
         .select("id, valor, servico_id, entregue_em, created_at")
@@ -138,7 +130,6 @@ export const getEquipeGanhos = createServerFn({ method: "POST" })
         .gte("pago_em", inicioMes),
     ]);
 
-    if (ordensMesError) throw ordensMesError;
     if (ordensHistoricoError) throw ordensHistoricoError;
     if (regrasError) throw regrasError;
     if (comissoesError) throw comissoesError;
@@ -154,7 +145,8 @@ export const getEquipeGanhos = createServerFn({ method: "POST" })
     const ganhoPorOrdem = (ordem: any) => calcComissaoOrdem(ordem, funcionario, regrasByServico);
     const inicioMesMs = new Date(inicioMes).getTime();
     const inicioHojeMs = new Date(inicioHoje).getTime();
-    const mes = (ordensMes ?? []).filter((o: any) => {
+    const historico = ordensHistorico ?? [];
+    const mes = historico.filter((o: any) => {
       const ref = ordemComissaoDate(o);
       return ref && new Date(ref).getTime() >= inicioMesMs;
     });
@@ -177,7 +169,7 @@ export const getEquipeGanhos = createServerFn({ method: "POST" })
 
     // Complemento read-only para o painel refletir uma OS recém-entregue mesmo antes
     // de o painel administrativo materializar a linha de comissão.
-    const abertoAindaNaoMaterializado = (ordensHistorico ?? [])
+    const abertoAindaNaoMaterializado = historico
       .filter((o: any) => !ordensComComissao.has(o.id))
       .reduce((sum: number, o: any) => sum + ganhoPorOrdem(o), 0);
 
