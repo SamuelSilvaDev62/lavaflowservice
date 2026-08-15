@@ -76,9 +76,9 @@ async function getWorkerSession(token: string) {
  * Resumo financeiro pessoal do colaborador autenticado pelo Modo Equipe.
  *
  * É somente leitura: não cria comissões, não marca pagamento e não altera OS.
- * `ganhosHoje`/`ganhoMes` são calculados pelas regras vigentes sobre OS entregues.
- * `aReceber` usa comissões materializadas em aberto e complementa, sem duplicar,
- * OS entregues nos últimos 180 dias que ainda não tenham linha em `comissoes`.
+ * Quando uma comissão já existe, o valor persistido é a fonte de verdade.
+ * Para OS entregue ainda sem linha de comissão, o resumo calcula o valor pelas
+ * regras vigentes apenas para que o painel possa refletir a entrega imediatamente.
  */
 export const getEquipeGanhos = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ token: z.string().min(20) }).parse(d))
@@ -142,7 +142,16 @@ export const getEquipeGanhos = createServerFn({ method: "POST" })
       ]),
     );
 
-    const ganhoPorOrdem = (ordem: any) => calcComissaoOrdem(ordem, funcionario, regrasByServico);
+    const comissoesRows = comissoes ?? [];
+    const valorPersistidoPorOrdem = new Map<string, number>(
+      comissoesRows
+        .filter((c: any) => c.ordem_id)
+        .map((c: any) => [c.ordem_id, Number(c.valor ?? 0)] as [string, number]),
+    );
+    const ganhoPorOrdem = (ordem: any) => valorPersistidoPorOrdem.has(ordem.id)
+      ? roundMoney(valorPersistidoPorOrdem.get(ordem.id) ?? 0)
+      : calcComissaoOrdem(ordem, funcionario, regrasByServico);
+
     const inicioMesMs = new Date(inicioMes).getTime();
     const inicioHojeMs = new Date(inicioHoje).getTime();
     const historico = ordensHistorico ?? [];
@@ -159,10 +168,7 @@ export const getEquipeGanhos = createServerFn({ method: "POST" })
     const ganhoMes = roundMoney(mes.reduce((sum: number, o: any) => sum + ganhoPorOrdem(o), 0));
     const faturamentoHoje = roundMoney(hoje.reduce((sum: number, o: any) => sum + Number(o.valor ?? 0), 0));
 
-    const comissoesRows = comissoes ?? [];
-    const ordensComComissao = new Set(
-      comissoesRows.map((c: any) => c.ordem_id).filter(Boolean),
-    );
+    const ordensComComissao = new Set(valorPersistidoPorOrdem.keys());
     const abertoMaterializado = comissoesRows
       .filter((c: any) => !c.pagamento_id)
       .reduce((sum: number, c: any) => sum + Number(c.valor ?? 0), 0);
@@ -171,7 +177,7 @@ export const getEquipeGanhos = createServerFn({ method: "POST" })
     // de o painel administrativo materializar a linha de comissão.
     const abertoAindaNaoMaterializado = historico
       .filter((o: any) => !ordensComComissao.has(o.id))
-      .reduce((sum: number, o: any) => sum + ganhoPorOrdem(o), 0);
+      .reduce((sum: number, o: any) => sum + calcComissaoOrdem(o, funcionario, regrasByServico), 0);
 
     const aReceber = roundMoney(abertoMaterializado + abertoAindaNaoMaterializado);
     const recebidoMes = roundMoney(
