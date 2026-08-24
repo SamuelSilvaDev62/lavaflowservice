@@ -1536,6 +1536,36 @@ export type Database = {
         }
         Relationships: []
       }
+      tenant_ai_settings: {
+        Row: {
+          ai_enabled: boolean
+          business_context: Json
+          created_at: string
+          id: string
+          preferred_tone: string | null
+          tenant_id: string
+          updated_at: string
+        }
+        Insert: {
+          ai_enabled?: boolean
+          business_context?: Json
+          created_at?: string
+          id?: string
+          preferred_tone?: string | null
+          tenant_id: string
+          updated_at?: string
+        }
+        Update: {
+          ai_enabled?: boolean
+          business_context?: Json
+          created_at?: string
+          id?: string
+          preferred_tone?: string | null
+          tenant_id?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       tenant_subscriptions: {
         Row: {
           cancel_at_period_end: boolean
