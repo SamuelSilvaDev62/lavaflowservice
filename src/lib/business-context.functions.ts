@@ -48,7 +48,7 @@ export const getBusinessContext = createServerFn({ method: "GET" })
     return {
       aiEnabled: settings?.ai_enabled ?? true,
       preferredTone: settings?.preferred_tone ?? null,
-      businessContext: (settings?.business_context ?? {}) as Record<string, unknown>,
+      businessContext: (settings?.business_context ?? {}) as Record<string, string | null>,
       atualizadoEm: settings?.updated_at ?? null,
       empresa: empresa ?? null,
     };
