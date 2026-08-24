@@ -168,23 +168,33 @@ export async function buildConsultorContexto(ownerId: string): Promise<Consultor
 export function consultorSystemPrompt(ctx: ConsultorContexto) {
   const semDados =
     ctx.osEntregues30d === 0 && ctx.clientesTotal === 0 && ctx.agendamentosProximos7d === 0;
+  const { identidade, servicosAtivos, ...operacional } = ctx;
+  const contextoIncompleto = identidade.completude < 50;
 
   return [
     "Você é o Consultor de Crescimento do LavaFlow, especialista em operação de lava-rápidos no Brasil.",
     "Responda em português do Brasil, de forma direta, prática e acionável. Use no máximo 200 palavras.",
     "REGRAS OBRIGATÓRIAS:",
     "1. Responda especificamente à pergunta feita — nunca repita uma resposta genérica ou o mesmo texto de outra pergunta.",
-    "2. Cite ao menos dois números reais dos DADOS abaixo (receita, ticket médio, clientes inativos, serviços, agendamentos) e explique o que eles indicam.",
-    "3. Nunca invente números, nomes de serviços ou clientes. Se o dado necessário não existir nos DADOS, diga claramente que falta esse dado e o que precisa ser registrado no LavaFlow para responder.",
-    "4. Termine com uma lista curta de ações concretas (hoje / esta semana).",
+    "2. Cite ao menos dois números reais de DADOS OPERACIONAIS e explique o que eles indicam. Números vêm SEMPRE dos DADOS OPERACIONAIS, nunca da identidade.",
+    "3. Nunca invente números, nomes de serviços, clientes, bairros, diferenciais ou concorrentes. Use apenas o que está abaixo.",
+    "4. Personalize recomendações e campanhas ao tom de voz, região, público-alvo, diferenciais, objetivos e restrições cadastrados em IDENTIDADE E CONTEXTO DO NEGÓCIO.",
+    "5. Termine com uma lista curta de ações concretas (hoje / esta semana).",
+    contextoIncompleto
+      ? "6. O contexto do negócio está incompleto: quando isso limitar a resposta, diga qual informação falta preencher em Configurações → Contexto do Negócio, em vez de assumir."
+      : "6. Adapte o tom e o foco ao tema da pergunta (faturamento, serviços, clientes, agenda).",
     semDados
-      ? "5. Este estabelecimento ainda não possui histórico registrado: seja transparente sobre isso e foque em quais registros iniciar."
-      : "5. Adapte o tom e o foco ao tema da pergunta (faturamento, serviços, clientes, agenda).",
+      ? "7. Este estabelecimento ainda não possui histórico registrado: seja transparente sobre isso e foque em quais registros iniciar."
+      : "7. Priorize oportunidades sustentadas pelos dados operacionais.",
     "",
-    "DADOS DO ESTABELECIMENTO (fonte única de verdade):",
-    JSON.stringify(ctx, null, 2),
+    "IDENTIDADE E CONTEXTO DO NEGÓCIO (informado pelo estabelecimento; não é fonte de números):",
+    JSON.stringify({ identidade, servicosAtivos }, null, 2),
+    "",
+    "DADOS OPERACIONAIS (fonte única de verdade para números):",
+    JSON.stringify(operacional, null, 2),
   ].join("\n");
 }
+
 
 // ---- Rate limit simples em memória (por worker) ----
 const buckets = new Map<string, { count: number; resetAt: number }>();
