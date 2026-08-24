@@ -1289,7 +1289,31 @@ export const getClienteInativos = createServerFn({ method: "GET" })
     return { inativos };
   });
 
-function campanhaMensagem(tipo: string, nome?: string) {
+type CampanhaTom = {
+  tom?: string | null;
+  cidade?: string | null;
+  bairros?: string | null;
+  diferenciais?: string | null;
+  restricoes?: string | null;
+  posicionamento?: string | null;
+};
+
+/** Ajuste determinístico da copy ao contexto do negócio (tom, região, diferenciais). */
+function personalizarCopy(base: string, ctx?: CampanhaTom | null) {
+  if (!ctx) return base;
+  let texto = base;
+  const tom = (ctx.tom ?? "").toLowerCase();
+  if (tom.includes("premium") || tom.includes("profissional")) {
+    texto = texto.replace("Olá", "Olá,").replace("Sentimos sua falta por aqui.", "Notamos que faz um tempo desde a sua última visita.");
+  }
+  const regiao = ctx.bairros || ctx.cidade;
+  if (regiao) texto += ` Atendemos ${regiao}.`;
+  const dif = (ctx.diferenciais ?? "").trim();
+  if (dif) texto += ` Nosso diferencial: ${dif.split(/[,.;\n]/)[0]!.trim()}.`;
+  return texto.slice(0, 900);
+}
+
+function campanhaMensagem(tipo: string, nome?: string, ctx?: CampanhaTom | null) {
   const primeiroNome = nome ? nome.split(" ")[0] : "{{nome}}";
   const mensagens: Record<string, string> = {
     inativos: `Olá ${primeiroNome}! Sentimos sua falta por aqui. Quer agendar um horário esta semana para cuidar do seu veículo?`,
@@ -1298,7 +1322,26 @@ function campanhaMensagem(tipo: string, nome?: string) {
     baixa_ocupacao: `Olá ${primeiroNome}! Temos horários disponíveis esta semana para cuidar do seu veículo. Quer reservar um horário?`,
     aniversario: `Olá ${primeiroNome}! Feliz aniversário! Temos um convite especial para você cuidar do seu veículo com a gente.`,
   };
-  return mensagens[tipo] ?? mensagens.inativos;
+  return personalizarCopy(mensagens[tipo] ?? mensagens.inativos!, ctx);
+}
+
+/** Contexto do negócio (tom/região/diferenciais) usado para personalizar campanhas. */
+async function getCampanhaContexto(supabase: any, ownerId: string): Promise<CampanhaTom | null> {
+  const { data } = await supabase
+    .from("tenant_ai_settings")
+    .select("preferred_tone, business_context")
+    .eq("tenant_id", ownerId)
+    .maybeSingle();
+  if (!data) return null;
+  const bc = (data.business_context ?? {}) as Record<string, string | null>;
+  return {
+    tom: data.preferred_tone ?? bc["tom_de_voz"] ?? null,
+    cidade: bc["cidade"] ?? null,
+    bairros: bc["bairros_atendidos"] ?? null,
+    diferenciais: bc["diferenciais"] ?? null,
+    restricoes: bc["restricoes_campanhas"] ?? null,
+    posicionamento: bc["posicionamento"] ?? null,
+  };
 }
 
 // Janela maxima de atribuicao de conversao de campanha (dias).
@@ -1362,6 +1405,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
     supabase.from("planos_assinatura").select("id, nome, valor_mensal, ativo").eq("owner_id", ownerId).eq("ativo", true).order("valor_mensal").limit(1),
   ]);
   const taxas = await getTaxasEsperadasPorTipo(supabase, ownerId);
+  const ctxNegocio = await getCampanhaContexto(supabase, ownerId);
   const valorPlano = Number(planos?.[0]?.valor_mensal ?? 0);
   const potencial = (tipo: string, qtd: number, valorUnit: number) => ({
     taxaEsperada: taxas[tipo] ?? 0.15,
@@ -1417,7 +1461,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
       impactoEstimado: roundMoney(inativos.length * ticketMedio),
       ...potencial("inativos", inativos.length, ticketMedio),
       alvos: inativos.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { dias_inativo: c.dias_inativo } })),
-      mensagem: campanhaMensagem("inativos"),
+      mensagem: campanhaMensagem("inativos", undefined, ctxNegocio),
     },
     {
       tipo: "fidelidade",
@@ -1426,7 +1470,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
       impactoEstimado: roundMoney(fidelidade.length * ticketMedio),
       ...potencial("fidelidade", fidelidade.length, ticketMedio),
       alvos: fidelidade.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { pontos: c.pontos_saldo } })),
-      mensagem: campanhaMensagem("fidelidade"),
+      mensagem: campanhaMensagem("fidelidade", undefined, ctxNegocio),
     },
     {
       tipo: "assinatura",
@@ -1435,7 +1479,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
       impactoEstimado: roundMoney(assinatura.length * (valorPlano || ticketMedio)),
       ...potencial("assinatura", assinatura.length, valorPlano || ticketMedio),
       alvos: assinatura.map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { visitas: visitas.get(c.id) ?? 0 } })),
-      mensagem: campanhaMensagem("assinatura"),
+      mensagem: campanhaMensagem("assinatura", undefined, ctxNegocio),
     },
     {
       tipo: "baixa_ocupacao",
@@ -1444,7 +1488,7 @@ async function getCampanhaSugestoesData(supabase: any, ownerId: string) {
       impactoEstimado: roundMoney(Math.max(0, diasBaixos.length) * ticketMedio),
       ...potencial("baixa_ocupacao", inativos.slice(0, 15).length, ticketMedio),
       alvos: inativos.slice(0, 15).map((c: any) => ({ cliente_id: c.id, nome: c.nome, telefone: c.telefone, metadata: { dias_baixos: diasBaixos } })),
-      mensagem: campanhaMensagem("baixa_ocupacao"),
+      mensagem: campanhaMensagem("baixa_ocupacao", undefined, ctxNegocio),
     },
   ].filter((s) => s.alvos.length > 0);
 
