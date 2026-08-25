@@ -35,8 +35,8 @@ export type BusinessContext = {
   politica_descontos?: string | null;
   restricoes_campanhas?: string | null;
   restricoes_comunicacao?: string | null;
-  // Extensibilidade: campos futuros continuam preservados no jsonb.
-  [key: string]: unknown;
+  // Extensibilidade: este JSONB aceita novos campos textuais sem perder serialização.
+  [key: string]: string | null | undefined;
 };
 
 export const TONS_DE_VOZ = [
