@@ -1,4 +1,5 @@
 import { mergeEmpresaIntoContext, type BusinessContext } from "@/lib/business-context";
+import { calculateCapacityTicket } from "@/lib/capacity-ticket";
 import { buildSkillContext } from "@/lib/skill-context";
 import { buildRecoveryEngineData } from "@/lib/recovery.server";
 
@@ -63,6 +64,16 @@ function localDayOfWeek() {
   return ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].indexOf(wd);
 }
 
+function localTimeMinutes() {
+  const hm = new Intl.DateTimeFormat("en-GB", {
+    timeZone: APP_TZ,
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false,
+  }).format(new Date());
+  return Number(hm.slice(0, 2)) * 60 + Number(hm.slice(3, 5));
+}
+
 function hmToMinutes(value: string | null | undefined) {
   const s = String(value ?? "00:00").slice(0, 5);
   return Number(s.slice(0, 2)) * 60 + Number(s.slice(3, 5));
@@ -87,15 +98,15 @@ export async function buildMorningBrief(
   ownerId: string,
 ): Promise<MorningBriefData> {
   const hoje = localDateOffset(0);
-  const desde16d = new Date(Date.now() - 16 * DIA).toISOString();
+  const desde30d = new Date(Date.now() - 30 * DIA).toISOString();
 
-  const [ordensRes, agendaRes, agendaCfgRes, abertasRes, settingsRes, empresaRes, recovery] = await Promise.all([
+  const [ordensRes, agendaRes, agendaCfgRes, abertasRes, settingsRes, empresaRes, servicosRes, recovery] = await Promise.all([
     supabase
       .from("ordens_servico")
       .select("id, valor, status, created_at, entregue_em")
       .eq("owner_id", ownerId)
       .eq("status", "entregue")
-      .gte("created_at", desde16d)
+      .gte("entregue_em", desde30d)
       .limit(5000),
     supabase
       .from("agendamentos")
@@ -124,6 +135,11 @@ export async function buildMorningBrief(
       .select("nome_fantasia, endereco, horario_funcionamento, whatsapp, instagram, facebook, website")
       .eq("owner_id", ownerId)
       .maybeSingle(),
+    supabase
+      .from("servicos")
+      .select("preco_padrao")
+      .eq("owner_id", ownerId)
+      .eq("ativo", true),
     buildRecoveryEngineData(supabase, ownerId),
   ]);
 
@@ -133,6 +149,7 @@ export async function buildMorningBrief(
   assertOk("ordens_abertas", abertasRes.error);
   assertOk("tenant_ai_settings", settingsRes.error);
   assertOk("empresa", empresaRes.error);
+  assertOk("servicos", servicosRes.error);
 
   const dias7 = new Set(Array.from({ length: 7 }, (_, i) => localDateOffset(-(i + 1))));
   const dias7Anterior = new Set(Array.from({ length: 7 }, (_, i) => localDateOffset(-(i + 8))));
@@ -145,6 +162,7 @@ export async function buildMorningBrief(
   let receita7d = 0;
   let receita7dAnterior = 0;
   let quantidade7d = 0;
+  let quantidade7dAnterior = 0;
   for (const ordem of ordens) {
     const data = ordem.entregue_em ?? ordem.created_at;
     if (!data) continue;
@@ -155,6 +173,7 @@ export async function buildMorningBrief(
       quantidade7d += 1;
     } else if (dias7Anterior.has(key)) {
       receita7dAnterior += valor;
+      quantidade7dAnterior += 1;
     }
   }
   receita7d = round2(receita7d);
@@ -162,7 +181,10 @@ export async function buildMorningBrief(
   const variacaoReceita7d = receita7dAnterior > 0
     ? round2((receita7d - receita7dAnterior) / receita7dAnterior)
     : null;
-  const ticketMedio7d = quantidade7d > 0 ? round2(receita7d / quantidade7d) : recovery.resumo.ticketMedio;
+
+  // Mesma regra usada pela Central do Dia para valorar capacidade ociosa.
+  const capacityTicket = calculateCapacityTicket(ordens, (servicosRes.data ?? []) as any[]);
+  const ticketMedioCapacidade = capacityTicket.value;
 
   const agendaAtiva = ((agendaRes.data ?? []) as any[]).filter((a) => isActiveAppointment(a.status));
   const cfg = agendaCfgRes.data as any;
@@ -172,11 +194,27 @@ export async function buildMorningBrief(
   const simultanea = Math.max(1, Number(cfg?.capacidade_simultanea ?? 1));
   const diasSemana = (cfg?.dias_semana ?? []) as number[];
   const abertoHoje = !cfg || diasSemana.length === 0 || diasSemana.includes(localDayOfWeek());
-  let capacidadeHoje = 0;
-  if (abertoHoje && fim > inicio) {
-    for (let slot = inicio; slot + intervalo <= fim; slot += intervalo) capacidadeHoje += simultanea;
+  const agoraMin = localTimeMinutes();
+
+  const ocupacaoPorSlot = new Map<number, number>();
+  for (const a of agendaAtiva) {
+    const minutos = hmToMinutes(a.hora_agendada);
+    const slot = inicio + Math.floor(Math.max(0, minutos - inicio) / intervalo) * intervalo;
+    ocupacaoPorSlot.set(slot, (ocupacaoPorSlot.get(slot) ?? 0) + 1);
   }
-  const horariosLivresHoje = Math.max(0, capacidadeHoje - agendaAtiva.length);
+
+  let capacidadeHoje = 0;
+  let horariosLivresHoje = 0;
+  if (abertoHoje && fim > inicio) {
+    const primeiroSlot = agoraMin <= inicio
+      ? inicio
+      : inicio + Math.ceil((agoraMin - inicio) / intervalo) * intervalo;
+    for (let slot = inicio; slot + intervalo <= fim; slot += intervalo) {
+      capacidadeHoje += simultanea;
+      if (slot < primeiroSlot) continue;
+      horariosLivresHoje += Math.max(0, simultanea - (ocupacaoPorSlot.get(slot) ?? 0));
+    }
+  }
   const ocupacaoHoje = capacidadeHoje > 0 ? round2(agendaAtiva.length / capacidadeHoje) : null;
   const veiculosProntos = ((abertasRes.data ?? []) as any[]).filter((o) => o.status === "pronto").length;
 
@@ -199,12 +237,17 @@ export async function buildMorningBrief(
   }
 
   if (abertoHoje && capacidadeHoje > 0 && horariosLivresHoje > 0) {
-    const potencialAgenda = round2(horariosLivresHoje * (ticketMedio7d || recovery.resumo.ticketMedio || 50));
+    const potencialAgenda = round2(horariosLivresHoje * ticketMedioCapacidade);
+    const fonteTicket = capacityTicket.source === "delivered_30d"
+      ? "ticket médio das OS entregues nos últimos 30 dias"
+      : capacityTicket.source === "active_services"
+        ? "média dos serviços ativos"
+        : "referência inicial de ticket";
     itens.push({
       id: "agenda",
       tipo: ocupacaoHoje !== null && ocupacaoHoje < 0.5 ? "atencao" : "oportunidade",
       titulo: `${horariosLivresHoje} ${horariosLivresHoje === 1 ? "horário ainda está livre" : "horários ainda estão livres"} hoje`,
-      detalhe: `${agendaAtiva.length} agendamentos ocupam ${Math.round((ocupacaoHoje ?? 0) * 100)}% da capacidade configurada. Preencher os espaços pode representar até ${brl(potencialAgenda)} pelo ticket recente.`,
+      detalhe: `${agendaAtiva.length} agendamentos ocupam ${Math.round((ocupacaoHoje ?? 0) * 100)}% da capacidade configurada. Os espaços ainda vendáveis representam até ${brl(potencialAgenda)} pelo ${fonteTicket}.`,
       metrica: `${Math.round((ocupacaoHoje ?? 0) * 100)}% ocupado`,
       impactoEstimado: potencialAgenda,
       acaoLabel: "Abrir agenda",
@@ -227,11 +270,18 @@ export async function buildMorningBrief(
 
   if (variacaoReceita7d !== null && Math.abs(variacaoReceita7d) >= 0.1) {
     const subiu = variacaoReceita7d > 0;
+    const amostraConfiavel = quantidade7d >= 3 && quantidade7dAnterior >= 3;
+    const titulo = amostraConfiavel
+      ? `Receita dos últimos 7 dias ${subiu ? "subiu" : "caiu"} ${Math.abs(Math.round(variacaoReceita7d * 100))}%`
+      : `Receita recente ficou ${subiu ? "acima" : "abaixo"} do período anterior`;
+    const detalheAmostra = amostraConfiavel
+      ? ""
+      : ` A amostra ainda é pequena (${quantidade7d} OS contra ${quantidade7dAnterior}), então trate isso como sinal e não como tendência consolidada.`;
     itens.push({
       id: "receita-7d",
       tipo: subiu ? "positivo" : "atencao",
-      titulo: `Receita dos últimos 7 dias ${subiu ? "subiu" : "caiu"} ${Math.abs(Math.round(variacaoReceita7d * 100))}%`,
-      detalhe: `${brl(receita7d)} nos 7 dias completos mais recentes contra ${brl(receita7dAnterior)} nos 7 dias anteriores.`,
+      titulo,
+      detalhe: `${brl(receita7d)} nos 7 dias completos mais recentes contra ${brl(receita7dAnterior)} nos 7 dias anteriores.${detalheAmostra}`,
       metrica: brl(receita7d),
       impactoEstimado: null,
       acaoLabel: subiu ? null : "Ver oportunidades",
@@ -255,9 +305,9 @@ export async function buildMorningBrief(
       itens.push({
         id: "agenda-cheia",
         tipo: "positivo",
-        titulo: "Agenda de hoje está cheia",
-        detalhe: `${agendaAtiva.length} agendamentos ocupam toda a capacidade configurada para o dia.`,
-        metrica: "100% ocupado",
+        titulo: "Agenda de hoje não tem mais espaços vendáveis",
+        detalhe: `${agendaAtiva.length} agendamentos estão registrados e não há mais slots disponíveis a partir do horário atual.`,
+        metrica: "sem vagas",
         impactoEstimado: null,
         acaoLabel: null,
         acaoRota: null,
@@ -282,6 +332,7 @@ export async function buildMorningBrief(
       agendamentosHoje: agendaAtiva.length,
       capacidadeHoje,
       horariosLivresHoje,
+      ticketMedioCapacidade,
       recoveryAltaPrioridade: recoveryAlta.length,
       recoveryValorEsperado,
     },
@@ -289,25 +340,23 @@ export async function buildMorningBrief(
 
   const atencoes = itensFinais.filter((i) => i.tipo === "atencao").length;
   const oportunidades = itensFinais.filter((i) => i.tipo === "oportunidade").length;
-  const nome = pack.identidade.nome_fantasia;
-  const titulo = nome ? `Bom dia, ${nome}` : "Morning Brief";
   const resumo = atencoes > 0
     ? `${atencoes} ponto${atencoes === 1 ? "" : "s"} pede${atencoes === 1 ? "" : "m"} atenção hoje${oportunidades ? ` e há ${oportunidades} oportunidade${oportunidades === 1 ? "" : "s"} de receita` : ""}.`
     : oportunidades > 0
-      ? `Encontrei ${oportunidades} oportunidade${oportunidades === 1 ? "" : "s"} prática${oportunidades === 1 ? "" : "s"} para começar o dia.`
+      ? `Encontrei ${oportunidades} oportunidade${oportunidades === 1 ? "" : "s"} prática${oportunidades === 1 ? "" : "s"} para hoje.`
       : "A operação está em dia com os dados disponíveis. Foque em manter o ritmo e registrar os atendimentos.";
 
   return {
     dataLocal: hoje,
     geradoEm: new Date().toISOString(),
-    titulo,
+    titulo: "Seu resumo de hoje",
     resumo,
     itens: itensFinais,
     metricas: {
       receita7d,
       receita7dAnterior,
       variacaoReceita7d,
-      ticketMedio7d: round2(ticketMedio7d),
+      ticketMedio7d: round2(ticketMedioCapacidade),
       agendamentosHoje: agendaAtiva.length,
       capacidadeHoje,
       horariosLivresHoje,
