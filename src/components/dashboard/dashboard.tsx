@@ -10,8 +10,7 @@ import { GrowthEngineCard } from "@/components/dashboard/growth-engine-card";
 import { MorningBriefCard } from "@/components/dashboard/morning-brief-card";
 import { brl } from "@/lib/format";
 import {
-  CalendarDays, Plus, UserPlus, Clock, AlertCircle, Play,
-  TrendingUp, ArrowRight,
+  Plus, UserPlus, Clock, AlertCircle, Play, ArrowRight,
 } from "lucide-react";
 
 const KANBAN_COLS: { key: string; label: string }[] = [
@@ -51,9 +50,7 @@ export function Dashboard() {
   const totalAgenda = Number(cards.agendamentosHoje ?? agenda.length);
   const horariosLivres = Number(cards.horariosLivres ?? 0);
   const ticketMedio = Number(cards.ticketMedio ?? 0);
-  const potencial = Number(cards.potencialFaturamento ?? 0);
-  const expedienteEncerrado = Boolean(cards.expedienteEncerrado);
-  const fechadoHoje = Boolean(cards.fechadoHoje);
+  const potencialAgenda = Number(cards.potencialFaturamento ?? 0);
 
   const kanbanCount = KANBAN_COLS.map((c) => ({
     ...c,
@@ -73,58 +70,11 @@ export function Dashboard() {
         }
       />
 
-      {/* 1. Morning Brief — leitura inteligente do negócio antes da operação */}
+      {/* 1. Morning Brief — protagonista da leitura inteligente do dia */}
       <MorningBriefCard />
 
-      {/* 2. Oportunidade operacional de hoje — hero */}
-      <Card
-        className="mb-4 overflow-hidden border-0 text-primary-foreground shadow-lg"
-        style={{
-          backgroundColor: "var(--primary)",
-          backgroundImage:
-            "linear-gradient(135deg, color-mix(in oklab, var(--primary) 92%, white 8%), var(--primary) 55%, color-mix(in oklab, var(--primary) 82%, black 18%))",
-        }}
-      >
-        <CardContent className="p-5">
-          <div className="mb-2 flex items-center gap-2 text-xs font-semibold uppercase tracking-widest text-primary-foreground/90">
-            <TrendingUp className="h-3.5 w-3.5 shrink-0" /> Oportunidade de hoje
-          </div>
-
-          {horariosLivres === 0 ? (
-            <>
-              <p className="font-display text-2xl font-bold text-primary-foreground">
-                {fechadoHoje ? "Fechado hoje" : expedienteEncerrado ? "Expediente encerrado" : "Agenda cheia hoje 🎉"}
-              </p>
-              <p className="mt-1 text-sm text-primary-foreground/90">
-                {fechadoHoje
-                  ? "Hoje não é dia de funcionamento na sua configuração de agenda."
-                  : expedienteEncerrado
-                    ? "Não há mais horários vendáveis hoje. Foque na agenda de amanhã."
-                    : "Nenhum horário livre até o fim do expediente. Ótimo trabalho!"}
-              </p>
-            </>
-          ) : (
-            <>
-              <p className="font-display text-3xl font-bold tabular-nums text-primary-foreground">{brl(potencial)}</p>
-              <p className="mt-1 text-sm text-primary-foreground/90">
-                <strong className="font-bold text-primary-foreground">{horariosLivres}</strong> {horariosLivres === 1 ? "horário livre" : "horários livres"} × ticket médio de <strong className="font-bold text-primary-foreground">{brl(ticketMedio)}</strong>
-              </p>
-              <Button
-                asChild
-                size="sm"
-                className="mt-3 border-0 font-semibold shadow-sm"
-                style={{ backgroundColor: "var(--card)", backgroundImage: "none", color: "var(--primary)" }}
-              >
-                <Link to="/agendamentos"><CalendarDays className="h-4 w-4" /> Preencher agenda</Link>
-              </Button>
-            </>
-          )}
-
-        </CardContent>
-      </Card>
-
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        {/* 3. Agenda do dia */}
+        {/* 2. Agenda do dia */}
         <Card>
           <CardContent className="p-4">
             <div className="mb-3 flex items-center gap-2">
@@ -165,7 +115,7 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* 4. Mini kanban */}
+        {/* 3. Mini kanban */}
         <Card>
           <CardContent className="p-4">
             <div className="mb-3 flex items-center gap-2">
@@ -187,8 +137,14 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* 5. Growth Engine — oportunidades agregadas (Free e Growth) */}
-      <GrowthEngineCard />
+      {/* 4. Growth Engine — usa a mesma oportunidade operacional vista pelo Brief */}
+      <GrowthEngineCard
+        agendaOpportunity={{
+          horariosLivres,
+          potencialEstimado: potencialAgenda,
+          ticketMedio,
+        }}
+      />
     </>
   );
 }
