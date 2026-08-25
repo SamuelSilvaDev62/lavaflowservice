@@ -1,4 +1,5 @@
 import { mergeEmpresaIntoContext, type BusinessContext } from "@/lib/business-context";
+import { calculateCapacityTicket } from "@/lib/capacity-ticket";
 import { buildSkillContext } from "@/lib/skill-context";
 
 const DIA = 86_400_000;
@@ -169,9 +170,10 @@ export async function buildAgendaFillData(supabase: any, ownerId: string): Promi
   const fimJanela = localDate(LOOKAHEAD_DIAS - 1);
   const futuro30 = localDate(30);
   const desdeHistorico = new Date(agora - LOOKBACK_DIAS * DIA).toISOString();
+  const desde30d = new Date(agora - 30 * DIA).toISOString();
   const desdeContato = new Date(agora - CONTATO_RECENTE_DIAS * DIA).toISOString();
 
-  const [agendaCfgRes, agenda7Res, agenda30Res, clientesRes, ordensRes, contatosRes, campanhasRes, settingsRes, empresaRes] = await Promise.all([
+  const [agendaCfgRes, agenda7Res, agenda30Res, clientesRes, ordensRes, contatosRes, campanhasRes, settingsRes, empresaRes, servicosRes] = await Promise.all([
     supabase
       .from("agenda_config")
       .select("hora_inicio, hora_fim, intervalo_min, capacidade_simultanea, dias_semana")
@@ -226,6 +228,11 @@ export async function buildAgendaFillData(supabase: any, ownerId: string): Promi
       .select("nome_fantasia, endereco, horario_funcionamento, whatsapp, instagram, facebook, website")
       .eq("owner_id", ownerId)
       .maybeSingle(),
+    supabase
+      .from("servicos")
+      .select("preco_padrao")
+      .eq("owner_id", ownerId)
+      .eq("ativo", true),
   ]);
 
   assertOk("agenda_config", agendaCfgRes.error);
@@ -237,6 +244,7 @@ export async function buildAgendaFillData(supabase: any, ownerId: string): Promi
   assertOk("campanhas", campanhasRes.error);
   assertOk("tenant_ai_settings", settingsRes.error);
   assertOk("empresa", empresaRes.error);
+  assertOk("servicos", servicosRes.error);
 
   const cfg = agendaCfgRes.data as any;
   const inicio = hmToMinutes(cfg?.hora_inicio ?? "08:00");
@@ -280,10 +288,14 @@ export async function buildAgendaFillData(supabase: any, ownerId: string): Promi
     .sort((a, b) => b.livres - a.livres || a.ocupacao - b.ocupacao || a.data.localeCompare(b.data))[0] ?? null;
 
   const ordens = (ordensRes.data ?? []) as any[];
-  const ticketsGlobais = ordens.map((o) => Number(o.valor ?? 0)).filter((v) => Number.isFinite(v) && v > 0);
-  const ticketGlobal = ticketsGlobais.length
-    ? ticketsGlobais.reduce((s, v) => s + v, 0) / ticketsGlobais.length
-    : 50;
+  const ordensEntregues30 = ordens.filter((ordem) => {
+    const entregueEm = String(ordem.entregue_em ?? "");
+    return Boolean(entregueEm && entregueEm >= desde30d);
+  });
+  // A capacidade usa a mesma referência econômica da Central do Dia e Morning Brief.
+  // O histórico de até 365 dias continua existindo apenas para timing/recorrência individual.
+  const capacityTicket = calculateCapacityTicket(ordensEntregues30, (servicosRes.data ?? []) as any[]);
+  const ticketGlobal = capacityTicket.value;
 
   const campanhasIds = (campanhasRes.data ?? []).map((c: any) => c.id);
   const historicoAlvosRes = campanhasIds.length
