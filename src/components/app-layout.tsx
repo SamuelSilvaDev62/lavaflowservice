@@ -102,7 +102,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
           <span className="grid h-9 w-9 place-content-center rounded-2xl bg-gradient-to-br from-primary to-primary/70 shadow-[var(--shadow-neo-sm)]">
             <Car className="h-4 w-4 text-primary-foreground" />
           </span>
-          Lava<span className="text-primary">Flow</span>
+          <span className="whitespace-nowrap"><span>Lava</span><span className="text-primary">Flow</span></span>
         </Link>
         <button onClick={() => setOpen(!open)} className="grid h-11 w-11 place-content-center rounded-2xl bg-card shadow-[var(--shadow-neo-sm)] transition-all duration-200 hover:shadow-[var(--shadow-neo)] active:shadow-[var(--shadow-neo-inset)]" aria-label="Menu">
           {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
@@ -118,7 +118,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             <Car className="h-5 w-5 text-primary-foreground" />
           </div>
           <Link to="/dashboard" className="font-display text-xl font-bold tracking-tight">
-            Lava<span className="text-primary">Flow</span>
+            <span className="whitespace-nowrap"><span>Lava</span><span className="text-primary">Flow</span></span>
           </Link>
         </div>
         {role && (
@@ -212,7 +212,7 @@ export function PageHeader({ title, subtitle, actions }: { title: string; subtit
   return (
     <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4 mb-8">
       <div>
-        <h1 className="text-3xl lg:text-4xl font-display font-bold tracking-tight">{title}</h1>
+        <h1 className="text-2xl sm:text-3xl lg:text-4xl font-display font-bold tracking-tight">{title}</h1>
         {subtitle && <p className="text-sm text-muted-foreground mt-2">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap gap-2">{actions}</div>}
