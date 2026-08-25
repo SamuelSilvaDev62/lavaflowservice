@@ -14,7 +14,8 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { getMorningBrief } from "@/lib/morning-brief.functions";
-import type { MorningBriefItemType } from "@/lib/morning-brief.server";
+
+type MorningBriefItemType = "atencao" | "oportunidade" | "positivo" | "info";
 
 const TYPE_META: Record<MorningBriefItemType, {
   label: string;
@@ -114,7 +115,7 @@ function BriefContent() {
               Ainda não há histórico suficiente para um resumo útil. Continue registrando agenda, clientes e ordens.
             </div>
           ) : data.itens.map((item) => {
-            const meta = TYPE_META[item.tipo];
+            const meta = TYPE_META[item.tipo as MorningBriefItemType];
             const Icon = meta.icon;
             return (
               <div key={item.id} className="grid gap-3 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
