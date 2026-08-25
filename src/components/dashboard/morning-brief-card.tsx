@@ -47,16 +47,16 @@ const TYPE_META: Record<MorningBriefItemType, {
 function LockedMorningBrief() {
   return (
     <Card className="mb-4 overflow-hidden border-primary/15 bg-gradient-to-br from-primary/5 via-card to-card">
-      <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="grid h-10 w-10 shrink-0 place-content-center rounded-xl bg-primary/10 text-primary">
+          <div className="grid h-9 w-9 shrink-0 place-content-center rounded-xl bg-primary/10 text-primary">
             <Lock className="h-4 w-4" />
           </div>
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-primary">Morning Brief · Growth</p>
-            <h2 className="mt-1 font-display text-lg font-semibold">Seu negócio resumido antes de você perguntar</h2>
-            <p className="mt-1 max-w-2xl text-sm text-muted-foreground">
-              O Growth cruza receita recente, agenda, operação e clientes com chance de retorno para dizer o que merece ação hoje.
+            <h2 className="mt-1 font-display text-base font-semibold">Seu negócio resumido antes de você perguntar</h2>
+            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+              O Growth cruza receita, agenda, operação e clientes com chance de retorno para dizer o que merece ação hoje.
             </p>
           </div>
         </div>
@@ -79,13 +79,13 @@ function BriefContent() {
   });
 
   if (isLoading) {
-    return <div className="mb-4 h-56 rounded-2xl skeleton-shimmer" />;
+    return <div className="mb-4 h-40 rounded-2xl skeleton-shimmer" />;
   }
 
   if (isError || !data) {
     return (
       <Card className="mb-4">
-        <CardContent className="p-5">
+        <CardContent className="p-4">
           <p className="text-sm font-medium">Morning Brief indisponível agora.</p>
           <p className="mt-1 text-xs text-muted-foreground">A Central do Dia continua funcionando normalmente.</p>
         </CardContent>
@@ -96,29 +96,29 @@ function BriefContent() {
   return (
     <Card className="mb-4 overflow-hidden border-primary/20">
       <CardContent className="p-0">
-        <div className="border-b bg-primary/[0.04] p-5">
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div className="border-b bg-primary/[0.04] p-4">
+          <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-primary">
                 <Sparkles className="h-3.5 w-3.5" /> Morning Brief
               </div>
-              <h2 className="mt-1 font-display text-xl font-semibold">{data.titulo}</h2>
-              <p className="mt-1 text-sm text-muted-foreground">{data.resumo}</p>
+              <h2 className="mt-1 font-display text-lg font-semibold">Seu resumo de hoje</h2>
+              <p className="mt-0.5 text-sm text-muted-foreground">{data.resumo}</p>
             </div>
-            <span className="shrink-0 text-xs text-muted-foreground">Atualiza automaticamente</span>
+            <span className="shrink-0 text-[11px] text-muted-foreground">Atualiza automaticamente</span>
           </div>
         </div>
 
         <div className="divide-y">
           {data.itens.length === 0 ? (
-            <div className="p-5 text-sm text-muted-foreground">
+            <div className="p-4 text-sm text-muted-foreground">
               Ainda não há histórico suficiente para um resumo útil. Continue registrando agenda, clientes e ordens.
             </div>
           ) : data.itens.map((item) => {
             const meta = TYPE_META[item.tipo as MorningBriefItemType];
             const Icon = meta.icon;
             return (
-              <div key={item.id} className="grid gap-3 p-4 sm:grid-cols-[1fr_auto] sm:items-center">
+              <div key={item.id} className="grid gap-2.5 p-3.5 sm:grid-cols-[1fr_auto] sm:items-center">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline" className={meta.className}>
@@ -126,11 +126,11 @@ function BriefContent() {
                     </Badge>
                     {item.metrica ? <span className="text-xs font-semibold tabular-nums text-foreground">{item.metrica}</span> : null}
                   </div>
-                  <p className="mt-2 font-display text-sm font-semibold">{item.titulo}</p>
-                  <p className="mt-1 text-sm leading-relaxed text-muted-foreground">{item.detalhe}</p>
+                  <p className="mt-1.5 font-display text-sm font-semibold">{item.titulo}</p>
+                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{item.detalhe}</p>
                 </div>
                 {item.acaoLabel && item.acaoRota ? (
-                  <Button asChild variant="ghost" size="sm" className="justify-self-start sm:justify-self-end">
+                  <Button asChild variant="ghost" size="sm" className="h-8 justify-self-start px-2 sm:justify-self-end">
                     <Link to={item.acaoRota as any}>{item.acaoLabel}<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
                   </Button>
                 ) : null}
