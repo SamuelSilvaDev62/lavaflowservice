@@ -2,7 +2,7 @@ import { Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { ArrowRight, CheckCircle2, Lock, Sparkles, TrendingUp, Users } from "lucide-react";
+import { ArrowRight, CalendarDays, CheckCircle2, Lock, Sparkles, TrendingUp, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -10,11 +10,17 @@ import { ativarTrialGrowth, getGrowthPreview } from "@/lib/growth.functions";
 import { GROWTH_PRICE_BRL, GROWTH_TRIAL_DAYS } from "@/lib/plans";
 import { brl } from "@/lib/format";
 
+type AgendaOpportunity = {
+  horariosLivres: number;
+  potencialEstimado: number;
+  ticketMedio: number;
+};
+
 /**
  * Motor de conversão Free → Growth. Mostra SOMENTE agregados (sem PII) e nunca
  * bloqueia a operação: é um convite contextual baseado nos dados reais do tenant.
  */
-export function GrowthEngineCard() {
+export function GrowthEngineCard({ agendaOpportunity }: { agendaOpportunity?: AgendaOpportunity }) {
   const qc = useQueryClient();
   const previewFn = useServerFn(getGrowthPreview);
   const trialFn = useServerFn(ativarTrialGrowth);
@@ -41,6 +47,9 @@ export function GrowthEngineCard() {
 
   const growthAtivo = data.tier === "growth";
   const op = data.oportunidades;
+  const agendaTemPotencial =
+    Number(agendaOpportunity?.horariosLivres ?? 0) > 0 &&
+    Number(agendaOpportunity?.potencialEstimado ?? 0) > 0;
 
   // Growth ativo: card operacional direto para as oportunidades.
   if (growthAtivo) {
@@ -66,15 +75,44 @@ export function GrowthEngineCard() {
               </span>
             </p>
           )}
-          {op.total === 0 ? (
+
+          {op.total === 0 && agendaTemPotencial ? (
+            <div className="space-y-3">
+              <div className="rounded-2xl border border-primary/15 bg-primary/[0.04] p-3">
+                <div className="flex items-start gap-3">
+                  <div className="grid h-9 w-9 shrink-0 place-content-center rounded-xl bg-primary/10 text-primary">
+                    <CalendarDays className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">1 oportunidade operacional identificada</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {agendaOpportunity!.horariosLivres} {agendaOpportunity!.horariosLivres === 1 ? "horário livre" : "horários livres"} hoje podem representar até {brl(agendaOpportunity!.potencialEstimado)} pelo ticket médio de {brl(agendaOpportunity!.ticketMedio)}.
+                    </p>
+                  </div>
+                </div>
+              </div>
+              <div className="flex flex-wrap gap-2">
+                <Button asChild size="sm" variant="premium">
+                  <Link to="/agendamentos">
+                    Preencher agenda <ArrowRight className="h-3 w-3" />
+                  </Link>
+                </Button>
+                <Button asChild size="sm" variant="outline">
+                  <Link to="/oportunidades">
+                    Abrir Recovery
+                  </Link>
+                </Button>
+              </div>
+            </div>
+          ) : op.total === 0 ? (
             <div className="space-y-2">
               <div className="flex items-center gap-2 rounded-2xl bg-muted/30 p-3 text-sm text-muted-foreground">
                 <CheckCircle2 className="h-4 w-4 text-success" />
-                Nenhuma oportunidade pendente agora. Sua base está em dia.
+                Nenhuma oportunidade pendente agora. Sua base e sua capacidade de hoje estão em dia.
               </div>
               <Button asChild size="sm" variant="outline">
                 <Link to="/oportunidades">
-                  Abrir oportunidades <ArrowRight className="h-3 w-3" />
+                  Abrir Recovery <ArrowRight className="h-3 w-3" />
                 </Link>
               </Button>
             </div>
@@ -95,6 +133,16 @@ export function GrowthEngineCard() {
                   </Link>
                 </Button>
               </div>
+              {agendaTemPotencial ? (
+                <div className="mt-3 flex flex-col gap-2 rounded-2xl bg-muted/25 p-3 sm:flex-row sm:items-center sm:justify-between">
+                  <p className="text-xs text-muted-foreground">
+                    Além da base de clientes, há {agendaOpportunity!.horariosLivres} espaços livres hoje com até {brl(agendaOpportunity!.potencialEstimado)} de capacidade estimada.
+                  </p>
+                  <Button asChild size="sm" variant="ghost" className="shrink-0 justify-start">
+                    <Link to="/agendamentos">Abrir agenda <ArrowRight className="h-3 w-3" /></Link>
+                  </Button>
+                </div>
+              ) : null}
             </>
           )}
         </CardContent>
