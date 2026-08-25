@@ -29,6 +29,7 @@ import { Route as AuthenticatedFilaRouteImport } from './routes/_authenticated/f
 import { Route as AuthenticatedFidelidadeRouteImport } from './routes/_authenticated/fidelidade'
 import { Route as AuthenticatedEquipeRouteImport } from './routes/_authenticated/equipe'
 import { Route as AuthenticatedDashboardRouteImport } from './routes/_authenticated/dashboard'
+import { Route as AuthenticatedContextoNegocioRouteImport } from './routes/_authenticated/contexto-negocio'
 import { Route as AuthenticatedConfiguracoesRouteImport } from './routes/_authenticated/configuracoes'
 import { Route as AuthenticatedCampanhasRouteImport } from './routes/_authenticated/campanhas'
 import { Route as AuthenticatedAssistenteRouteImport } from './routes/_authenticated/assistente'
@@ -139,6 +140,12 @@ const AuthenticatedDashboardRoute = AuthenticatedDashboardRouteImport.update({
   path: '/dashboard',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedContextoNegocioRoute =
+  AuthenticatedContextoNegocioRouteImport.update({
+    id: '/contexto-negocio',
+    path: '/contexto-negocio',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 const AuthenticatedConfiguracoesRoute =
   AuthenticatedConfiguracoesRouteImport.update({
     id: '/configuracoes',
@@ -202,6 +209,7 @@ export interface FileRoutesByFullPath {
   '/assistente': typeof AuthenticatedAssistenteRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/contexto-negocio': typeof AuthenticatedContextoNegocioRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/equipe': typeof AuthenticatedEquipeRoute
   '/fidelidade': typeof AuthenticatedFidelidadeRoute
@@ -232,6 +240,7 @@ export interface FileRoutesByTo {
   '/assistente': typeof AuthenticatedAssistenteRoute
   '/campanhas': typeof AuthenticatedCampanhasRoute
   '/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/contexto-negocio': typeof AuthenticatedContextoNegocioRoute
   '/dashboard': typeof AuthenticatedDashboardRoute
   '/equipe': typeof AuthenticatedEquipeRoute
   '/fidelidade': typeof AuthenticatedFidelidadeRoute
@@ -264,6 +273,7 @@ export interface FileRoutesById {
   '/_authenticated/assistente': typeof AuthenticatedAssistenteRoute
   '/_authenticated/campanhas': typeof AuthenticatedCampanhasRoute
   '/_authenticated/configuracoes': typeof AuthenticatedConfiguracoesRoute
+  '/_authenticated/contexto-negocio': typeof AuthenticatedContextoNegocioRoute
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRoute
   '/_authenticated/equipe': typeof AuthenticatedEquipeRoute
   '/_authenticated/fidelidade': typeof AuthenticatedFidelidadeRoute
@@ -296,6 +306,7 @@ export interface FileRouteTypes {
     | '/assistente'
     | '/campanhas'
     | '/configuracoes'
+    | '/contexto-negocio'
     | '/dashboard'
     | '/equipe'
     | '/fidelidade'
@@ -326,6 +337,7 @@ export interface FileRouteTypes {
     | '/assistente'
     | '/campanhas'
     | '/configuracoes'
+    | '/contexto-negocio'
     | '/dashboard'
     | '/equipe'
     | '/fidelidade'
@@ -357,6 +369,7 @@ export interface FileRouteTypes {
     | '/_authenticated/assistente'
     | '/_authenticated/campanhas'
     | '/_authenticated/configuracoes'
+    | '/_authenticated/contexto-negocio'
     | '/_authenticated/dashboard'
     | '/_authenticated/equipe'
     | '/_authenticated/fidelidade'
@@ -533,6 +546,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/contexto-negocio': {
+      id: '/_authenticated/contexto-negocio'
+      path: '/contexto-negocio'
+      fullPath: '/contexto-negocio'
+      preLoaderRoute: typeof AuthenticatedContextoNegocioRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/configuracoes': {
       id: '/_authenticated/configuracoes'
       path: '/configuracoes'
@@ -605,6 +625,7 @@ interface AuthenticatedRouteRouteChildren {
   AuthenticatedAssistenteRoute: typeof AuthenticatedAssistenteRoute
   AuthenticatedCampanhasRoute: typeof AuthenticatedCampanhasRoute
   AuthenticatedConfiguracoesRoute: typeof AuthenticatedConfiguracoesRoute
+  AuthenticatedContextoNegocioRoute: typeof AuthenticatedContextoNegocioRoute
   AuthenticatedDashboardRoute: typeof AuthenticatedDashboardRoute
   AuthenticatedEquipeRoute: typeof AuthenticatedEquipeRoute
   AuthenticatedFidelidadeRoute: typeof AuthenticatedFidelidadeRoute
@@ -625,6 +646,7 @@ const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedAssistenteRoute: AuthenticatedAssistenteRoute,
   AuthenticatedCampanhasRoute: AuthenticatedCampanhasRoute,
   AuthenticatedConfiguracoesRoute: AuthenticatedConfiguracoesRoute,
+  AuthenticatedContextoNegocioRoute: AuthenticatedContextoNegocioRoute,
   AuthenticatedDashboardRoute: AuthenticatedDashboardRoute,
   AuthenticatedEquipeRoute: AuthenticatedEquipeRoute,
   AuthenticatedFidelidadeRoute: AuthenticatedFidelidadeRoute,
