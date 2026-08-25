@@ -7,14 +7,25 @@ const textoOpcional = z.string().max(2000).optional().nullable();
 const contextSchema = z.object({
   descricao: textoOpcional,
   posicionamento: textoOpcional,
+  slogan_promessa: z.string().max(300).optional().nullable(),
   publico_alvo: textoOpcional,
+  perfil_cliente_ideal: textoOpcional,
   diferenciais: textoOpcional,
+  especialidades: z.string().max(500).optional().nullable(),
+  servicos_destaque: z.string().max(500).optional().nullable(),
   tom_de_voz: textoOpcional,
   objetivos_marketing: textoOpcional,
+  politica_descontos: textoOpcional,
   restricoes_campanhas: textoOpcional,
+  restricoes_comunicacao: textoOpcional,
   cidade: z.string().max(120).optional().nullable(),
   estado: z.string().max(40).optional().nullable(),
   bairros_atendidos: z.string().max(500).optional().nullable(),
+  cidades_atendidas: z.string().max(500).optional().nullable(),
+  area_atendimento: z.string().max(500).optional().nullable(),
+  raio_atendimento_km: z.string().max(20).optional().nullable(),
+  observacoes_regionais: textoOpcional,
+  referencias_locais: z.string().max(500).optional().nullable(),
   concorrentes: z.string().max(500).optional().nullable(),
   google_business_url: z.string().max(500).optional().nullable(),
   instagram_url: z.string().max(500).optional().nullable(),
@@ -23,6 +34,7 @@ const contextSchema = z.object({
   website_url: z.string().max(500).optional().nullable(),
   outras_referencias: textoOpcional,
 });
+
 
 /** Perfil de IA + contexto do negócio do tenant (owner/admin). */
 export const getBusinessContext = createServerFn({ method: "GET" })
