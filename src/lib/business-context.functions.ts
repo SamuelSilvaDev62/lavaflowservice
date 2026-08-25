@@ -35,17 +35,17 @@ const contextSchema = z.object({
   outras_referencias: textoOpcional,
 });
 
-
-/** Perfil de IA + contexto do negócio do tenant (owner/admin). */
+/** Perfil de IA + conhecimento do negócio do tenant (owner/admin). */
 export const getBusinessContext = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { resolveOwnerScope } = await import("@/lib/entitlements.server");
     const { ownerId, role } = await resolveOwnerScope(context.supabase, context.userId);
     if (!["owner", "admin"].includes(role)) {
-      throw new Error("Sem permissão para acessar o contexto do negócio.");
+      throw new Error("Sem permissão para acessar o conhecimento do negócio.");
     }
-    const [{ data: settings }, { data: empresa }] = await Promise.all([
+
+    const [settingsRes, empresaRes, historicoRes] = await Promise.all([
       context.supabase
         .from("tenant_ai_settings")
         .select("ai_enabled, preferred_tone, business_context, updated_at")
@@ -56,13 +56,26 @@ export const getBusinessContext = createServerFn({ method: "GET" })
         .select("nome_fantasia, endereco, horario_funcionamento, instagram, facebook, website, whatsapp, telefone")
         .eq("owner_id", ownerId)
         .maybeSingle(),
+      context.supabase
+        .from("ordens_servico")
+        .select("id", { count: "exact", head: true })
+        .eq("owner_id", ownerId),
     ]);
+
+    if (settingsRes.error) throw settingsRes.error;
+    if (empresaRes.error) throw empresaRes.error;
+    if (historicoRes.error) throw historicoRes.error;
+
+    const settings = settingsRes.data;
+    const empresa = empresaRes.data;
+
     return {
       aiEnabled: settings?.ai_enabled ?? true,
       preferredTone: settings?.preferred_tone ?? null,
       businessContext: (settings?.business_context ?? {}) as Record<string, string | null>,
       atualizadoEm: settings?.updated_at ?? null,
       empresa: empresa ?? null,
+      temHistoricoOperacional: (historicoRes.count ?? 0) > 0,
     };
   });
 
@@ -81,7 +94,7 @@ export const updateBusinessContext = createServerFn({ method: "POST" })
     const { resolveOwnerScope } = await import("@/lib/entitlements.server");
     const { ownerId, role } = await resolveOwnerScope(context.supabase, context.userId);
     if (!["owner", "admin"].includes(role)) {
-      throw new Error("Sem permissão para editar o contexto do negócio.");
+      throw new Error("Sem permissão para editar o conhecimento do negócio.");
     }
     const limpo = Object.fromEntries(
       Object.entries(data.business_context).filter(([, v]) => v != null && String(v).trim() !== ""),
