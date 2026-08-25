@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { PageHeader } from "@/components/app-layout";
 import { getDashboardOperacional } from "@/lib/lavaflow.functions";
 import { GrowthEngineCard } from "@/components/dashboard/growth-engine-card";
+import { MorningBriefCard } from "@/components/dashboard/morning-brief-card";
 import { brl } from "@/lib/format";
 import {
   CalendarDays, Plus, UserPlus, Clock, AlertCircle, Play,
@@ -72,7 +73,10 @@ export function Dashboard() {
         }
       />
 
-      {/* 1. Oportunidade de hoje — hero */}
+      {/* 1. Morning Brief — leitura inteligente do negócio antes da operação */}
+      <MorningBriefCard />
+
+      {/* 2. Oportunidade operacional de hoje — hero */}
       <Card
         className="mb-4 overflow-hidden border-0 text-primary-foreground shadow-lg"
         style={{
@@ -120,7 +124,7 @@ export function Dashboard() {
       </Card>
 
       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
-        {/* 2. Agenda do dia */}
+        {/* 3. Agenda do dia */}
         <Card>
           <CardContent className="p-4">
             <div className="mb-3 flex items-center gap-2">
@@ -161,7 +165,7 @@ export function Dashboard() {
           </CardContent>
         </Card>
 
-        {/* 3. Mini kanban */}
+        {/* 4. Mini kanban */}
         <Card>
           <CardContent className="p-4">
             <div className="mb-3 flex items-center gap-2">
@@ -183,7 +187,7 @@ export function Dashboard() {
         </Card>
       </div>
 
-      {/* 4. Growth Engine — oportunidades agregadas (Free e Growth) */}
+      {/* 5. Growth Engine — oportunidades agregadas (Free e Growth) */}
       <GrowthEngineCard />
     </>
   );
