@@ -14,6 +14,6 @@ export const getMorningBrief = createServerFn({ method: "GET" })
       throw new Error("Sem permissão para acessar o Morning Brief.");
     }
 
-    await assertFeature(ownerId, "morning_brief");
+    await assertFeature(ownerId, "analises_inteligentes");
     return buildMorningBrief(context.supabase, ownerId);
   });
