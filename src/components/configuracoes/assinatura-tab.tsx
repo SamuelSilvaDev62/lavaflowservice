@@ -1,17 +1,13 @@
-import { useState } from "react";
 import { Link } from "@tanstack/react-router";
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { Check, Copy, CreditCard, Crown, ExternalLink, Sparkles } from "lucide-react";
+import { Check, CreditCard, Crown, Sparkles } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { useEntitlement } from "@/hooks/use-entitlement";
 import { abrirPortalAssinatura } from "@/lib/billing.functions";
-import { atualizarSlugPublico, getEmpresa } from "@/lib/lavaflow.functions";
 import { GROWTH_PRICE_BRL, STATUS_LABELS, TIERS, tierLabel } from "@/lib/plans";
 import { brl } from "@/lib/format";
 import { cn } from "@/lib/utils";
@@ -63,7 +59,13 @@ export function AssinaturaTab() {
             <div>
               <dt className="text-xs text-muted-foreground">Preço</dt>
               <dd className="font-display font-semibold tabular-nums">
-                {entitlement.isFounders ? `${brl(GROWTH_PRICE_BRL)}/mês` : tierAtual ? (tierAtual.precoMensal === 0 ? "R$ 0" : `${brl(tierAtual.precoMensal)}/mês`) : "—"}
+                {entitlement.isFounders
+                  ? `${brl(GROWTH_PRICE_BRL)}/mês`
+                  : tierAtual
+                    ? tierAtual.precoMensal === 0
+                      ? "R$ 0"
+                      : `${brl(tierAtual.precoMensal)}/mês`
+                    : "—"}
               </dd>
             </div>
             <div>
@@ -111,7 +113,6 @@ export function AssinaturaTab() {
       </Card>
 
       <ComparacaoPlanos tierAtual={entitlement.tier} />
-      <LinkPublicoCard />
     </div>
   );
 }
@@ -152,84 +153,5 @@ function ComparacaoPlanos({ tierAtual }: { tierAtual: string }) {
         </Card>
       ))}
     </div>
-  );
-}
-
-function LinkPublicoCard() {
-  const empresaFn = useServerFn(getEmpresa);
-  const salvar = useServerFn(atualizarSlugPublico);
-  const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ["empresa"], queryFn: () => empresaFn() });
-  const slugAtual = (data?.empresa as any)?.slug as string | undefined;
-  const [slug, setSlug] = useState("");
-
-  const mut = useMutation({
-    mutationFn: () => salvar({ data: { slug: slug || slugAtual || "" } }),
-    onSuccess: (r: any) => {
-      toast.success("Link público atualizado.");
-      setSlug("");
-      qc.invalidateQueries({ queryKey: ["empresa"] });
-      void r;
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Não foi possível atualizar o link"),
-  });
-
-  const url = slugAtual ? `${typeof window !== "undefined" ? window.location.origin : ""}/agendar/${slugAtual}` : "";
-
-  return (
-    <Card>
-      <CardContent className="space-y-3 p-4 sm:p-5">
-        <div className="space-y-1">
-          <h3 className="font-display font-semibold">Link público de agendamento</h3>
-          <p className="text-xs text-muted-foreground">
-            É único do seu estabelecimento e compartilhado por toda a equipe. Adicionar ou remover
-            funcionários não altera este link.
-          </p>
-        </div>
-
-        {url && (
-          <div className="flex flex-wrap items-center gap-2">
-            <code className="min-w-0 flex-1 break-all rounded-xl bg-muted px-3 py-2 text-xs">{url}</code>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                void navigator.clipboard.writeText(url);
-                toast.success("Link copiado");
-              }}
-            >
-              <Copy className="mr-1.5 h-3.5 w-3.5" /> Copiar
-            </Button>
-            <Button asChild size="sm" variant="ghost">
-              <a href={url} target="_blank" rel="noreferrer">
-                <ExternalLink className="h-3.5 w-3.5" />
-              </a>
-            </Button>
-          </div>
-        )}
-
-        <div className="space-y-1.5">
-          <Label className="text-xs font-semibold">Personalizar link</Label>
-          <div className="flex flex-col gap-2 sm:flex-row">
-            <Input
-              value={slug}
-              onChange={(e) => setSlug(e.target.value)}
-              placeholder={slugAtual ?? "lava-jato-do-samuel"}
-            />
-            <Button
-              className="w-full sm:w-auto"
-              disabled={mut.isPending || slug.trim().length < 3}
-              onClick={() => mut.mutate()}
-            >
-              {mut.isPending ? "Salvando…" : "Salvar link"}
-            </Button>
-          </div>
-          <p className="text-xs text-muted-foreground">
-            Apenas letras minúsculas, números e hífens. Precisa ser único entre todos os
-            estabelecimentos.
-          </p>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
