@@ -3,7 +3,7 @@
 
 import type { BusinessContext } from "@/lib/business-context";
 
-export type SkillId = "recovery" | "morning_brief" | "campaign";
+export type SkillId = "recovery" | "morning_brief" | "agenda_fill" | "campaign";
 
 export type SkillContextPack = {
   skill: SkillId;
@@ -39,6 +39,18 @@ export const SKILL_PRESETS: Record<SkillId, { identidade: string[]; regras: stri
   morning_brief: {
     identidade: ["posicionamento", "area_atendimento", "cidade", "estado"],
     regras: ["objetivos_marketing", "restricoes_comunicacao"],
+  },
+  agenda_fill: {
+    identidade: [
+      "posicionamento",
+      "diferenciais",
+      "cidade",
+      "estado",
+      "bairros_atendidos",
+      "area_atendimento",
+      "referencias_locais",
+    ],
+    regras: ["politica_descontos", "restricoes_campanhas", "restricoes_comunicacao"],
   },
   campaign: {
     identidade: [
@@ -79,7 +91,7 @@ export function buildSkillContext(skill: SkillId, input: SkillContextInput): Ski
   const identidade: Record<string, string> = { ...id.out };
   if (input.empresa?.nome_fantasia) identidade["nome_fantasia"] = input.empresa.nome_fantasia;
   if (input.tom) identidade["tom_de_voz"] = input.tom;
-  if (skill === "morning_brief" && input.empresa?.horario_funcionamento) {
+  if ((skill === "morning_brief" || skill === "agenda_fill") && input.empresa?.horario_funcionamento) {
     identidade["horario_funcionamento"] = input.empresa.horario_funcionamento;
   }
 
