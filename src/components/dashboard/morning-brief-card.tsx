@@ -114,11 +114,15 @@ function BriefContent() {
             <div className="p-4 text-sm text-muted-foreground">
               Ainda não há histórico suficiente para um resumo útil. Continue registrando agenda, clientes e ordens.
             </div>
-          ) : data.itens.map((item) => {
+          ) : data.itens.map((item, index) => {
             const meta = TYPE_META[item.tipo as MorningBriefItemType];
             const Icon = meta.icon;
+            const destaque = index === 0;
             return (
-              <div key={item.id} className="grid gap-2.5 p-3.5 sm:grid-cols-[1fr_auto] sm:items-center">
+              <div
+                key={item.id}
+                className={`grid sm:grid-cols-[1fr_auto] sm:items-center ${destaque ? "gap-2.5 p-3.5" : "gap-2 p-3"}`}
+              >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
                     <Badge variant="outline" className={meta.className}>
@@ -126,11 +130,18 @@ function BriefContent() {
                     </Badge>
                     {item.metrica ? <span className="text-xs font-semibold tabular-nums text-foreground">{item.metrica}</span> : null}
                   </div>
-                  <p className="mt-1.5 font-display text-sm font-semibold">{item.titulo}</p>
-                  <p className="mt-0.5 text-xs leading-relaxed text-muted-foreground">{item.detalhe}</p>
+                  <p className={`${destaque ? "mt-1.5" : "mt-1"} font-display text-sm font-semibold`}>{item.titulo}</p>
+                  <p className={`${destaque ? "mt-0.5 block" : "mt-0.5 hidden sm:block"} text-xs leading-relaxed text-muted-foreground`}>
+                    {item.detalhe}
+                  </p>
                 </div>
                 {item.acaoLabel && item.acaoRota ? (
-                  <Button asChild variant="ghost" size="sm" className="h-8 justify-self-start px-2 sm:justify-self-end">
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className={`${destaque ? "h-8" : "h-7 text-xs"} justify-self-start px-2 sm:justify-self-end`}
+                  >
                     <Link to={item.acaoRota as any}>{item.acaoLabel}<ArrowRight className="ml-1 h-3.5 w-3.5" /></Link>
                   </Button>
                 ) : null}
