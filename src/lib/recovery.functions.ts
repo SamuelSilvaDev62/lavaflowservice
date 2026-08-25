@@ -18,7 +18,8 @@ export const getRecoveryOverview = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const { resolveOwnerScope, assertFeature } = await import("@/lib/entitlements.server");
-    const { buildRecoveryEngineData, buildRecoveryRoi } = await import("@/lib/recovery.server");
+    const { buildRecoveryEngineData } = await import("@/lib/recovery.server");
+    const { buildRecoveryRoi } = await import("@/lib/recovery-roi.server");
     const { ownerId, role } = await resolveOwnerScope(context.supabase, context.userId);
     assertGestao(role);
     await assertFeature(ownerId, "oportunidades");
