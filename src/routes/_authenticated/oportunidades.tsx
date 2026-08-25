@@ -1,105 +1,343 @@
-import { FeatureGate } from "@/components/feature-gate";
-import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
+import {
+  ArrowRight,
+  BrainCircuit,
+  CheckCircle2,
+  CircleDollarSign,
+  History,
+  MessageSquareText,
+  ShieldCheck,
+  Sparkles,
+  Target,
+  UsersRound,
+} from "lucide-react";
+import { toast } from "sonner";
+import { FeatureGate } from "@/components/feature-gate";
 import { PageHeader } from "@/components/app-layout";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
-import { getOportunidades, getClientesComRecompensa } from "@/lib/lavaflow.functions";
-import { brl } from "@/lib/format";
-import { waLink, getTemplate, renderTemplate, type WhatsAppTemplateKey } from "@/lib/whatsapp";
-import { MessageCircle, TrendingUp, Gift, ArrowRight } from "lucide-react";
 import { RequireRole } from "@/components/require-role";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
+import { brl } from "@/lib/format";
+import { criarCampanhaRecovery, getRecoveryOverview } from "@/lib/recovery.functions";
 import { GESTAO } from "@/lib/rbac";
 
 export const Route = createFileRoute("/_authenticated/oportunidades")({
   component: () => (
     <RequireRole roles={GESTAO}>
-      <FeatureGate feature="oportunidades"><Page /></FeatureGate>
+      <FeatureGate feature="oportunidades">
+        <Page />
+      </FeatureGate>
     </RequireRole>
   ),
 });
 
-const prioColor: Record<number, string> = {
-  4: "bg-destructive/10 text-destructive border-destructive/20",
-  3: "bg-warning/10 text-warning-foreground border-warning/30",
-  2: "bg-accent text-accent-foreground border-accent",
-  1: "bg-muted text-muted-foreground border-border",
+const prioridadeClass: Record<string, string> = {
+  alta: "border-destructive/20 bg-destructive/10 text-destructive",
+  media: "border-warning/30 bg-warning/10 text-warning-foreground",
+  baixa: "border-border bg-muted text-muted-foreground",
 };
-const prioLabel: Record<number, string> = { 4: "Crítica", 3: "Alta", 2: "Média", 1: "Baixa" };
+
+const confiancaLabel: Record<string, string> = {
+  alta: "confiança alta",
+  media: "confiança média",
+  baixa: "confiança inicial",
+};
+
+function MetricCard({
+  label,
+  value,
+  helper,
+  icon: Icon,
+}: {
+  label: string;
+  value: string;
+  helper: string;
+  icon: typeof Target;
+}) {
+  return (
+    <Card>
+      <CardContent className="space-y-2 p-4">
+        <div className="flex items-center justify-between gap-3">
+          <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+          <Icon className="h-4 w-4 shrink-0 text-primary" />
+        </div>
+        <p className="font-display text-2xl font-bold tabular-nums">{value}</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">{helper}</p>
+      </CardContent>
+    </Card>
+  );
+}
 
 function Page() {
-  const fn = useServerFn(getOportunidades);
-  const recFn = useServerFn(getClientesComRecompensa);
-  const { data, isLoading } = useQuery({ queryKey: ["oportunidades"], queryFn: () => fn() });
-  const { data: rec } = useQuery({ queryKey: ["clientes-recompensa"], queryFn: () => recFn() });
+  const overviewFn = useServerFn(getRecoveryOverview);
+  const criarFn = useServerFn(criarCampanhaRecovery);
+  const qc = useQueryClient();
+  const navigate = useNavigate();
 
-  const valorPotencialFidelidade = rec ? rec.qtd * (rec.ticketMedio ?? 50) : 0;
-  const totalReceita = (data?.oportunidades.reduce((s, o) => s + o.receitaPotencial, 0) ?? 0) + valorPotencialFidelidade;
+  const { data, isLoading, isError, error } = useQuery({
+    queryKey: ["recovery-overview"],
+    queryFn: () => overviewFn(),
+  });
+
+  const criarMut = useMutation({
+    mutationFn: (limit: number) => criarFn({ data: { limit } }),
+    onSuccess: async (result) => {
+      toast.success(`Campanha preparada para ${result.candidatos} cliente(s).`);
+      await qc.invalidateQueries({ queryKey: ["recovery-overview"] });
+      await qc.invalidateQueries({ queryKey: ["campanhas"] });
+      await navigate({ to: "/campanhas" });
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Não foi possível preparar a campanha."),
+  });
+
+  if (isLoading) {
+    return (
+      <>
+        <PageHeader title="Recovery Engine" subtitle="Encontrando clientes com maior chance de retorno…" />
+        <div className="space-y-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />)}
+          </div>
+          <div className="h-64 rounded-2xl bg-muted animate-pulse" />
+        </div>
+      </>
+    );
+  }
+
+  if (isError || !data) {
+    return (
+      <>
+        <PageHeader title="Recovery Engine" subtitle="Clientes que merecem uma nova tentativa, com rastreio de resultado." />
+        <Card>
+          <CardContent className="p-8 text-center">
+            <p className="font-display font-semibold">Não foi possível calcular as oportunidades agora.</p>
+            <p className="mt-1 text-sm text-muted-foreground">{(error as any)?.message ?? "Tente novamente em instantes."}</p>
+          </CardContent>
+        </Card>
+      </>
+    );
+  }
+
+  const { engine, roi } = data;
+  const qtdCampanha = Math.min(20, engine.candidatos.length);
+  const taxaPct = Math.round(engine.resumo.taxaConversaoUsada * 100);
+  const roiPct = Math.round(roi.taxaConversao * 100);
 
   return (
     <>
       <PageHeader
-        title="Oportunidades de hoje"
-        subtitle="Ações priorizadas para aumentar seu faturamento agora."
-        actions={<div className="text-sm font-medium flex items-center gap-2 px-3 py-2 bg-primary/10 text-primary rounded-lg"><TrendingUp className="h-4 w-4" /> Potencial: {brl(totalReceita)}</div>}
+        title="Recovery Engine"
+        subtitle="Encontra quem tem maior chance de voltar, prepara a abordagem e mede o dinheiro que realmente retornou."
+        actions={
+          engine.resumo.elegiveis > 0 ? (
+            <Button
+              variant="premium"
+              onClick={() => criarMut.mutate(qtdCampanha)}
+              disabled={criarMut.isPending || qtdCampanha === 0}
+            >
+              <Sparkles className="mr-1 h-4 w-4" />
+              {criarMut.isPending ? "Preparando…" : `Preparar campanha (${qtdCampanha})`}
+            </Button>
+          ) : null
+        }
       />
 
-      {rec && rec.qtd > 0 && (
-        <Card className="mb-3 border-l-4 border-success bg-success/5">
-          <CardContent className="p-4 flex items-start gap-3">
-            <div className="h-10 w-10 rounded-xl bg-success text-success-foreground grid place-content-center shrink-0">
-              <Gift className="h-5 w-5" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <p className="font-display font-semibold">{rec.qtd} clientes podem resgatar benefícios</p>
-              <p className="text-sm text-muted-foreground mt-0.5">Ainda não realizaram o resgate. Avise-os e traga-os de volta.</p>
-              <p className="text-xs text-success font-medium mt-1">Potencial de retorno: {brl(valorPotencialFidelidade)}</p>
-              <Button asChild size="sm" className="mt-3 h-8 text-xs">
-                <Link to="/clientes" search={{ filtro: "recompensa_disponivel" }}>Ver clientes <ArrowRight className="h-3 w-3 ml-1" /></Link>
-              </Button>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      <div className="space-y-6">
+        <section className="space-y-3">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Clientes elegíveis"
+              value={String(engine.resumo.elegiveis)}
+              helper={`${engine.resumo.altaPrioridade} com prioridade alta agora.`}
+              icon={UsersRound}
+            />
+            <MetricCard
+              label="Receita potencial"
+              value={brl(engine.resumo.receitaPotencial)}
+              helper="Soma do ticket histórico dos clientes elegíveis — não é receita garantida."
+              icon={CircleDollarSign}
+            />
+            <MetricCard
+              label="Valor esperado"
+              value={brl(engine.resumo.valorEsperado)}
+              helper={`${taxaPct}% de conversão usada ${engine.resumo.taxaBaseadaEmHistorico ? "com base no seu histórico" : "como hipótese inicial"}.`}
+              icon={Target}
+            />
+            <MetricCard
+              label="Ticket médio"
+              value={brl(engine.resumo.ticketMedio)}
+              helper={`${engine.resumo.excluidosContatoRecente} contato(s) recente(s) e ${engine.resumo.excluidosJaAgendados} já agendado(s) foram excluídos.`}
+              icon={ShieldCheck}
+            />
+          </div>
 
-      {isLoading && <div className="space-y-3">{[1,2,3].map(i => <div key={i} className="h-32 rounded-xl bg-muted animate-pulse" />)}</div>}
-
-      {data && data.oportunidades.length === 0 && !rec?.qtd && (
-        <Card><CardContent className="p-10 text-center">
-          <p className="font-display text-lg">Você está em dia! 🎉</p>
-          <p className="text-sm text-muted-foreground mt-1">Nenhuma oportunidade pendente. Continue acompanhando.</p>
-        </CardContent></Card>
-      )}
-
-
-      <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-3">
-        {data?.oportunidades.map((o) => {
-          const tplKey = (o.tipo.startsWith("reativacao") ? o.tipo : "convite_assinatura") as WhatsAppTemplateKey;
-          const msg = renderTemplate(getTemplate(tplKey), { nome: o.cliente_nome });
-          return (
-            <Card key={o.id} className="overflow-hidden border-l-4" style={{ borderLeftColor: o.prioridade >= 3 ? "var(--color-primary)" : "var(--color-border)" }}>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between gap-2">
-                  <Badge variant="outline" className={prioColor[o.prioridade]}>{prioLabel[o.prioridade]}</Badge>
-                  <span className="text-xs font-medium text-success">+{brl(o.receitaPotencial)}</span>
+          <Card className="overflow-hidden border-primary/20 bg-primary/5">
+            <CardContent className="grid gap-4 p-5 lg:grid-cols-[1fr_auto] lg:items-center">
+              <div className="min-w-0">
+                <div className="mb-2 flex items-center gap-2">
+                  <BrainCircuit className="h-4 w-4 text-primary" />
+                  <h2 className="font-display font-semibold">Como o motor escolhe</h2>
                 </div>
-                <div>
-                  <p className="font-display font-semibold">{o.titulo}</p>
-                  <p className="text-sm text-muted-foreground mt-1">{o.descricao}</p>
-                </div>
-                {o.telefone && (
-                  <Button asChild size="sm" className="w-full" variant="default">
-                    <a href={waLink(o.telefone, msg)} target="_blank" rel="noopener noreferrer">
-                      <MessageCircle className="h-4 w-4 mr-1" /> Enviar WhatsApp
-                    </a>
-                  </Button>
+                <p className="text-sm leading-relaxed text-muted-foreground">
+                  O Recovery Engine compara frequência real de visitas, atraso em relação ao padrão do cliente, ticket histórico e quantidade de visitas. Também remove quem foi contatado nos últimos {engine.regras.contatoRecenteDias} dias ou já possui agendamento futuro.
+                </p>
+              </div>
+              <div className="flex flex-wrap gap-2 lg:justify-end">
+                <Badge variant="secondary">SQL + regras</Badge>
+                <Badge variant="outline">sem IA para calcular elegibilidade</Badge>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold">ROI do Recovery neste mês</h2>
+            <p className="text-sm text-muted-foreground">Resultado atribuído somente às campanhas criadas por este motor.</p>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+            <MetricCard
+              label="Receita atribuída"
+              value={brl(roi.receitaAtribuida)}
+              helper={roi.receitaAtribuida > 0 ? `${roi.multiploVsGrowth.toFixed(1)}× o valor mensal atual do Growth.` : "Ainda sem OS atribuída ao Recovery neste mês."}
+              icon={CircleDollarSign}
+            />
+            <MetricCard
+              label="Clientes recuperados"
+              value={String(roi.clientesRecuperados)}
+              helper={`${roi.contatosEnviados} envio(s) confirmado(s) no mês.`}
+              icon={CheckCircle2}
+            />
+            <MetricCard
+              label="Conversão observada"
+              value={`${roiPct}%`}
+              helper="Conversões sobre envios confirmados, sem contar apenas abrir o WhatsApp."
+              icon={Target}
+            />
+            <MetricCard
+              label="Custo IA registrado"
+              value={brl(roi.custoIaRegistrado)}
+              helper={roi.custoMensageriaRastreado ? "IA + mensageria rastreadas." : "Mensageria ainda não entra neste custo; o motor atual é majoritariamente determinístico."}
+              icon={History}
+            />
+          </div>
+
+          <Card>
+            <CardContent className="flex items-start gap-3 p-4">
+              <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold">Regra de atribuição transparente</p>
+                <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                  {roi.atribuicao.metodo} Isso indica receita diretamente atribuída pelo critério operacional do LavaFlow; não é uma afirmação de causalidade perfeita.
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="space-y-3">
+          <div className="flex items-end justify-between gap-3">
+            <div>
+              <h2 className="font-display text-lg font-semibold">Abordagem preparada</h2>
+              <p className="text-sm text-muted-foreground">Usa o Conhecimento do Negócio, mas a execução continua sob aprovação humana.</p>
+            </div>
+            <Link to="/contexto-negocio" className="hidden text-xs font-medium text-primary hover:underline sm:inline">
+              Melhorar contexto
+            </Link>
+          </div>
+
+          <Card>
+            <CardContent className="space-y-4 p-5">
+              <div className="flex items-start gap-3">
+                <MessageSquareText className="mt-0.5 h-5 w-5 shrink-0 text-primary" />
+                <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{engine.mensagemSugerida}</p>
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                <Badge variant="secondary">{engine.contextoUsado.length} sinais de contexto usados</Badge>
+                {engine.contextoFaltando.length > 0 && (
+                  <Badge variant="outline">{engine.contextoFaltando.length} informações ainda faltando</Badge>
                 )}
+              </div>
+              <p className="text-xs leading-relaxed text-muted-foreground">
+                O Recovery não envia mensagens nesta tela. Ao preparar a campanha, você revisa os contatos em Campanhas, abre o WhatsApp e confirma cada envio. Só a confirmação inicia a janela de atribuição.
+              </p>
+            </CardContent>
+          </Card>
+        </section>
+
+        <section className="space-y-3">
+          <div>
+            <h2 className="font-display text-lg font-semibold">Quem o LavaFlow priorizaria agora</h2>
+            <p className="text-sm text-muted-foreground">Ranking determinístico. O score ajuda a ordenar; não é garantia de retorno.</p>
+          </div>
+
+          {engine.candidatos.length === 0 ? (
+            <Card>
+              <CardContent className="p-8 text-center">
+                <p className="font-display text-lg font-semibold">Nenhum cliente precisa ser perseguido agora. 😄</p>
+                <p className="mt-1 text-sm text-muted-foreground">O motor não encontrou clientes atrasados em relação ao próprio histórico e sem agendamento futuro.</p>
               </CardContent>
             </Card>
-          );
-        })}
+          ) : (
+            <div className="grid gap-3 lg:grid-cols-2">
+              {engine.candidatos.slice(0, 10).map((cliente) => (
+                <Card key={cliente.clienteId} className="overflow-hidden">
+                  <CardContent className="space-y-3 p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate font-display font-semibold">{cliente.nome}</p>
+                        <p className="text-xs text-muted-foreground">{cliente.diasSemRetornar} dias sem retornar · {cliente.visitas} visita(s)</p>
+                      </div>
+                      <Badge variant="outline" className={prioridadeClass[cliente.prioridade]}>
+                        {cliente.prioridade} · {cliente.score}
+                      </Badge>
+                    </div>
+
+                    <p className="text-sm leading-relaxed text-muted-foreground">{cliente.motivo}</p>
+
+                    <div className="grid grid-cols-3 gap-3 border-t pt-3">
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Ticket</p>
+                        <p className="text-sm font-semibold tabular-nums">{brl(cliente.ticketMedio)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Potencial</p>
+                        <p className="text-sm font-semibold tabular-nums">{brl(cliente.receitaPotencial)}</p>
+                      </div>
+                      <div>
+                        <p className="text-[10px] uppercase tracking-wide text-muted-foreground">Sinal</p>
+                        <p className="text-xs font-medium capitalize">{confiancaLabel[cliente.confianca]}</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
+
+          {engine.resumo.elegiveis > 10 && (
+            <p className="text-center text-xs text-muted-foreground">Mostrando os 10 primeiros de {engine.resumo.elegiveis} clientes elegíveis.</p>
+          )}
+        </section>
+
+        {engine.resumo.elegiveis > 0 && (
+          <Card className="border-primary/20">
+            <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <p className="font-display font-semibold">Pronto para transformar a análise em ação?</p>
+                <p className="mt-1 text-sm text-muted-foreground">Prepare até {qtdCampanha} contatos prioritários e execute dentro do fluxo rastreado de Campanhas.</p>
+              </div>
+              <Button variant="premium" onClick={() => criarMut.mutate(qtdCampanha)} disabled={criarMut.isPending}>
+                {criarMut.isPending ? "Preparando…" : "Preparar campanha"}
+                {!criarMut.isPending && <ArrowRight className="ml-1 h-4 w-4" />}
+              </Button>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </>
   );
