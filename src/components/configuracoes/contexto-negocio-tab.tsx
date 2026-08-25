@@ -61,7 +61,9 @@ export function ContextoNegocioTab() {
 
   const completude = businessContextCompleteness(ctx, tom);
   const fatos = businessContextFatos(ctx, (data?.empresa ?? null) as any, tom);
-  const fontes = knowledgeSources(ctx, { temHistorico: fatos.length > 1 });
+  const fontes = knowledgeSources(ctx, {
+    temHistorico: data?.temHistoricoOperacional ?? false,
+  });
 
   if (isLoading) return <p className="text-sm text-muted-foreground">Carregando…</p>;
 

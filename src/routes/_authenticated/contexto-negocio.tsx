@@ -16,8 +16,8 @@ function ContextoNegocioPage() {
   return (
     <>
       <PageHeader
-        title="Contexto do Negócio"
-        subtitle="Ensine ao LavaFlow como sua empresa se posiciona, comunica e atende."
+        title="Conhecimento do Negócio"
+        subtitle="Ensine ao LavaFlow como sua empresa se posiciona, comunica, atende e cresce."
       />
       <ContextoNegocioTab />
     </>

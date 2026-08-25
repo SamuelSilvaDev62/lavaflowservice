@@ -1,7 +1,9 @@
 import {
   businessContextCompleteness,
   mergeEmpresaIntoContext,
+  type BusinessContext,
 } from "@/lib/business-context";
+import { buildSkillContext } from "@/lib/skill-context";
 
 // Contexto de negócio para o Consultor IA (server-only).
 // Não há tabelas de log de IA neste projeto: rate limit é em memória por worker.
@@ -16,7 +18,7 @@ export type ConsultorContexto = {
     facebook: string | null;
     website: string | null;
     tomDeVoz: string | null;
-    contexto: Record<string, string | null>;
+    contexto: BusinessContext;
     completude: number;
   };
   servicosAtivos: Array<{
@@ -122,11 +124,10 @@ export async function buildConsultorContexto(ownerId: string): Promise<Consultor
   const ativos = new Set(((osRecentes ?? []) as any[]).map((o) => String(o.cliente_id)));
   const clientes = (clientesRes.data ?? []) as any[];
 
-
   const emp = (empresaRes.data ?? null) as any;
-  const bc = (((aiRes.data as any)?.business_context ?? {}) as Record<string, string | null>);
-  const tom = ((aiRes.data as any)?.preferred_tone as string | null) ?? (bc["tom_de_voz"] ?? null);
-  const contextoNegocio = mergeEmpresaIntoContext(bc as any, emp) as Record<string, string | null>;
+  const bc = (((aiRes.data as any)?.business_context ?? {}) as BusinessContext);
+  const tom = ((aiRes.data as any)?.preferred_tone as string | null) ?? ((bc.tom_de_voz as string | null) ?? null);
+  const contextoNegocio = mergeEmpresaIntoContext(bc, emp);
 
   return {
     empresa: emp?.nome_fantasia ?? "Seu lava-rápido",
@@ -140,7 +141,7 @@ export async function buildConsultorContexto(ownerId: string): Promise<Consultor
       website: emp?.website ?? null,
       tomDeVoz: tom,
       contexto: contextoNegocio,
-      completude: businessContextCompleteness(contextoNegocio as any, tom),
+      completude: businessContextCompleteness(contextoNegocio, tom),
     },
     servicosAtivos: ((servicosRes.data ?? []) as any[])
       .filter((s) => s.ativo !== false)
@@ -171,30 +172,59 @@ export function consultorSystemPrompt(ctx: ConsultorContexto) {
   const { identidade, servicosAtivos, ...operacional } = ctx;
   const contextoIncompleto = identidade.completude < 50;
 
+  const pack = buildSkillContext("campaign", {
+    contexto: identidade.contexto,
+    empresa: {
+      nome_fantasia: identidade.nomeFantasia,
+      endereco: identidade.endereco,
+      horario_funcionamento: identidade.horarioFuncionamento,
+      whatsapp: identidade.whatsapp,
+    },
+    tom: identidade.tomDeVoz,
+    servicos: servicosAtivos.map((s) => ({ nome: s.nome, preco: s.preco })),
+  });
+
+  const conhecimentoCompacto = {
+    nomeFantasia: identidade.nomeFantasia,
+    endereco: identidade.endereco,
+    horarioFuncionamento: identidade.horarioFuncionamento,
+    whatsapp: identidade.whatsapp,
+    referenciasDigitais: {
+      instagram: identidade.instagram,
+      facebook: identidade.facebook,
+      website: identidade.website,
+    },
+    identidade: pack.identidade,
+    regras: pack.regras,
+    servicos: pack.servicosRelevantes ?? [],
+    faltando: pack.faltando,
+    completude: identidade.completude,
+  };
+
   return [
     "Você é o Consultor de Crescimento do LavaFlow, especialista em operação de lava-rápidos no Brasil.",
     "Responda em português do Brasil, de forma direta, prática e acionável. Use no máximo 200 palavras.",
     "REGRAS OBRIGATÓRIAS:",
     "1. Responda especificamente à pergunta feita — nunca repita uma resposta genérica ou o mesmo texto de outra pergunta.",
-    "2. Cite ao menos dois números reais de DADOS OPERACIONAIS e explique o que eles indicam. Números vêm SEMPRE dos DADOS OPERACIONAIS, nunca da identidade.",
-    "3. Nunca invente números, nomes de serviços, clientes, bairros, diferenciais ou concorrentes. Use apenas o que está abaixo.",
-    "4. Personalize recomendações e campanhas ao tom de voz, região, público-alvo, diferenciais, objetivos e restrições cadastrados em IDENTIDADE E CONTEXTO DO NEGÓCIO.",
-    "5. Termine com uma lista curta de ações concretas (hoje / esta semana).",
+    "2. Cite ao menos dois números reais de DADOS OPERACIONAIS e explique o que eles indicam. Números vêm SEMPRE dos DADOS OPERACIONAIS, nunca do conhecimento do negócio.",
+    "3. Nunca invente números, nomes de serviços, clientes, bairros, diferenciais, concorrentes ou conteúdo de redes sociais. Use apenas o que está abaixo.",
+    "4. Personalize recomendações e campanhas ao tom de voz, região, público-alvo, diferenciais, objetivos e restrições cadastrados em CONHECIMENTO DO NEGÓCIO.",
+    "5. URLs de redes/site são apenas referências cadastradas; não assuma que seu conteúdo foi lido ou sincronizado.",
+    "6. Termine com uma lista curta de ações concretas (hoje / esta semana).",
     contextoIncompleto
-      ? "6. O contexto do negócio está incompleto: quando isso limitar a resposta, diga qual informação falta preencher em Configurações → Contexto do Negócio, em vez de assumir."
-      : "6. Adapte o tom e o foco ao tema da pergunta (faturamento, serviços, clientes, agenda).",
+      ? "7. O conhecimento do negócio está incompleto: quando isso limitar a resposta, diga qual informação falta preencher em Configurações → Conhecimento do Negócio, em vez de assumir."
+      : "7. Adapte o tom e o foco ao tema da pergunta (faturamento, serviços, clientes, agenda).",
     semDados
-      ? "7. Este estabelecimento ainda não possui histórico registrado: seja transparente sobre isso e foque em quais registros iniciar."
-      : "7. Priorize oportunidades sustentadas pelos dados operacionais.",
+      ? "8. Este estabelecimento ainda não possui histórico registrado: seja transparente sobre isso e foque em quais registros iniciar."
+      : "8. Priorize oportunidades sustentadas pelos dados operacionais.",
     "",
-    "IDENTIDADE E CONTEXTO DO NEGÓCIO (informado pelo estabelecimento; não é fonte de números):",
-    JSON.stringify({ identidade, servicosAtivos }, null, 2),
+    "CONHECIMENTO DO NEGÓCIO (contexto compacto informado pelo estabelecimento; não é fonte de números):",
+    JSON.stringify(conhecimentoCompacto),
     "",
     "DADOS OPERACIONAIS (fonte única de verdade para números):",
-    JSON.stringify(operacional, null, 2),
+    JSON.stringify(operacional),
   ].join("\n");
 }
-
 
 // ---- Rate limit simples em memória (por worker) ----
 const buckets = new Map<string, { count: number; resetAt: number }>();
