@@ -17,6 +17,7 @@ import { toast } from "sonner";
 import { FeatureGate } from "@/components/feature-gate";
 import { PageHeader } from "@/components/app-layout";
 import { RequireRole } from "@/components/require-role";
+import { AgendaFillPanel } from "@/components/opportunities/agenda-fill-panel";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -96,12 +97,12 @@ function Page() {
   if (isLoading) {
     return (
       <>
-        <PageHeader title="Recovery Engine" subtitle="Encontrando clientes com maior chance de retorno…" />
+        <PageHeader title="Oportunidades" subtitle="Analisando recuperação de clientes e capacidade da agenda…" />
         <div className="space-y-4">
+          <div className="h-64 rounded-2xl bg-muted animate-pulse" />
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             {[1, 2, 3, 4].map((i) => <div key={i} className="h-32 rounded-2xl bg-muted animate-pulse" />)}
           </div>
-          <div className="h-64 rounded-2xl bg-muted animate-pulse" />
         </div>
       </>
     );
@@ -110,7 +111,7 @@ function Page() {
   if (isError || !data) {
     return (
       <>
-        <PageHeader title="Recovery Engine" subtitle="Clientes que merecem uma nova tentativa, com rastreio de resultado." />
+        <PageHeader title="Oportunidades" subtitle="Recovery Engine e Agenda Fill em um só lugar." />
         <Card>
           <CardContent className="p-8 text-center">
             <p className="font-display font-semibold">Não foi possível calcular as oportunidades agora.</p>
@@ -129,24 +130,36 @@ function Page() {
   return (
     <>
       <PageHeader
-        title="Recovery Engine"
-        subtitle="Encontra quem tem maior chance de voltar, prepara a abordagem e mede o dinheiro que realmente retornou."
-        actions={
-          engine.resumo.elegiveis > 0 ? (
-            <Button
-              variant="premium"
-              onClick={() => criarMut.mutate(qtdCampanha)}
-              disabled={criarMut.isPending || qtdCampanha === 0}
-            >
-              <Sparkles className="mr-1 h-4 w-4" />
-              {criarMut.isPending ? "Preparando…" : `Preparar campanha (${qtdCampanha})`}
-            </Button>
-          ) : null
-        }
+        title="Oportunidades"
+        subtitle="Preencha capacidade ociosa, recupere clientes no timing certo e acompanhe o que virou receita."
       />
 
-      <div className="space-y-6">
-        <section className="space-y-3">
+      <div className="space-y-8">
+        <AgendaFillPanel />
+
+        <section className="space-y-5 border-t pt-7">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <div className="flex items-center gap-2">
+                <UsersRound className="h-5 w-5 text-primary" />
+                <h2 className="font-display text-xl font-semibold">Recovery Engine</h2>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Encontra clientes que já passaram da própria janela de retorno e mede o dinheiro atribuído às ações.
+              </p>
+            </div>
+            {engine.resumo.elegiveis > 0 ? (
+              <Button
+                variant="premium"
+                onClick={() => criarMut.mutate(qtdCampanha)}
+                disabled={criarMut.isPending || qtdCampanha === 0}
+              >
+                <Sparkles className="mr-1 h-4 w-4" />
+                {criarMut.isPending ? "Preparando…" : `Preparar Recovery (${qtdCampanha})`}
+              </Button>
+            ) : null}
+          </div>
+
           <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <MetricCard
               label="Clientes elegíveis"
@@ -179,7 +192,7 @@ function Page() {
               <div className="min-w-0">
                 <div className="mb-2 flex items-center gap-2">
                   <BrainCircuit className="h-4 w-4 text-primary" />
-                  <h2 className="font-display font-semibold">Como o motor escolhe</h2>
+                  <h3 className="font-display font-semibold">Como o motor escolhe</h3>
                 </div>
                 <p className="text-sm leading-relaxed text-muted-foreground">
                   O Recovery Engine compara frequência real de visitas, atraso em relação ao padrão do cliente, ticket histórico e quantidade de visitas. Também remove quem foi contatado nos últimos {engine.regras.contatoRecenteDias} dias ou já possui agendamento futuro.
@@ -242,7 +255,7 @@ function Page() {
         <section className="space-y-3">
           <div className="flex items-end justify-between gap-3">
             <div>
-              <h2 className="font-display text-lg font-semibold">Abordagem preparada</h2>
+              <h2 className="font-display text-lg font-semibold">Abordagem de Recovery preparada</h2>
               <p className="text-sm text-muted-foreground">Usa o Conhecimento do Negócio, mas a execução continua sob aprovação humana.</p>
             </div>
             <Link to="/contexto-negocio" className="hidden text-xs font-medium text-primary hover:underline sm:inline">
@@ -271,7 +284,7 @@ function Page() {
 
         <section className="space-y-3">
           <div>
-            <h2 className="font-display text-lg font-semibold">Quem o LavaFlow priorizaria agora</h2>
+            <h2 className="font-display text-lg font-semibold">Quem o Recovery priorizaria agora</h2>
             <p className="text-sm text-muted-foreground">Ranking determinístico. O score ajuda a ordenar; não é garantia de retorno.</p>
           </div>
 
@@ -328,11 +341,11 @@ function Page() {
           <Card className="border-primary/20">
             <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="font-display font-semibold">Pronto para transformar a análise em ação?</p>
+                <p className="font-display font-semibold">Pronto para transformar o Recovery em ação?</p>
                 <p className="mt-1 text-sm text-muted-foreground">Prepare até {qtdCampanha} contatos prioritários e execute dentro do fluxo rastreado de Campanhas.</p>
               </div>
               <Button variant="premium" onClick={() => criarMut.mutate(qtdCampanha)} disabled={criarMut.isPending}>
-                {criarMut.isPending ? "Preparando…" : "Preparar campanha"}
+                {criarMut.isPending ? "Preparando…" : "Preparar Recovery"}
                 {!criarMut.isPending && <ArrowRight className="ml-1 h-4 w-4" />}
               </Button>
             </CardContent>
