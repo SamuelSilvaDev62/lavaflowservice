@@ -43,8 +43,10 @@ jobs:
         # the declared dependency graph without mutating/depending on that stale lock.
         run: npm install --package-lock=false --no-audit --no-fund
 
-      - name: Typecheck
-        run: npx tsc --noEmit
-
+      # TanStack Router updates src/routeTree.gen.ts through the Vite plugin.
+      # Build first so newly added file routes are registered before tsc validates them.
       - name: Build
         run: npm run build
+
+      - name: Typecheck
+        run: npx tsc --noEmit
