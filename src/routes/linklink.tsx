@@ -18,6 +18,21 @@ export const Route = createFileRoute("/linklink")({
         content:
           "A Link&Link desenvolve produtos digitais, sistemas web, automações e soluções com IA para ajudar pequenos negócios a operar melhor e crescer.",
       },
+      { property: "og:title", content: "Link&Link — Tecnologia e soluções digitais para negócios" },
+      {
+        property: "og:description",
+        content:
+          "Produtos digitais, sistemas web, automações e soluções com IA para pequenos negócios.",
+      },
+      { property: "og:type", content: "website" },
+      { property: "og:site_name", content: "Link&Link" },
+      { name: "twitter:card", content: "summary" },
+      { name: "twitter:title", content: "Link&Link — Tecnologia e soluções digitais para negócios" },
+      {
+        name: "twitter:description",
+        content:
+          "Produtos digitais, sistemas web, automações e soluções com IA para pequenos negócios.",
+      },
       { name: "robots", content: "index,follow" },
     ],
   }),
