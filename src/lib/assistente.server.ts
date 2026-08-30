@@ -4,6 +4,7 @@ import {
   type BusinessContext,
 } from "@/lib/business-context";
 import { buildSkillContext } from "@/lib/skill-context";
+import { externalIntelligenceSummary } from "@/lib/external-intelligence.server";
 
 // Contexto de negócio para o Consultor IA (server-only).
 // Não há tabelas de log de IA neste projeto: rate limit é em memória por worker.
@@ -37,6 +38,7 @@ export type ConsultorContexto = {
   agendamentosProximos7d: number;
   topServicos: Array<{ nome: string; quantidade: number; receita: number }>;
   ocupacaoMediaDia: number;
+  inteligenciaExterna: ReturnType<typeof externalIntelligenceSummary>;
 };
 
 const DIA = 86_400_000;
@@ -162,6 +164,7 @@ export async function buildConsultorContexto(ownerId: string): Promise<Consultor
     agendamentosProximos7d: (agRes.data ?? []).length,
     topServicos: [...porServico.values()].sort((a, b) => b.receita - a.receita).slice(0, 5),
     ocupacaoMediaDia: Math.round(((entregues.length / 30) + Number.EPSILON) * 10) / 10,
+    inteligenciaExterna: externalIntelligenceSummary(),
   };
 }
 
@@ -169,7 +172,7 @@ export async function buildConsultorContexto(ownerId: string): Promise<Consultor
 export function consultorSystemPrompt(ctx: ConsultorContexto) {
   const semDados =
     ctx.osEntregues30d === 0 && ctx.clientesTotal === 0 && ctx.agendamentosProximos7d === 0;
-  const { identidade, servicosAtivos, ...operacional } = ctx;
+  const { identidade, servicosAtivos, inteligenciaExterna, ...operacional } = ctx;
   const contextoIncompleto = identidade.completude < 50;
 
   const pack = buildSkillContext("campaign", {
@@ -217,9 +220,14 @@ export function consultorSystemPrompt(ctx: ConsultorContexto) {
     semDados
       ? "8. Este estabelecimento ainda não possui histórico registrado: seja transparente sobre isso e foque em quais registros iniciar."
       : "8. Priorize oportunidades sustentadas pelos dados operacionais.",
+    "9. INTELIGÊNCIA EXTERNA: só trate uma fonte como verificada quando ela estiver marcada como conectada. Se estiver desconectada, diga que a fonte ainda não foi consultada e não infira seu conteúdo.",
+    "10. Separe claramente dados internos do LavaFlow de qualquer dado externo. Nunca apresente uma referência digital cadastrada como se seu conteúdo tivesse sido sincronizado.",
     "",
     "CONHECIMENTO DO NEGÓCIO (contexto compacto informado pelo estabelecimento; não é fonte de números):",
     JSON.stringify(conhecimentoCompacto),
+    "",
+    "STATUS DAS FONTES DE INTELIGÊNCIA EXTERNA:",
+    JSON.stringify(inteligenciaExterna),
     "",
     "DADOS OPERACIONAIS (fonte única de verdade para números):",
     JSON.stringify(operacional),

@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useChat } from "@ai-sdk/react";
 import { DefaultChatTransport } from "ai";
-import { Bot, Send, Sparkles, TrendingUp, Users } from "lucide-react";
+import { Bot, CheckCircle2, CircleAlert, Send, Sparkles, TrendingUp, Users } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -81,35 +81,63 @@ function AssistentePage() {
   return (
     <div className="space-y-5">
       <header className="space-y-1">
-        <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">
-          Consultor IA
-        </h1>
+        <h1 className="font-display text-xl font-semibold tracking-tight sm:text-2xl">Consultor IA</h1>
         <p className="text-sm text-muted-foreground">
-          Diagnóstico do seu negócio com dados reais e próximos passos práticos.
+          Diagnóstico do seu negócio com dados reais e fontes externas conectáveis.
         </p>
       </header>
 
       {ctx && (
-        <div className="grid gap-3 sm:grid-cols-3">
-          <Resumo
-            icon={TrendingUp}
-            titulo="Receita (30 dias)"
-            valor={`R$ ${ctx.receita30d.toFixed(2)}`}
-            detalhe={`${ctx.osEntregues30d} OS entregues`}
-          />
-          <Resumo
-            icon={Sparkles}
-            titulo="Ticket médio"
-            valor={`R$ ${ctx.ticketMedio.toFixed(2)}`}
-            detalhe={ctx.topServicos[0]?.nome ?? "Sem serviços registrados"}
-          />
-          <Resumo
-            icon={Users}
-            titulo="Clientes inativos"
-            valor={String(ctx.clientesInativos60d)}
-            detalhe={`de ${ctx.clientesTotal} cadastrados`}
-          />
-        </div>
+        <>
+          <div className="grid gap-3 sm:grid-cols-3">
+            <Resumo
+              icon={TrendingUp}
+              titulo="Receita (30 dias)"
+              valor={`R$ ${ctx.receita30d.toFixed(2)}`}
+              detalhe={`${ctx.osEntregues30d} OS entregues`}
+            />
+            <Resumo
+              icon={Sparkles}
+              titulo="Ticket médio"
+              valor={`R$ ${ctx.ticketMedio.toFixed(2)}`}
+              detalhe={ctx.topServicos[0]?.nome ?? "Sem serviços registrados"}
+            />
+            <Resumo
+              icon={Users}
+              titulo="Clientes inativos"
+              valor={String(ctx.clientesInativos60d)}
+              detalhe={`de ${ctx.clientesTotal} cadastrados`}
+            />
+          </div>
+
+          <Card>
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base">Inteligência externa</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                O consultor só considera uma fonte externa verificada quando a integração estiver conectada.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <div className="grid gap-2 sm:grid-cols-2">
+                {ctx.inteligenciaExterna.sources.map((source) => (
+                  <div key={source.key} className="flex items-start gap-2 rounded-xl bg-muted/40 p-3">
+                    {source.connected ? (
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" />
+                    ) : (
+                      <CircleAlert className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
+                    )}
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium">{source.label}</p>
+                      <p className="text-xs text-muted-foreground">
+                        {source.connected ? "Conectada" : "Ainda não conectada"} · {source.description}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </>
       )}
 
       <Card>
@@ -161,8 +189,7 @@ function AssistentePage() {
             {error && (
               <div className="space-y-2 rounded-2xl border border-destructive/30 bg-destructive/5 px-4 py-3">
                 <p className="text-sm text-destructive">
-                  Consultor IA temporariamente indisponível. Nenhuma resposta genérica é exibida —
-                  tente novamente em instantes.
+                  Consultor IA temporariamente indisponível. Nenhuma resposta genérica é exibida — tente novamente em instantes.
                 </p>
                 <Button variant="outline" size="sm" onClick={() => regenerate()} disabled={carregando}>
                   Tentar novamente
