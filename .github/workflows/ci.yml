@@ -46,5 +46,8 @@ jobs:
       - name: Typecheck
         run: npx tsc --noEmit
 
+      - name: Tenant scope regression tests
+        run: node --experimental-strip-types --test tests/*.test.mjs
+
       - name: Build
         run: npm run build
