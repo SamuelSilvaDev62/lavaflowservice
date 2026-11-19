@@ -38,6 +38,9 @@ jobs:
           node-version: 22
           cache: npm
 
+      - name: Tenant scope regression tests
+        run: node --experimental-strip-types --test tests/*.test.mjs
+
       - name: Install dependencies
         # package.json is currently ahead of the committed lockfile. We validate
         # the declared dependency graph without mutating/depending on that stale lock.
@@ -45,9 +48,6 @@ jobs:
 
       - name: Typecheck
         run: npx tsc --noEmit
-
-      - name: Tenant scope regression tests
-        run: node --experimental-strip-types --test tests/*.test.mjs
 
       - name: Build
         run: npm run build
