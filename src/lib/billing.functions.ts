@@ -9,13 +9,14 @@ export const getMeuPlano = createServerFn({ method: "GET" })
     const { isStripeConfigured } = await import("@/lib/stripe.server");
     const { hasManageableStripeSubscription } = await import("@/lib/plans");
     const { ownerId, role } = await resolveOwnerScope(context.supabase, context.userId);
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const entitlement = await fetchEntitlement(supabaseAdmin, ownerId);
-    const { data: sub } = await supabaseAdmin
+    // Consulta comum do tenant: usa a sessão validada e as RLS, não uma chave privilegiada.
+    const entitlement = await fetchEntitlement(context.supabase, ownerId);
+    const { data: sub, error } = await context.supabase
       .from("tenant_subscriptions")
       .select("stripe_subscription_id, subscription_status")
       .eq("owner_id", ownerId)
       .maybeSingle();
+    if (error) throw new Error("Não foi possível consultar a assinatura do estabelecimento.");
     return {
       entitlement,
       role,
@@ -40,11 +41,12 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
     const ownerId = await requireGestao(context.supabase, context.userId);
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: sub } = await supabaseAdmin
+    const { data: sub, error: subscriptionError } = await context.supabase
       .from("tenant_subscriptions")
       .select("stripe_customer_id, stripe_subscription_id, subscription_status, is_founders")
       .eq("owner_id", ownerId)
       .maybeSingle();
+    if (subscriptionError) throw new Error("Não foi possível consultar a assinatura do estabelecimento.");
 
     const origin = appOrigin();
 
@@ -77,7 +79,7 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
 
     let customerId = sub?.stripe_customer_id ?? null;
     if (!customerId) {
-      const { data: emp } = await supabaseAdmin
+      const { data: emp } = await context.supabase
         .from("empresa")
         .select("nome_fantasia, email")
         .eq("owner_id", ownerId)
@@ -122,12 +124,12 @@ export const abrirPortalAssinatura = createServerFn({ method: "POST" })
     const { appOrigin, requireGestao } = await import("@/lib/billing.server");
     const ownerId = await requireGestao(context.supabase, context.userId);
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: sub } = await supabaseAdmin
+    const { data: sub, error } = await context.supabase
       .from("tenant_subscriptions")
       .select("stripe_customer_id")
       .eq("owner_id", ownerId)
       .maybeSingle();
+    if (error) throw new Error("Não foi possível consultar a assinatura do estabelecimento.");
 
     if (!sub?.stripe_customer_id) throw new Error("Nenhuma assinatura encontrada para este estabelecimento.");
 

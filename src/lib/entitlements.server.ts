@@ -28,11 +28,12 @@ export async function resolveOwnerScope(supabase: any, userId: string) {
 }
 
 export async function fetchEntitlement(supabase: any, ownerId: string): Promise<Entitlement> {
-  const { data } = await supabase
+  const { data, error } = await supabase
     .from("tenant_subscriptions")
     .select("plan, subscription_status, is_founders, stripe_price_id, current_period_end, trial_ends_at, cancel_at_period_end, stripe_customer_id, updated_at")
     .eq("owner_id", ownerId)
     .maybeSingle();
+  if (error) throw new Error("Não foi possível consultar o plano do estabelecimento.");
 
   return getEntitlement(
     data
