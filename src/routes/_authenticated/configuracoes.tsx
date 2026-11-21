@@ -24,6 +24,7 @@ import { ImageUploadField } from "@/components/image-upload-field";
 import { ADMINS } from "@/lib/rbac";
 import { AssinaturaTab } from "@/components/configuracoes/assinatura-tab";
 import { googleMapsDirectionsUrl } from "@/lib/business-location";
+import { applyCepLookup, EMPTY_BUSINESS_ADDRESS, formatBusinessAddress, formatCep, parseBusinessAddress, validAddress, type BusinessAddress, type CepLookup } from "@/lib/business-address";
 import { Building2, Pencil, MapPin, Phone, MessageCircle, Mail, Clock3, Instagram, ExternalLink, Copy, CheckCircle2, AlertCircle, Link2, ArrowLeft, Globe, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
@@ -333,11 +334,21 @@ function EmpresaTab() {
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ["empresa"], queryFn: () => fn() });
   const [editing, setEditing] = useState(false);
   const [f, setF] = useState<BusinessProfileForm>(profileFromEmpresa(null));
+  const [address, setAddress] = useState<BusinessAddress>({ ...EMPTY_BUSINESS_ADDRESS });
+  const [addressTouched, setAddressTouched] = useState(false);
+  const [cepLoading, setCepLoading] = useState(false);
+  const [cepNotice, setCepNotice] = useState("");
+  const [cepLookupId, setCepLookupId] = useState(0);
 
   const saved = profileFromEmpresa(data?.empresa);
-  const dirty = PROFILE_FIELDS.some((key) => f[key] !== saved[key]);
+  const dirty = PROFILE_FIELDS.some((key) => f[key] !== saved[key]) || addressTouched;
   useEffect(() => {
-    if (!editing && data?.empresa) setF(profileFromEmpresa(data.empresa));
+    if (!editing && data?.empresa) {
+      setF(profileFromEmpresa(data.empresa));
+      setAddress(parseBusinessAddress(data.empresa.endereco) ?? { ...EMPTY_BUSINESS_ADDRESS });
+      setAddressTouched(false);
+      setCepNotice("");
+    }
   }, [data?.empresa, editing]);
 
   const mut = useMutation({
@@ -346,7 +357,7 @@ function EmpresaTab() {
       telefone: f.telefone.trim() || null,
       whatsapp: f.whatsapp.trim() || null,
       email: f.email.trim() || null,
-      endereco: f.endereco.trim() || null,
+      endereco: addressTouched ? formatBusinessAddress(address) : f.endereco.trim() || null,
       horario_funcionamento: f.horario_funcionamento.trim() || null,
       instagram: f.instagram.trim() || null,
     } }),
@@ -383,7 +394,46 @@ function EmpresaTab() {
   }
   function cancelEditing() {
     setF(profileFromEmpresa(empresa));
+    setAddress(parseBusinessAddress(empresa?.endereco) ?? { ...EMPTY_BUSINESS_ADDRESS });
+    setAddressTouched(false);
+    setCepNotice("");
     setEditing(false);
+  }
+
+  function changeAddress(key: keyof BusinessAddress, value: string) {
+    setAddress((current) => ({ ...current, [key]: key === "cep" ? formatCep(value) : key === "uf" ? value.toUpperCase().slice(0, 2) : value }));
+    setAddressTouched(true);
+    if (key === "cep") setCepLookupId((id) => id + 1);
+    setCepNotice("");
+  }
+  async function lookupCep() {
+    const cep = address.cep.replace(/\D/g, "");
+    if (cep.length !== 8) {
+      setCepNotice("Informe um CEP com 8 dígitos.");
+      return;
+    }
+    const lookupId = cepLookupId + 1;
+    setCepLookupId(lookupId);
+    setCepLoading(true);
+    setCepNotice("");
+    try {
+      const response = await fetch("https://viacep.com.br/ws/" + cep + "/json/", { signal: AbortSignal.timeout(8000) });
+      if (!response.ok) throw new Error("CEP temporariamente indisponível.");
+      const result = await response.json() as CepLookup;
+      if (result.erro) {
+        setCepNotice("CEP não encontrado. Preencha o endereço manualmente.");
+      } else {
+        setAddress((old) => applyCepLookup(old, result));
+        setAddressTouched(true);
+        setCepNotice(result.logradouro && result.bairro
+          ? "CEP encontrado. Confira o número e o complemento."
+          : "CEP localizado parcialmente. Preencha os campos que faltam.");
+      }
+    } catch {
+      setCepNotice("Não foi possível consultar o CEP. Você pode preencher tudo manualmente.");
+    } finally {
+      setCepLoading(false);
+    }
   }
 
   if (isLoading) return <Card><CardContent className="space-y-4 p-5"><div className="h-20 animate-pulse rounded-2xl bg-muted" /><div className="h-44 animate-pulse rounded-2xl bg-muted" /></CardContent></Card>;
@@ -417,7 +467,42 @@ function EmpresaTab() {
             </section>
             <section className="space-y-3 border-t pt-4">
               <h3 className="text-sm font-semibold">Localização e atendimento</h3>
-              <div className="space-y-1.5"><Label htmlFor="empresa-endereco">Endereço</Label><Input id="empresa-endereco" maxLength={200} placeholder="Rua, número, bairro, cidade e estado" value={f.endereco} onChange={(e) => setF({ ...f, endereco: e.target.value })} /><p className="text-xs text-muted-foreground">Este endereço aparece na página pública e nas novas mensagens de confirmação.</p></div>
+              <div className="space-y-3">
+                {f.endereco && !parseBusinessAddress(f.endereco) && !addressTouched && (
+                  <div className="rounded-xl border bg-muted/40 p-3 text-sm">
+                    <p className="font-medium">Endereço cadastrado anteriormente</p>
+                    <p className="mt-1 break-words text-muted-foreground">{f.endereco}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">Ao salvar outros dados, este endereço será preservado. Para melhorar a localização, preencha os campos abaixo.</p>
+                  </div>
+                )}
+                <div className="flex items-end gap-2">
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    <Label htmlFor="empresa-cep">CEP</Label>
+                    <Input id="empresa-cep" inputMode="numeric" autoComplete="postal-code" maxLength={9} placeholder="00000-000" value={address.cep} onChange={(e) => changeAddress("cep", e.target.value)} />
+                  </div>
+                  <Button type="button" variant="outline" disabled={cepLoading || address.cep.replace(/\D/g, "").length !== 8} onClick={lookupCep}>{cepLoading ? "Buscando..." : "Buscar CEP"}</Button>
+                </div>
+                {cepNotice && <p role="status" className="text-xs text-muted-foreground">{cepNotice}</p>}
+                <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+                  <div className="space-y-1.5"><Label htmlFor="empresa-rua">Rua / Avenida / Estrada</Label><Input id="empresa-rua" maxLength={100} placeholder="Rua das Flores" value={address.rua} onChange={(e) => changeAddress("rua", e.target.value)} /></div>
+                  <div className="space-y-1.5"><Label htmlFor="empresa-numero">Número</Label><Input id="empresa-numero" maxLength={15} placeholder="123 ou S/N" value={address.numero} onChange={(e) => changeAddress("numero", e.target.value)} /></div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="space-y-1.5"><Label htmlFor="empresa-bairro">Bairro / Localidade</Label><Input id="empresa-bairro" maxLength={80} placeholder="Centro" value={address.bairro} onChange={(e) => changeAddress("bairro", e.target.value)} /></div>
+                  <div className="space-y-1.5"><Label htmlFor="empresa-complemento">Complemento (opcional)</Label><Input id="empresa-complemento" maxLength={80} placeholder="Próximo à praça" value={address.complemento} onChange={(e) => changeAddress("complemento", e.target.value)} /></div>
+                </div>
+                <div className="grid gap-3 sm:grid-cols-[2fr_1fr]">
+                  <div className="space-y-1.5"><Label htmlFor="empresa-cidade">Cidade</Label><Input id="empresa-cidade" maxLength={80} value={address.cidade} onChange={(e) => changeAddress("cidade", e.target.value)} /></div>
+                  <div className="space-y-1.5"><Label htmlFor="empresa-uf">UF</Label><Input id="empresa-uf" maxLength={2} placeholder="MG" value={address.uf} onChange={(e) => changeAddress("uf", e.target.value)} /></div>
+                </div>
+                {addressTouched && (
+                  <p className="rounded-xl bg-muted/50 p-3 text-xs">
+                    <strong>Prévia do endereço:</strong> {formatBusinessAddress(address)}
+                    {!validAddress(address) && <span className="mt-1 block text-destructive">Preencha rua, número, bairro, cidade e UF para salvar.</span>}
+                  </p>
+                )}
+                <p className="text-xs text-muted-foreground">Os dados atualizados serão usados nas próximas consultas da página de agendamento e nas novas mensagens de WhatsApp. Confira o ponto no Google Maps.</p>
+              </div>
               <div className="space-y-1.5"><Label htmlFor="empresa-horario">Horário de funcionamento</Label><Input id="empresa-horario" maxLength={120} placeholder="Seg a Sex, 08h às 18h" value={f.horario_funcionamento} onChange={(e) => setF({ ...f, horario_funcionamento: e.target.value })} /></div>
             </section>
             <section className="space-y-3 border-t pt-4">
@@ -426,7 +511,7 @@ function EmpresaTab() {
             </section>
             <div className="sticky bottom-16 z-20 -mx-4 flex gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur-xl sm:static sm:mx-0 sm:justify-end sm:border-0 sm:px-0 lg:bottom-0">
               <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={cancelEditing} disabled={mut.isPending}>Cancelar</Button>
-              <Button type="submit" className="flex-1 sm:flex-none" disabled={mut.isPending || !dirty || !f.nome_fantasia.trim()}>{mut.isPending ? "Salvando..." : "Salvar alterações"}</Button>
+              <Button type="submit" className="flex-1 sm:flex-none" disabled={mut.isPending || !dirty || !f.nome_fantasia.trim() || (addressTouched && (!validAddress(address) || formatBusinessAddress(address).length > 200))}>{mut.isPending ? "Salvando..." : "Salvar alterações"}</Button>
             </div>
           </form>
         </CardContent>
