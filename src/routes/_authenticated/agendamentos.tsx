@@ -437,7 +437,7 @@ function KpiCard({ label, value, tone, sub, wide }: { label: string; value: numb
   );
 }
 
-function AgendamentoCard({ a, empresa }: { a: any; empresa?: { nome_fantasia?: string | null; endereco?: string | null } }) {
+function AgendamentoCard({ a, empresa }: { a: any; empresa?: { nome_fantasia?: string | null; endereco?: string | null } | null }) {
   const [open, setOpen] = useState(false);
   const upd = useServerFn(updateAgendamentoStatus);
   const ini = useServerFn(iniciarAtendimento);
