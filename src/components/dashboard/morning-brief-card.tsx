@@ -46,21 +46,21 @@ const TYPE_META: Record<MorningBriefItemType, {
 
 function LockedMorningBrief() {
   return (
-    <Card className="mb-4 overflow-hidden border-primary/15 bg-gradient-to-br from-primary/5 via-card to-card">
-      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+    <Card className="overflow-hidden border border-primary/15 bg-gradient-to-r from-primary/[0.07] via-card to-card shadow-sm">
+      <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="flex min-w-0 items-start gap-3">
-          <div className="grid h-9 w-9 shrink-0 place-content-center rounded-xl bg-primary/10 text-primary">
+          <div className="grid h-11 w-11 shrink-0 place-content-center rounded-2xl bg-primary/10 text-primary">
             <Lock className="h-4 w-4" />
           </div>
           <div className="min-w-0">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-primary">Morning Brief · Growth</p>
-            <h2 className="mt-1 font-display text-base font-semibold">Seu negócio resumido antes de você perguntar</h2>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-muted-foreground">
+            <h2 className="mt-1 font-display text-base font-bold sm:text-lg">Inteligência para as próximas decisões</h2>
+            <p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">
               O Growth cruza receita, agenda, operação e clientes com chance de retorno para dizer o que merece ação hoje.
             </p>
           </div>
         </div>
-        <Button asChild size="sm" className="shrink-0">
+        <Button asChild size="sm" className="shrink-0 gap-2">
           <Link to="/planos">Liberar no Growth <ArrowRight className="ml-1 h-4 w-4" /></Link>
         </Button>
       </CardContent>
@@ -79,12 +79,12 @@ function BriefContent() {
   });
 
   if (isLoading) {
-    return <div className="mb-4 h-40 rounded-2xl skeleton-shimmer" />;
+    return <div className="h-32 rounded-3xl skeleton-shimmer" />;
   }
 
   if (isError || !data) {
     return (
-      <Card className="mb-4">
+      <Card className="border border-border/60 shadow-sm">
         <CardContent className="p-4">
           <p className="text-sm font-medium">Morning Brief indisponível agora.</p>
           <p className="mt-1 text-xs text-muted-foreground">A Central do Dia continua funcionando normalmente.</p>
@@ -94,15 +94,15 @@ function BriefContent() {
   }
 
   return (
-    <Card className="mb-4 overflow-hidden border-primary/20">
+    <Card className="overflow-hidden border border-primary/15 shadow-sm">
       <CardContent className="p-0">
-        <div className="border-b bg-primary/[0.04] p-4">
+        <div className="border-b border-border/60 bg-gradient-to-r from-primary/[0.07] to-card p-4 sm:p-5">
           <div className="flex flex-col gap-1.5 sm:flex-row sm:items-start sm:justify-between">
             <div className="min-w-0">
               <div className="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-widest text-primary">
                 <Sparkles className="h-3.5 w-3.5" /> Morning Brief
               </div>
-              <h2 className="mt-1 font-display text-lg font-semibold">Seu resumo de hoje</h2>
+              <h2 className="mt-1 font-display text-lg font-bold">Seu resumo inteligente de hoje</h2>
               <p className="mt-0.5 text-sm text-muted-foreground">{data.resumo}</p>
             </div>
             <span className="shrink-0 text-[11px] text-muted-foreground">Atualiza automaticamente</span>
@@ -114,14 +114,14 @@ function BriefContent() {
             <div className="p-4 text-sm text-muted-foreground">
               Ainda não há histórico suficiente para um resumo útil. Continue registrando agenda, clientes e ordens.
             </div>
-          ) : data.itens.map((item, index) => {
-            const meta = TYPE_META[item.tipo as MorningBriefItemType];
+          ) : data.itens.slice(0, 3).map((item, index) => {
+            const meta = TYPE_META[item.tipo as MorningBriefItemType] ?? TYPE_META.info;
             const Icon = meta.icon;
             const destaque = index === 0;
             return (
               <div
                 key={item.id}
-                className={`grid sm:grid-cols-[1fr_auto] sm:items-center ${destaque ? "gap-2.5 p-3.5" : "gap-2 p-3"}`}
+                className={`grid sm:grid-cols-[1fr_auto] sm:items-center ${destaque ? "gap-3 p-4 sm:px-5" : "gap-3 px-4 py-3 sm:px-5"}`}
               >
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2">
@@ -131,7 +131,7 @@ function BriefContent() {
                     {item.metrica ? <span className="text-xs font-semibold tabular-nums text-foreground">{item.metrica}</span> : null}
                   </div>
                   <p className={`${destaque ? "mt-1.5" : "mt-1"} font-display text-sm font-semibold`}>{item.titulo}</p>
-                  <p className={`${destaque ? "mt-0.5 block" : "mt-0.5 hidden sm:block"} text-xs leading-relaxed text-muted-foreground`}>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
                     {item.detalhe}
                   </p>
                 </div>
@@ -149,6 +149,11 @@ function BriefContent() {
             );
           })}
         </div>
+        {data.itens.length > 3 && (
+          <p className="border-t border-border/60 px-4 py-2.5 text-xs text-muted-foreground sm:px-5">
+            Mostrando as três prioridades do momento.
+          </p>
+        )}
       </CardContent>
     </Card>
   );
