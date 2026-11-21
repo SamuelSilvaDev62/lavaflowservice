@@ -4,6 +4,7 @@ import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeBookingBranding } from "@/lib/booking-branding";
 import { appointmentForecast, countOperationStages } from "@/lib/dashboard-metrics";
 import { bookingPhoneLookupSuffix, isSameBookingPhone, normalizeBookingPhone } from "@/lib/booking-customer-phone";
+import { orderPeriodStart, selectOrderPage, summarizeOrders, type OrderIndex } from "@/lib/ordens-model";
 
 // ============ DASHBOARD METRICS ============
 type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
@@ -1245,6 +1246,56 @@ export const listOrdens = createServerFn({ method: "GET" })
     (upsells ?? []).forEach((u: any) => byOrdem.set(u.ordem_id, [...(byOrdem.get(u.ordem_id) ?? []), u]));
     (origens ?? []).forEach((r: any) => origensByOrdem.set(r.ordem_id, [...(origensByOrdem.get(r.ordem_id) ?? []), r]));
     return { ordens: (data ?? []).map((o: any) => ({ ...o, upsell_oportunidades: byOrdem.get(o.id) ?? [], origens_receita: origensByOrdem.get(o.id) ?? [] })) };
+  });
+
+/** Separate contract: existing listOrdens consumers keep their original response. */
+export const listOrdensPage = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((input) => z.object({
+    q: z.string().max(120), period: z.enum(["today", "7", "30", "all"]),
+    status: z.enum(["all", "aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"]),
+    service: z.union([z.literal("all"), z.string().uuid()]),
+    employee: z.union([z.literal("all"), z.literal("none"), z.string().uuid()]),
+    sort: z.enum(["recent", "oldest", "value"]), page: z.number().int().min(1),
+  }).parse(input))
+  .handler(async ({ data: filters, context }) => {
+    const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    // Read a lean period index in bounded batches. This avoids the Data API's
+    // 1000-row cap and counts/searches the entire tenant, not just one page.
+    const rows: OrderIndex[] = [];
+    const start = orderPeriodStart(filters.period);
+    const end = new Date().toISOString();
+    const projection: string = "id,status,valor,created_at,checklist_inicial_status,servico_id,funcionario_id,clientes:cliente_id(nome),servicos:servico_id(nome),veiculos:veiculo_id(placa)";
+    for (let offset = 0; ; offset += 1000) {
+      let query = supabase.from("ordens_servico").select(projection).eq("owner_id", ownerId).lte("created_at", end);
+      if (start) query = query.gte("created_at", start);
+      const { data, error } = await query.order("created_at", { ascending: false }).order("id").range(offset, offset + 999).returns<OrderIndex[]>();
+      if (error) throw error;
+      rows.push(...(data ?? []));
+      if ((data?.length ?? 0) < 1000) break;
+    }
+    const pagination = selectOrderPage(rows, filters);
+    const ids = pagination.ids;
+    if (!ids.length) return { ordens: [], ...pagination, summary: summarizeOrders(rows) };
+    const { data, error } = await supabase.from("ordens_servico")
+      .select(`id, status, valor, created_at, observacoes, iniciado_em, finalizado_em, entregue_em,
+        checklist_inicial_status, checklist_inicial_em,
+        clientes:cliente_id(nome), veiculos:veiculo_id(placa), servicos:servico_id(nome),
+        funcionarios:funcionario_id(nome), checklist_funcionario:checklist_inicial_funcionario_id(nome)`)
+      .eq("owner_id", ownerId).in("id", ids);
+    if (error) throw error;
+    const [upsells, origins] = await Promise.all([
+      supabase.from("os_upsell_oportunidades").select("id, ordem_id, servico_sugerido, motivo, valor_estimado, status, origem_item_label").eq("owner_id", ownerId).in("ordem_id", ids).order("created_at", { ascending: false }),
+      supabase.from("receita_influenciada").select("id, ordem_id, origem, valor, descricao, created_at").eq("owner_id", ownerId).in("ordem_id", ids).order("created_at", { ascending: false }),
+    ]);
+    if (upsells.error) throw upsells.error;
+    if (origins.error) throw origins.error;
+    const ordens = ids.flatMap((id) => {
+      const order = data?.find((o) => o.id === id);
+      return order ? [{ ...order, upsell_oportunidades: (upsells.data ?? []).filter((u) => u.ordem_id === id), origens_receita: (origins.data ?? []).filter((r) => r.ordem_id === id) }] : [];
+    });
+    return { ordens, ...pagination, summary: summarizeOrders(rows) };
   });
 
 // ============ CLIENTES ============
