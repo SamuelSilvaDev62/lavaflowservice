@@ -2508,7 +2508,8 @@ async function getOwnerScope(
   userId: string,
   opts?: { skipSubscription?: boolean },
 ) {
-  const { data } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
+  const { data, error: rolesError } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
+  if (rolesError) throw new Error("Não foi possível verificar as permissões desta conta.");
   const priority: Record<TenantRole, number> = {
     owner: 1,
     admin: 2,
@@ -2529,7 +2530,8 @@ async function getOwnerScope(
       return String(a.owner_id).localeCompare(String(b.owner_id));
     });
   const current = selfOwner ?? sorted[0];
-  const ownerId = current?.owner_id ?? userId;
+  if (!current) throw new Error("Acesso negado: usuário sem vínculo com estabelecimento.");
+  const ownerId = current.owner_id;
 
   // Free organiza: a operação núcleo NUNCA depende de assinatura.
   // Recursos Growth continuam protegidos por assertPlanFeature/assertFeature.
@@ -2537,7 +2539,7 @@ async function getOwnerScope(
 
   return {
     ownerId,
-    role: current?.role ?? "owner",
+    role: current.role,
   };
 }
 
