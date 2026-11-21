@@ -1,4 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
+import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
@@ -12,11 +13,16 @@ import { brl, dateTimeBr } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import { buildReadyVehicleMessage, getFidelidadeTemplates } from "@/lib/fidelidade-messages";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, PointerSensor, useSensor, useSensors, TouchSensor } from "@dnd-kit/core";
-import { MessageCircle, Check, Send, Phone, ChevronRight, ChevronLeft, X } from "lucide-react";
+import { MessageCircle, Check, Send, Phone, ChevronRight, ChevronLeft, X, Filter, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
+
+const filaSearchSchema = z.object({
+  etapa: z.enum(["aguardando", "em_lavagem", "finalizacao", "pronto"]).optional(),
+});
 
 export const Route = createFileRoute("/_authenticated/fila")({
   component: FilaPage,
+  validateSearch: filaSearchSchema,
 });
 
 const columns: Array<{ key: OsStatus; label: string; short: string; color: string; emoji: string }> = [
@@ -76,6 +82,8 @@ function prevStatus(s: OsStatus): OsStatus | null {
 }
 
 function FilaPage() {
+  const { etapa: etapaFoco } = Route.useSearch();
+  const navigate = Route.useNavigate();
   const getFn = useServerFn(getFila);
   const updFn = useServerFn(updateOrdemStatus);
   const logFn = useServerFn(logWhatsappEnvio);
@@ -128,7 +136,10 @@ function FilaPage() {
     .reduce((s, o) => s + Number(o.valor ?? 0), 0);
 
 
-  const itemsMobile = ordensList.filter(o => o.status === activeMobile);
+  const etapaVisivel = etapaFoco ?? activeMobile;
+  const itemsMobile = ordensList.filter(o => o.status === etapaVisivel);
+  const colunaFoco = columns.find(c => c.key === etapaFoco);
+  const itensFiltrados = etapaFoco ? ordensList.filter(o => o.status === etapaFoco) : [];
 
   return (
     <>
@@ -139,6 +150,19 @@ function FilaPage() {
       <div className="hidden sm:block">
         <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', o WhatsApp dispara automaticamente." />
       </div>
+
+      {colunaFoco && (
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-primary/20 bg-primary/[0.055] p-3.5 sm:p-4" role="status">
+          <div className="flex min-w-0 items-center gap-2 text-sm">
+            <Filter className="h-4 w-4 shrink-0 text-primary" aria-hidden />
+            <span>Etapa selecionada: <strong>{colunaFoco.label}</strong></span>
+            <Badge variant="secondary">{countBy(colunaFoco.key)} OS</Badge>
+          </div>
+          <Button type="button" variant="outline" size="sm" onClick={() => { setActiveMobile(etapaFoco ?? "aguardando"); navigate({ search: {} }); }}>
+            Ver todas as etapas
+          </Button>
+        </div>
+      )}
 
       {/* Resumo compacto — sem duplicar os contadores das etapas */}
       <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
@@ -169,9 +193,9 @@ function FilaPage() {
           <div className="grid grid-cols-5 gap-1">
             {columns.map(c => {
               const n = countBy(c.key);
-              const active = c.key === activeMobile;
+              const active = c.key === etapaVisivel;
               return (
-                <button key={c.key} onClick={() => setActiveMobile(c.key)}
+                <button key={c.key} onClick={() => { setActiveMobile(c.key); if (etapaFoco) navigate({ search: {} }); }}
                   className={`flex min-w-0 flex-col items-center gap-0.5 rounded-xl border px-1 py-1.5 text-[10px] font-medium transition ${active ? "bg-primary text-primary-foreground border-primary shadow-sm" : "bg-card border-border text-foreground/70"}`}>
                   <span className="w-full truncate text-center leading-tight">{c.emoji} {c.short}</span>
                   <span className={`inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full px-1 text-[10px] ${active ? "bg-primary-foreground/20" : "bg-muted"}`}>{n}</span>
@@ -203,16 +227,51 @@ function FilaPage() {
         </div>
       </div>
 
-      {/* DESKTOP: kanban com drag */}
+      {/* DESKTOP: deeplink abre a etapa filtrada; sem filtro, conserva o Kanban com drag & drop. */}
       <div className="hidden sm:block">
-        <DndContext sensors={sensors} onDragEnd={onDragEnd}>
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-3">
-            {columns.map((c) => {
-              const items = ordensList.filter((o) => o.status === c.key);
-              return <Column key={c.key} col={c} items={items} onAdvance={(id, s) => mut.mutate({ id, status: s })} onReenviar={reenviarWhats} />;
-            })}
-          </div>
-        </DndContext>
+        {colunaFoco ? (
+          <Card className="border border-border/60 bg-card shadow-sm">
+            <CardContent className="p-4 sm:p-5">
+              <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+                <div>
+                  <h2 className="font-display text-lg font-semibold">{colunaFoco.label}</h2>
+                  <p className="text-xs text-muted-foreground">Clique em uma OS para consultar os detalhes ou mudar sua etapa.</p>
+                </div>
+                <Badge variant="secondary">{itensFiltrados.length} registros</Badge>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+                {itensFiltrados.map(o => (
+                  <button key={o.id} type="button" onClick={() => setSelected(o)}
+                    className="group min-w-0 rounded-2xl border border-border/70 bg-muted/20 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary/30 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{o.clientes?.nome ?? "Cliente"}</p>
+                        <p className="mt-1 truncate text-xs text-muted-foreground">{o.servicos?.nome ?? "Serviço"}</p>
+                      </div>
+                      <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground group-hover:text-primary" />
+                    </div>
+                    <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
+                      <span className="rounded-lg bg-card px-2 py-1 font-mono text-xs">{o.veiculos?.placa ?? "Sem placa"}</span>
+                      <span className="text-sm font-semibold tabular-nums">{brl(o.valor)}</span>
+                    </div>
+                  </button>
+                ))}
+              </div>
+              {itensFiltrados.length === 0 && (
+                <div className="py-14 text-center text-sm text-muted-foreground">Nenhuma OS nesta etapa.</div>
+              )}
+            </CardContent>
+          </Card>
+        ) : (
+          <DndContext sensors={sensors} onDragEnd={onDragEnd}>
+            <div className="grid grid-cols-1 gap-3 md:grid-cols-2 lg:grid-cols-5">
+              {columns.map((c) => {
+                const items = ordensList.filter((o) => o.status === c.key);
+                return <Column key={c.key} col={c} items={items} onAdvance={(id, s) => mut.mutate({ id, status: s })} onReenviar={reenviarWhats} />;
+              })}
+            </div>
+          </DndContext>
+        )}
       </div>
 
       {/* Bottom sheet detalhes (mobile-first, mas funciona em qualquer largura) */}
