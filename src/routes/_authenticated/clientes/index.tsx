@@ -14,7 +14,7 @@ import { brl, daysBetween } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import {
   ArrowUpRight, CalendarClock, CheckCircle2, ChevronRight, Gift, MessageCircle,
-  Plus, RotateCw, Search, SlidersHorizontal, UsersRound,
+  Plus, RotateCw, Search, SlidersHorizontal, ChevronDown, UsersRound,
   Wallet, X,
 } from "lucide-react";
 import { toast } from "sonner";
@@ -76,6 +76,7 @@ function Page() {
   const [segmento, setSegmento] = useState<Segmento>("todos");
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("nome");
   const [open, setOpen] = useState(false);
+  const [expandedClienteId, setExpandedClienteId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: "", telefone: "", origem_cliente: "Indicação" });
   const mut = useMutation({
     mutationFn: () => create({ data: { ...form, nome: form.nome.trim() } }),
@@ -238,66 +239,86 @@ function Page() {
               <Button type="button" variant="outline" size="sm" onClick={() => { setQ(""); setSegmento("todos"); if (filtroRecompensa) navigate({ search: {} }); }}>Limpar filtros</Button>
             </CardContent></Card>
           ) : (
-            <section className="grid items-stretch gap-3 lg:grid-cols-2" aria-label="Lista de clientes">
+            <section className="grid items-start gap-2.5 lg:grid-cols-2" aria-label="Lista de clientes">
               {filtered.map(c => {
                 const visits = Number(c.visitas ?? 0);
                 const days = c.ultima_visita ? daysBetween(c.ultima_visita) : null;
                 const rec = filtroRecompensa ? recData?.clientes.find(r => r.id === c.id) : null;
                 const phone = c.telefone?.trim() || "";
                 const canMessage = phone.replace(/\D/g, "").length >= 10;
+                const expanded = expandedClienteId === c.id;
+                const detailsId = "cliente-detalhes-" + c.id;
+                const fromOnlineBooking = c.origem_cliente === "Agendamento online";
                 return (
-                  <Card key={c.id} className="group h-full min-w-0 overflow-hidden border border-border/60 bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/25 hover:shadow-md">
-                    <CardContent className="flex h-full flex-col gap-4 p-4 sm:p-5">
-                      <div className="flex min-w-0 items-start gap-3">
-                        <span className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-primary/10 font-display text-sm font-bold text-primary" aria-hidden>
+                  <Card key={c.id} className={"min-w-0 overflow-hidden border bg-card shadow-sm transition-all duration-200 " + (expanded ? "border-primary/25 shadow-md" : "border-border/60 hover:border-primary/25 hover:shadow-md")}>
+                    <CardContent className="p-0">
+                      <button
+                        type="button"
+                        aria-expanded={expanded}
+                        aria-controls={detailsId}
+                        aria-label={c.nome + ". " + (expanded ? "Ocultar" : "Mostrar") + " detalhes do cliente"}
+                        onClick={() => setExpandedClienteId(id => id === c.id ? null : c.id)}
+                        className="group flex min-h-20 w-full items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-muted/25 focus-visible:outline focus-visible:outline-2 focus-visible:-outline-offset-2 focus-visible:outline-primary sm:px-5"
+                      >
+                        <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 font-display text-sm font-bold text-primary" aria-hidden>
                           {initials(c.nome)}
                         </span>
-                        <div className="min-w-0 flex-1">
-                          <Link to="/clientes/$id" params={{ id: c.id }} className="inline-flex max-w-full items-center gap-1.5 text-base font-semibold hover:text-primary hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
-                            <span className="truncate">{c.nome}</span><ArrowUpRight className="h-4 w-4 shrink-0 opacity-40 group-hover:opacity-100" />
-                          </Link>
-                          <p className="mt-0.5 break-all text-xs text-muted-foreground">{phone || "Telefone não informado"}</p>
-                        </div>
-                        <Badge variant={visits ? "secondary" : "outline"} className="shrink-0 text-[10px]">
-                          {visits ? "Com histórico" : "Sem visitas"}
-                        </Badge>
-                      </div>
-
-                      <div className="grid grid-cols-3 gap-2">
-                        <div className="min-w-0 rounded-xl bg-muted/35 p-2.5">
-                          <p className="text-[10px] text-muted-foreground">OS · 90 dias</p>
-                          <p className="mt-1 font-display text-base font-bold tabular-nums">{visits}</p>
-                        </div>
-                        <div className="min-w-0 rounded-xl bg-muted/35 p-2.5">
-                          <p className="text-[10px] text-muted-foreground">Valor das OS</p>
-                          <p className="mt-1 break-words font-display text-xs font-bold tabular-nums sm:text-sm">{brl(Number(c.total_gasto ?? 0))}</p>
-                        </div>
-                        <div className="min-w-0 rounded-xl bg-primary/[0.05] p-2.5">
-                          <p className="text-[10px] text-muted-foreground">Pontos</p>
-                          <p className="mt-1 font-display text-base font-bold tabular-nums text-primary">{c.pontos_saldo ?? 0}</p>
-                        </div>
-                      </div>
-
-                      {rec && (rec as any).recompensa && (
-                        <p className="flex items-start gap-2 rounded-xl bg-emerald-500/[0.07] p-2.5 text-xs text-emerald-700 dark:text-emerald-400"><Gift className="h-3.5 w-3.5 shrink-0" /> Pode resgatar: {(rec as any).recompensa}</p>
-                      )}
-
-                      <div className="mt-auto flex flex-wrap items-center justify-between gap-2 border-t border-border/50 pt-3">
-                        <p className="text-[11px] text-muted-foreground">
-                          {days == null ? "Sem OS nos últimos 90 dias" : days === 0 ? "Último atendimento hoje" : `Último atendimento há ${days} ${days === 1 ? "dia" : "dias"}`}
-                        </p>
-                        <div className="flex items-center gap-2">
-                          {canMessage && (
-                            <Button asChild size="sm" variant="outline" className="h-9 gap-1.5" title="Abrir WhatsApp">
-                              <a href={waLink(phone, `Olá ${c.nome.split(" ")[0]}!`)} target="_blank" rel="noopener noreferrer" aria-label={`Conversar com ${c.nome} no WhatsApp`}>
-                                <MessageCircle className="h-4 w-4" /><span className="sr-only sm:not-sr-only">WhatsApp</span>
-                              </a>
-                            </Button>
-                          )}
-                          <Button asChild size="sm" variant="outline" className="h-9 gap-1.5">
-                            <Link to="/clientes/$id" params={{ id: c.id }}>Ver perfil <ChevronRight className="h-4 w-4" /></Link>
-                          </Button>
-                        </div>
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-semibold sm:text-base">{c.nome}</span>
+                          <span className="mt-0.5 block truncate text-xs text-muted-foreground">{phone || "Telefone não informado"}</span>
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          {fromOnlineBooking && <Badge variant="secondary" className="hidden text-[10px] sm:inline-flex">Reserva online</Badge>}
+                          <Badge variant={visits ? "secondary" : "outline"} className="hidden text-[10px] min-[400px]:inline-flex">
+                            {visits ? "Com histórico" : "Sem OS recentes"}
+                          </Badge>
+                          <ChevronDown className={"h-4 w-4 text-muted-foreground transition-transform duration-200 group-hover:text-primary " + (expanded ? "rotate-180" : "")} aria-hidden />
+                        </span>
+                      </button>
+                      <div id={detailsId} hidden={!expanded}>
+                        {expanded && (
+                          <div className="space-y-3 border-t border-border/50 px-4 pb-4 pt-3 sm:px-5 sm:pb-5">
+                            {fromOnlineBooking && (
+                              <p className="text-xs font-medium text-primary">Cadastrado pelo agendamento online</p>
+                            )}
+                            <div className="grid grid-cols-3 gap-2">
+                              <div className="min-w-0 rounded-xl bg-muted/35 p-2.5">
+                                <p className="text-[10px] text-muted-foreground">OS · 90 dias</p>
+                                <p className="mt-1 font-display text-base font-bold tabular-nums">{visits}</p>
+                              </div>
+                              <div className="min-w-0 rounded-xl bg-muted/35 p-2.5">
+                                <p className="text-[10px] text-muted-foreground">Valor das OS</p>
+                                <p className="mt-1 break-words font-display text-xs font-bold tabular-nums sm:text-sm">{brl(Number(c.total_gasto ?? 0))}</p>
+                              </div>
+                              <div className="min-w-0 rounded-xl bg-primary/[0.05] p-2.5">
+                                <p className="text-[10px] text-muted-foreground">Pontos</p>
+                                <p className="mt-1 font-display text-base font-bold tabular-nums text-primary">{c.pontos_saldo ?? 0}</p>
+                              </div>
+                            </div>
+                            {rec && (rec as any).recompensa && (
+                              <p className="flex items-start gap-2 rounded-xl bg-emerald-500/[0.07] p-2.5 text-xs text-emerald-700 dark:text-emerald-400">
+                                <Gift className="h-3.5 w-3.5 shrink-0" /> Pode resgatar: {(rec as any).recompensa}
+                              </p>
+                            )}
+                            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/50 pt-3">
+                              <p className="text-[11px] text-muted-foreground">
+                                {days == null ? "Sem OS nos últimos 90 dias" : days === 0 ? "Último atendimento hoje" : "Último atendimento há " + days + (days === 1 ? " dia" : " dias")}
+                              </p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                {canMessage && (
+                                  <Button asChild size="sm" variant="outline" className="h-9 gap-1.5">
+                                    <a href={waLink(phone, "Olá " + c.nome.split(" ")[0] + "!")} target="_blank" rel="noopener noreferrer" aria-label={"Conversar com " + c.nome + " no WhatsApp"}>
+                                      <MessageCircle className="h-4 w-4" /> WhatsApp
+                                    </a>
+                                  </Button>
+                                )}
+                                <Button asChild size="sm" variant="outline" className="h-9 gap-1.5">
+                                  <Link to="/clientes/$id" params={{ id: c.id }}>Ver perfil <ChevronRight className="h-4 w-4" /></Link>
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        )}
                       </div>
                     </CardContent>
                   </Card>
