@@ -57,6 +57,20 @@ export const Route = createFileRoute("/api/assistente-chat")({
           throw err;
         }
 
+        // Opt-in explícito do estabelecimento antes de acessar dados ou enviar contexto à IA.
+        // Ausência de configuração ou falha de leitura => nenhum dado enviado ao provedor.
+        const { data: aiSettings, error: aiSettingsError } = await supabase
+          .from("tenant_ai_settings")
+          .select("ai_enabled")
+          .eq("tenant_id", ownerId)
+          .maybeSingle();
+        if (aiSettingsError) {
+          return new Response("Não foi possível confirmar a configuração de IA.", { status: 503 });
+        }
+        if (aiSettings?.ai_enabled !== true) {
+          return new Response("O proprietário ainda não habilitou o consultor IA.", { status: 403 });
+        }
+
         const { buildConsultorContexto, consultorSystemPrompt, checkAiRateLimit } = await import(
           "@/lib/assistente.server"
         );
