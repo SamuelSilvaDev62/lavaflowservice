@@ -41,6 +41,9 @@ jobs:
       - name: Business rules regression tests
         run: node --experimental-strip-types --test tests/*.test.mjs
 
+      - name: Booking location regression tests
+        run: node --experimental-strip-types --test tests/business-location.test.mjs
+
       - name: Install dependencies
         # package.json is currently ahead of the committed lockfile. We validate
         # the declared dependency graph without mutating/depending on that stale lock.
