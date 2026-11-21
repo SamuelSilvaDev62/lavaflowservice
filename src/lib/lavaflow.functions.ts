@@ -4158,8 +4158,8 @@ export const getHorariosDisponiveis = createServerFn({ method: "GET" })
 export const solicitarAgendamentoPublico = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     slug: z.string().min(1).max(80),
-    nome: z.string().min(2).max(120),
-    telefone: z.string().min(8).max(20),
+    nome: z.string().trim().min(2).max(120),
+    telefone: z.string().trim().min(8).max(20).refine(v => normalizeBookingPhone(v).length >= 8, "Informe um telefone válido."),
     veiculo: z.string().max(60).optional(),
     servico_id: z.string().uuid().nullable().optional(),
     data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
