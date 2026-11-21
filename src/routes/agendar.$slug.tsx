@@ -427,6 +427,9 @@ function ConfirmarStep({
         <Field label="Observações (opcional)">
           <Textarea rows={2} value={obs} onChange={(e) => setObs(e.target.value)} />
         </Field>
+        <p className="rounded-xl border border-border/60 bg-muted/30 p-3 text-xs leading-relaxed text-muted-foreground">
+          Ao confirmar, seus dados de contato e as informações desta reserva serão registrados pelo estabelecimento para organizar o atendimento e falar com você sobre o agendamento.
+        </p>
       </div>
     </div>
   );

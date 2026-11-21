@@ -13,7 +13,7 @@ import { getClienteDetalhe, addVeiculo, getExtratoFidelidade } from "@/lib/lavaf
 import { brl, dateBr, daysBetween } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import { buildExtratoMessage, getFidelidadeTemplates } from "@/lib/fidelidade-messages";
-import { ArrowLeft, Car, Plus, MessageCircle, Gift, Pencil } from "lucide-react";
+import { ArrowLeft, CalendarDays, Car, Plus, MessageCircle, Gift, Pencil } from "lucide-react";
 import { toast } from "sonner";
 import { EditarClienteDialog } from "@/components/clientes/editar-cliente-dialog";
 
@@ -100,6 +100,47 @@ function Page() {
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Visitas</p><p className="font-display text-2xl font-bold">{data.visitas}</p></CardContent></Card>
         <Card><CardContent className="p-4"><p className="text-xs text-muted-foreground">Pontos</p><p className="font-display text-2xl font-bold text-primary">{c.pontos_saldo}</p></CardContent></Card>
       </div>
+
+      {data.agendamentos.length > 0 && (
+        <Card className="mb-5 overflow-hidden border border-primary/15 bg-card shadow-sm">
+          <CardContent className="space-y-4 p-4 sm:p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <h3 className="flex items-center gap-2 font-display text-base font-semibold">
+                  <CalendarDays className="h-4 w-4 text-primary" /> Reservas do cliente
+                </h3>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Serviço, data, horário e informações fornecidas no agendamento.
+                </p>
+              </div>
+              <Badge variant="secondary" className="shrink-0">{data.agendamentos.length} recentes</Badge>
+            </div>
+            <div className="divide-y divide-border/50 rounded-xl border border-border/60">
+              {data.agendamentos.slice(0, 5).map(a => (
+                <div key={a.id} className="flex flex-col gap-2 p-3.5 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold">{a.servicos?.nome || "Serviço não informado"}</p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      {dateBr(a.data_agendada)} às {String(a.hora_agendada).slice(0, 5)}
+                    </p>
+                    {a.observacoes && <p className="mt-2 break-words text-xs text-muted-foreground">{a.observacoes}</p>}
+                  </div>
+                  <div className="flex shrink-0 flex-wrap gap-1.5">
+                    {a.origem === "publico" && <Badge variant="outline" className="text-[10px]">Online</Badge>}
+                    <Badge variant="secondary" className="text-[10px]">{({
+                      agendado: "Agendado", confirmado: "Confirmado", em_andamento: "Em andamento",
+                      concluido: "Concluído", cancelado: "Cancelado", nao_compareceu: "Não compareceu",
+                    } as Record<string, string>)[a.status] ?? a.status}</Badge>
+                  </div>
+                </div>
+              ))}
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              Reservas registradas não representam lavagens concluídas nem pagamentos recebidos.
+            </p>
+          </CardContent>
+        </Card>
+      )}
 
       <div className="grid lg:grid-cols-2 gap-4">
         <Card>

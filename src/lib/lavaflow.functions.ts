@@ -3,6 +3,7 @@ import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeBookingBranding } from "@/lib/booking-branding";
 import { appointmentForecast, countOperationStages } from "@/lib/dashboard-metrics";
+import { bookingPhoneLookupSuffix, isSameBookingPhone, normalizeBookingPhone } from "@/lib/booking-customer-phone";
 
 // ============ DASHBOARD METRICS ============
 type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
@@ -1254,7 +1255,7 @@ export const listClientes = createServerFn({ method: "GET" })
     const { ownerId } = await getOwnerScope(supabase, userId);
     const ninetyAgo = new Date(Date.now() - 90 * 86_400_000).toISOString();
     const [{ data: clientes }, { data: ordens }] = await Promise.all([
-      supabase.from("clientes").select("id, nome, telefone, pontos_saldo, created_at").eq("owner_id", ownerId).order("nome"),
+      supabase.from("clientes").select("id, nome, telefone, origem_cliente, pontos_saldo, created_at").eq("owner_id", ownerId).order("nome"),
       supabase.from("ordens_servico").select("cliente_id, created_at, valor").eq("owner_id", ownerId).gte("created_at", ninetyAgo),
     ]);
     const lastVisit = new Map<string, string>();
@@ -1714,18 +1715,19 @@ export const getClienteDetalhe = createServerFn({ method: "GET" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
-    const [{ data: cliente }, { data: veiculos }, { data: ordens }, { data: interacoes }] = await Promise.all([
+    const [{ data: cliente }, { data: veiculos }, { data: ordens }, { data: interacoes }, { data: agendamentos }] = await Promise.all([
       supabase.from("clientes").select("*").eq("id", data.id).eq("owner_id", ownerId).single(),
       supabase.from("veiculos").select("*").eq("cliente_id", data.id).eq("owner_id", ownerId),
       supabase.from("ordens_servico").select("id, valor, status, created_at, servicos:servico_id(nome)").eq("cliente_id", data.id).eq("owner_id", ownerId).order("created_at", { ascending: false }),
       supabase.from("interacoes_clientes").select("*").eq("cliente_id", data.id).eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(30),
+      supabase.from("agendamentos").select("id, data_agendada, hora_agendada, status, origem, observacoes, servicos:servico_id(nome)").eq("cliente_id", data.id).eq("owner_id", ownerId).order("data_agendada", { ascending: false }).order("hora_agendada", { ascending: false }).limit(20),
     ]);
     const totalGasto = (ordens ?? []).reduce((s, o) => s + Number(o.valor ?? 0), 0);
     const visitas = (ordens ?? []).length;
     const last = ordens?.[0]?.created_at ?? null;
     const dias = last ? Math.floor((Date.now() - new Date(last).getTime()) / 86_400_000) : 999;
     const score = Math.max(0, Math.min(100, 100 - dias + Math.min(40, visitas * 4)));
-    return { cliente, veiculos: veiculos ?? [], ordens: ordens ?? [], interacoes: interacoes ?? [], totalGasto, visitas, score };
+    return { cliente, veiculos: veiculos ?? [], ordens: ordens ?? [], interacoes: interacoes ?? [], agendamentos: agendamentos ?? [], totalGasto, visitas, score };
   });
 
 // ============ VEÍCULOS ============
@@ -4156,8 +4158,8 @@ export const getHorariosDisponiveis = createServerFn({ method: "GET" })
 export const solicitarAgendamentoPublico = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     slug: z.string().min(1).max(80),
-    nome: z.string().min(2).max(120),
-    telefone: z.string().min(8).max(20),
+    nome: z.string().trim().min(2).max(120),
+    telefone: z.string().trim().min(8).max(20).refine(v => normalizeBookingPhone(v).length >= 8, "Informe um telefone válido."),
     veiculo: z.string().max(60).optional(),
     servico_id: z.string().uuid().nullable().optional(),
     data: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
@@ -4183,13 +4185,32 @@ export const solicitarAgendamentoPublico = createServerFn({ method: "POST" })
       .not("status", "in", "(cancelado,nao_compareceu)");
     if ((count ?? 0) >= cap) throw new Error("Horário não está mais disponível.");
 
-    // Upsert cliente por telefone
-    const { data: existing } = await supabaseAdmin.from("clientes")
-      .select("id").eq("owner_id", owner_id).eq("telefone", data.telefone).maybeSingle();
-    let cliente_id = existing?.id;
+    // Cada reserva pública utiliza a carteira do estabelecimento correspondente.
+    // Evita duplicatas por máscara (+55, espaços, parênteses e hífens) sem substituir
+    // o nome já cadastrado com dados enviados por alguém não autenticado.
+    const phone = normalizeBookingPhone(data.telefone);
+    const suffix = bookingPhoneLookupSuffix(data.telefone);
+    if (!suffix) throw new Error("Informe um WhatsApp válido para confirmar sua reserva.");
+    let cliente_id: string | undefined;
+    let page = 0;
+    const pageSize = 200;
+    while (!cliente_id) {
+      const { data: candidates, error: lookupError } = await supabaseAdmin.from("clientes")
+        .select("id, telefone")
+        .eq("owner_id", owner_id)
+        .ilike("telefone", "%" + suffix + "%")
+        .order("created_at", { ascending: true })
+        .range(page * pageSize, (page + 1) * pageSize - 1);
+      if (lookupError) throw lookupError;
+      cliente_id = candidates?.find((c) => isSameBookingPhone(c.telefone, phone))?.id;
+      if (cliente_id || !candidates || candidates.length < pageSize) break;
+      page += 1;
+      // Nunca criar um possível duplicado se a consulta estiver truncada.
+      if (page >= 10) throw new Error("Não foi possível validar seu cadastro. Entre em contato com o estabelecimento.");
+    }
     if (!cliente_id) {
       const { data: novo, error } = await supabaseAdmin.from("clientes").insert({
-        owner_id, nome: data.nome, telefone: data.telefone, origem_cliente: "Agendamento online",
+        owner_id, nome: data.nome.trim(), telefone: phone, origem_cliente: "Agendamento online",
       }).select("id").single();
       if (error) throw error;
       cliente_id = novo.id;
