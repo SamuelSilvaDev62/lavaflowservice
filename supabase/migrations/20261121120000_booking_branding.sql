@@ -3,7 +3,7 @@
 create table if not exists public.booking_branding (
   owner_id uuid primary key,
   primary_color text not null default '#2563EB',
-  secondary_color text not null default '#0F172A',
+  secondary_color text not null default '#F8FAFC',
   cover_url text,
   logo_url text,
   tagline text,
