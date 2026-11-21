@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -338,7 +338,7 @@ function EmpresaTab() {
   const [addressTouched, setAddressTouched] = useState(false);
   const [cepLoading, setCepLoading] = useState(false);
   const [cepNotice, setCepNotice] = useState("");
-  const [cepLookupId, setCepLookupId] = useState(0);
+  const cepRequestRef = useRef(0);
 
   const saved = profileFromEmpresa(data?.empresa);
   const dirty = PROFILE_FIELDS.some((key) => f[key] !== saved[key]) || addressTouched;
@@ -403,7 +403,7 @@ function EmpresaTab() {
   function changeAddress(key: keyof BusinessAddress, value: string) {
     setAddress((current) => ({ ...current, [key]: key === "cep" ? formatCep(value) : key === "uf" ? value.toUpperCase().slice(0, 2) : value }));
     setAddressTouched(true);
-    if (key === "cep") setCepLookupId((id) => id + 1);
+    if (key === "cep") cepRequestRef.current += 1;
     setCepNotice("");
   }
   async function lookupCep() {
@@ -412,14 +412,14 @@ function EmpresaTab() {
       setCepNotice("Informe um CEP com 8 dígitos.");
       return;
     }
-    const lookupId = cepLookupId + 1;
-    setCepLookupId(lookupId);
+    const lookupId = ++cepRequestRef.current;
     setCepLoading(true);
     setCepNotice("");
     try {
       const response = await fetch("https://viacep.com.br/ws/" + cep + "/json/", { signal: AbortSignal.timeout(8000) });
       if (!response.ok) throw new Error("CEP temporariamente indisponível.");
       const result = await response.json() as CepLookup;
+      if (lookupId !== cepRequestRef.current) return;
       if (result.erro) {
         setCepNotice("CEP não encontrado. Preencha o endereço manualmente.");
       } else {
@@ -430,9 +430,9 @@ function EmpresaTab() {
           : "CEP localizado parcialmente. Preencha os campos que faltam.");
       }
     } catch {
-      setCepNotice("Não foi possível consultar o CEP. Você pode preencher tudo manualmente.");
+      if (lookupId === cepRequestRef.current) setCepNotice("Não foi possível consultar o CEP. Você pode preencher tudo manualmente.");
     } finally {
-      setCepLoading(false);
+      if (lookupId === cepRequestRef.current) setCepLoading(false);
     }
   }
 
