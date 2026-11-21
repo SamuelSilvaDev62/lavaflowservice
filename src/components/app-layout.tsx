@@ -16,6 +16,8 @@ import {
   LogOut,
   Lock,
   Menu,
+  PanelLeftClose,
+  PanelLeftOpen,
   Settings,
   Target,
   Sparkles,
@@ -67,6 +69,7 @@ const BOTTOM_TAB_ROUTES = ["/dashboard", "/agendamentos", "/fila", "/ordens"] as
 
 export function AppLayout({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
+  const [sidebarHidden, setSidebarHidden] = useState(false);
   const router = useRouter();
   const qc = useQueryClient();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
@@ -74,6 +77,21 @@ export function AppLayout({ children }: { children: ReactNode }) {
   const { can, isLoading: loadingPlano } = useEntitlement();
 
   useEffect(() => setOpen(false), [pathname]);
+
+  // Desktop preference only. On mobile the existing hamburger menu remains unchanged.
+  useEffect(() => {
+    try { setSidebarHidden(window.localStorage.getItem("lavaflow-sidebar-hidden") === "true"); }
+    catch { /* Storage may be disabled in private browsing. */ }
+  }, []);
+
+  function toggleDesktopSidebar() {
+    setSidebarHidden((current) => {
+      const next = !current;
+      try { window.localStorage.setItem("lavaflow-sidebar-hidden", String(next)); }
+      catch { /* Sidebar still works without storage. */ }
+      return next;
+    });
+  }
 
   const groups: NavGroup[] = groupsAll
     .map((g) => ({
@@ -136,9 +154,10 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <aside className={cn(
-        "fixed inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ease-out lg:translate-x-0 shadow-[var(--shadow-neo)]",
+      <aside id="lavaflow-sidebar" className={cn(
+        "fixed inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ease-out shadow-[var(--shadow-neo)]",
         open ? "translate-x-0" : "-translate-x-full",
+        sidebarHidden ? "lg:-translate-x-full" : "lg:translate-x-0",
       )}>
         <div className="h-20 flex items-center gap-3 px-6">
           <div className="h-11 w-11 rounded-2xl bg-gradient-to-br from-primary to-primary/70 grid place-content-center shadow-[var(--shadow-neo-sm)]">
@@ -194,8 +213,22 @@ export function AppLayout({ children }: { children: ReactNode }) {
 
       {open && <div className="fixed inset-0 z-30 bg-black/40 backdrop-blur-sm lg:hidden animate-in fade-in duration-200" onClick={() => setOpen(false)} />}
 
-      <main className="lg:pl-64 min-h-screen pb-20 lg:pb-0">
-        <div className="px-4 lg:px-10 py-6 lg:py-10 max-w-7xl mx-auto animate-in fade-in duration-300">{children}</div>
+      <main className={cn("min-h-screen pb-20 transition-[padding] duration-300 lg:pb-0", sidebarHidden ? "lg:pl-0" : "lg:pl-64")}>
+        <div className="sticky top-0 z-20 hidden h-11 items-center border-b border-border/40 bg-background/90 px-5 backdrop-blur-xl lg:flex lg:px-10">
+          <button
+            type="button"
+            onClick={toggleDesktopSidebar}
+            aria-expanded={!sidebarHidden}
+            aria-controls="lavaflow-sidebar"
+            aria-label={sidebarHidden ? "Mostrar menu lateral" : "Ocultar menu lateral"}
+            title={sidebarHidden ? "Mostrar menu lateral" : "Ocultar menu lateral"}
+            className="inline-flex h-8 items-center gap-2 rounded-lg px-3 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted hover:text-foreground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-primary"
+          >
+            {sidebarHidden ? <PanelLeftOpen className="h-4 w-4" /> : <PanelLeftClose className="h-4 w-4" />}
+            {sidebarHidden ? "Mostrar menu" : "Ocultar menu"}
+          </button>
+        </div>
+        <div className="mx-auto max-w-7xl animate-in fade-in px-4 py-6 duration-300 lg:px-10 lg:py-7">{children}</div>
       </main>
 
       {(() => {
