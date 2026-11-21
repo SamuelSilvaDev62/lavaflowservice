@@ -1,3 +1,4 @@
+import { selectTenantMembership } from "@/lib/tenant-scope";
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
@@ -2418,37 +2419,10 @@ async function getOwnerScope(
   userId: string,
   opts?: { skipSubscription?: boolean },
 ) {
-  const { data } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
-  const priority: Record<TenantRole, number> = {
-    owner: 1,
-    admin: 2,
-    gerente: 3,
-    atendente: 4,
-    lavador: 5,
-    colaborador: 5,
-  };
-  const rows = (data ?? []) as Array<{ owner_id: string; role: TenantRole; created_at?: string | null }>;
-  const selfOwner = rows.find((r) => r.owner_id === userId && r.role === "owner");
-  const sorted = rows
-    .slice()
-    .sort((a, b) => {
-      const byRole = (priority[a.role] ?? 99) - (priority[b.role] ?? 99);
-      if (byRole) return byRole;
-      const byCreated = String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
-      if (byCreated) return byCreated;
-      return String(a.owner_id).localeCompare(String(b.owner_id));
-    });
-  const current = selfOwner ?? sorted[0];
-  const ownerId = current?.owner_id ?? userId;
-
-  // Free organiza: a operação núcleo NUNCA depende de assinatura.
-  // Recursos Growth continuam protegidos por assertPlanFeature/assertFeature.
+  const { data, error } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
+  if (error) throw new Error("Falha ao consultar os vínculos da empresa.");
   void opts;
-
-  return {
-    ownerId,
-    role: current?.role ?? "owner",
-  };
+  return selectTenantMembership(userId, (data ?? []) as Array<{ owner_id: string; role: TenantRole; created_at?: string | null }>);
 }
 
 export const getMyRole = createServerFn({ method: "GET" })

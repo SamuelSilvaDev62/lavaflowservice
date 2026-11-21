@@ -1,3 +1,4 @@
+import { selectTenantMembership } from "@/lib/tenant-scope";
 // Helpers de entitlement no SERVIDOR. Nunca importado pelo cliente.
 import {
   getEntitlement,
@@ -8,23 +9,13 @@ import {
   type FeatureKey,
 } from "@/lib/plans";
 
-type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
+import type { TenantMembership } from "@/lib/tenant-scope";
 
 /** Resolve o tenant (owner_id) e o papel do usuário autenticado. */
 export async function resolveOwnerScope(supabase: any, userId: string) {
-  const { data } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
-  const priority: Record<TenantRole, number> = {
-    owner: 1, admin: 2, gerente: 3, atendente: 4, lavador: 5, colaborador: 5,
-  };
-  const rows = (data ?? []) as Array<{ owner_id: string; role: TenantRole; created_at?: string | null }>;
-  const selfOwner = rows.find((r) => r.owner_id === userId && r.role === "owner");
-  const sorted = rows.slice().sort((a, b) => {
-    const byRole = (priority[a.role] ?? 99) - (priority[b.role] ?? 99);
-    if (byRole) return byRole;
-    return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
-  });
-  const current = selfOwner ?? sorted[0];
-  return { ownerId: current?.owner_id ?? userId, role: (current?.role ?? "owner") as TenantRole };
+  const { data, error } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
+  if (error) throw new Error("Falha ao consultar os vínculos da empresa.");
+  return selectTenantMembership(userId, (data ?? []) as TenantMembership[]);
 }
 
 export async function fetchEntitlement(supabase: any, ownerId: string): Promise<Entitlement> {
