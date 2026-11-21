@@ -30,30 +30,39 @@ export const Route = createFileRoute("/_authenticated/clientes/")({
 });
 
 type Segmento = "todos" | "com_visitas" | "sem_visitas";
-type Ordenacao = "nome" | "mais_visitas" | "ultima_visita";
+type Ordenacao = "nome" | "mais_visitas" | "ultima_visita" | "maior_valor";
 
 function initials(name: string) {
   return name.trim().split(/\s+/).filter(Boolean).slice(0, 2).map(p => p[0].toLocaleUpperCase("pt-BR")).join("") || "?";
 }
 
-function ClientSummary({ label, value, icon: Icon, hint, tone }: {
-  label: string; value: string; icon: typeof UsersRound; hint: string; tone?: "green" | "blue";
+function ClientSummary({ label, value, icon: Icon, hint, tone, onClick, active, action }: {
+  label: string; value: string; icon: typeof UsersRound; hint: string;
+  tone?: "green" | "blue"; onClick: () => void; active?: boolean; action: string;
 }) {
   return (
-    <Card className="h-full min-w-0 border border-border/60 bg-card shadow-sm">
-      <CardContent className="flex h-full min-h-32 flex-col justify-between gap-3 p-4 sm:p-5">
-        <div className="flex min-w-0 items-start justify-between gap-2">
-          <p className="text-xs font-medium leading-5 text-muted-foreground sm:text-sm">{label}</p>
-          <span className={`grid h-9 w-9 shrink-0 place-items-center rounded-xl ${tone === "green" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-primary/10 text-primary"}`}>
-            <Icon className="h-4 w-4" aria-hidden />
-          </span>
-        </div>
-        <div className="min-w-0">
-          <p className="break-words font-display text-2xl font-bold tracking-tight tabular-nums sm:text-[27px]">{value}</p>
-          <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{hint}</p>
-        </div>
-      </CardContent>
-    </Card>
+    <button type="button" onClick={onClick} aria-pressed={!!active}
+      aria-label={label + ": " + value + ". " + action}
+      className="group h-full w-full rounded-3xl text-left outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2">
+      <Card className={"h-full min-w-0 cursor-pointer border bg-card shadow-sm transition-all duration-200 group-hover:-translate-y-0.5 group-hover:shadow-md " + (active ? "border-primary/35" : "border-border/60 group-hover:border-primary/25")}>
+        <CardContent className="flex h-full min-h-32 flex-col justify-between gap-3 p-4 sm:p-5">
+          <div className="flex min-w-0 items-start justify-between gap-2">
+            <p className="text-xs font-medium leading-5 text-muted-foreground sm:text-sm">{label}</p>
+            <span className="flex shrink-0 items-center gap-1">
+              <span className={"grid h-9 w-9 place-items-center rounded-xl " + (tone === "green" ? "bg-emerald-500/10 text-emerald-700 dark:text-emerald-400" : "bg-primary/10 text-primary")}>
+                <Icon className="h-4 w-4" aria-hidden />
+              </span>
+              <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground/50 group-hover:text-primary" aria-hidden />
+            </span>
+          </div>
+          <div className="min-w-0">
+            <p className="break-words font-display text-2xl font-bold tracking-tight tabular-nums sm:text-[27px]">{value}</p>
+            <p className="mt-1 text-[11px] leading-relaxed text-muted-foreground">{hint}</p>
+            <p className="mt-1 text-[11px] font-semibold text-primary">{action}</p>
+          </div>
+        </CardContent>
+      </Card>
+    </button>
   );
 }
 
@@ -110,6 +119,7 @@ function Page() {
     return matchesSearch && matchesSegmento && (!filtroRecompensa || (recompensaIds ? recompensaIds.has(c.id) : false));
   }).sort((a, b) => {
     if (ordenacao === "mais_visitas") return Number(b.visitas ?? 0) - Number(a.visitas ?? 0) || a.nome.localeCompare(b.nome, "pt-BR");
+    if (ordenacao === "maior_valor") return Number(b.total_gasto ?? 0) - Number(a.total_gasto ?? 0) || a.nome.localeCompare(b.nome, "pt-BR");
     if (ordenacao === "ultima_visita") return String(b.ultima_visita ?? "").localeCompare(String(a.ultima_visita ?? "")) || a.nome.localeCompare(b.nome, "pt-BR");
     return a.nome.localeCompare(b.nome, "pt-BR");
   });
@@ -165,10 +175,22 @@ function Page() {
       ) : (
         <>
           <section aria-label="Resumo da carteira" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            <ClientSummary icon={UsersRound} label="Clientes cadastrados" value={String(totalClientes)} hint="Total de cadastros" />
-            <ClientSummary icon={CheckCircle2} label="Com atendimentos" value={String(comVisitas)} hint="Com OS nos últimos 90 dias" tone="green" />
-            <ClientSummary icon={CalendarClock} label="Sem atendimentos" value={String(semVisitas)} hint="Sem OS nos últimos 90 dias" />
-            <ClientSummary icon={Wallet} label="Valor registrado em OS" value={brl(valorRegistrado90)} hint="Ordens dos últimos 90 dias; não indica pagamento" tone="green" />
+            <ClientSummary icon={UsersRound} label="Clientes cadastrados" value={String(totalClientes)}
+              hint="Total de cadastros" action="Ver todos"
+              active={segmento === "todos" && ordenacao === "nome" && !q && !filtroRecompensa}
+              onClick={() => { setQ(""); setSegmento("todos"); setOrdenacao("nome"); if (filtroRecompensa) navigate({ search: {} }); }} />
+            <ClientSummary icon={CheckCircle2} label="Com atendimentos" value={String(comVisitas)}
+              hint="Com OS nos últimos 90 dias" tone="green" action="Filtrar carteira"
+              active={segmento === "com_visitas" && !q && !filtroRecompensa}
+              onClick={() => { setQ(""); setSegmento("com_visitas"); if (filtroRecompensa) navigate({ search: {} }); }} />
+            <ClientSummary icon={CalendarClock} label="Sem atendimentos" value={String(semVisitas)}
+              hint="Sem OS nos últimos 90 dias" action="Ver clientes"
+              active={segmento === "sem_visitas" && !q && !filtroRecompensa}
+              onClick={() => { setQ(""); setSegmento("sem_visitas"); if (filtroRecompensa) navigate({ search: {} }); }} />
+            <ClientSummary icon={Wallet} label="Valor registrado em OS" value={brl(valorRegistrado90)}
+              hint="Ordens dos últimos 90 dias; não indica pagamento" tone="green" action="Ordenar por valor"
+              active={ordenacao === "maior_valor" && segmento === "todos" && !q && !filtroRecompensa}
+              onClick={() => { setQ(""); setSegmento("todos"); setOrdenacao("maior_valor"); if (filtroRecompensa) navigate({ search: {} }); }} />
           </section>
 
           <Card className="border border-border/60 bg-card shadow-sm">
@@ -193,6 +215,7 @@ function Page() {
                       <option value="nome">Nome (A–Z)</option>
                       <option value="ultima_visita">Atendimento recente</option>
                       <option value="mais_visitas">Mais atendimentos</option>
+                      <option value="maior_valor">Maior valor de OS</option>
                     </select>
                   </div>
                 </div>
