@@ -15,7 +15,7 @@ entitlements. No production deploy, database write or Stripe action.
 | --- | --- | --- |
 | TypeScript/build | Existing CI | Production deploy correctness |
 | Plan tiers | Node unit regression tests | Stripe webhook + live subscription lifecycle |
-| Public routes | HTTP GET for /, /auth, /lp | JS hydration/console errors and authenticated routes |
+| Public routes | HTTP GET plus Chromium guest-page hydration for /, /auth, /lp | Authenticated routes and real user workflows |
 | Auth | None | Login/logout, expired JWT, protected route redirect, multiple memberships |
 | Booking | None | Public booking contention, capacity, write permissions |
 | Multi-tenant isolation | None | Actual Supabase RLS SELECT/INSERT/UPDATE/DELETE across two accounts |
@@ -26,7 +26,7 @@ entitlements. No production deploy, database write or Stripe action.
 1. Keep PR draft until checks run and results are understood.
 2. Never run synthetic booking against the real production database.
 3. Use a staging Supabase project with two seeded test organizations for authenticated e2e.
-4. Treat HTTP smoke as availability only: a 200 HTML response can still hydrate into an error.
+4. HTTP smoke checks availability only; the separate Chromium test detects guest root error boundaries and uncaught page errors, not authenticated flows.
 5. Only merge regression tests after check results are reviewed.
 
 ## Follow-up
