@@ -88,11 +88,24 @@ export function AppLayout({ children }: { children: ReactNode }) {
     }))
     .filter((g) => g.items.length > 0);
 
+  const [signingOut, setSigningOut] = useState(false);
+
   async function signOut() {
-    await qc.cancelQueries();
-    qc.clear();
-    await supabase.auth.signOut();
-    router.navigate({ to: "/auth", replace: true });
+    if (signingOut) return;
+    setSigningOut(true);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) throw error;
+      await qc.cancelQueries();
+      qc.clear();
+      setOpen(false);
+      await router.navigate({ to: "/auth", replace: true });
+    } catch (error) {
+      console.error("[auth] não foi possível encerrar a sessão", error);
+      // Não navega para /auth enquanto a sessão antiga permanecer ativa.
+    } finally {
+      setSigningOut(false);
+    }
   }
 
   return (
@@ -104,9 +117,23 @@ export function AppLayout({ children }: { children: ReactNode }) {
           </span>
           <span className="whitespace-nowrap"><span>Lava</span><span className="text-primary">Flow</span></span>
         </Link>
-        <button onClick={() => setOpen(!open)} className="grid h-11 w-11 place-content-center rounded-2xl bg-card shadow-[var(--shadow-neo-sm)] transition-all duration-200 hover:shadow-[var(--shadow-neo)] active:shadow-[var(--shadow-neo-inset)]" aria-label="Menu">
-          {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            className="h-10 gap-1.5 px-2.5 text-xs"
+            onClick={signOut}
+            disabled={signingOut}
+            aria-label="Trocar conta: sair e entrar com outro usuário"
+          >
+            <LogOut className="h-4 w-4" />
+            <span>Trocar conta</span>
+          </Button>
+          <button type="button" onClick={() => setOpen(!open)} className="grid h-11 w-11 place-content-center rounded-2xl bg-card shadow-[var(--shadow-neo-sm)] transition-all duration-200 hover:shadow-[var(--shadow-neo)] active:shadow-[var(--shadow-neo-inset)]" aria-label="Menu" aria-expanded={open}>
+            {open ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
+          </button>
+        </div>
       </header>
 
       <aside className={cn(
@@ -128,7 +155,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </span>
           </div>
         )}
-        <nav className="px-4 py-3 space-y-6 overflow-y-auto h-[calc(100dvh-10rem)]">
+        <nav className="px-4 py-3 space-y-6 overflow-y-auto h-[calc(100dvh-15rem)] lg:h-[calc(100dvh-10rem)]">
           {groups.map((g) => (
             <div key={g.label}>
               <p className="px-3 pb-2 text-[10px] font-semibold tracking-widest uppercase text-muted-foreground">{g.label}</p>
@@ -158,7 +185,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
             </div>
           ))}
         </nav>
-        <div className="absolute bottom-0 inset-x-0 p-4">
+        <div className="absolute bottom-20 lg:bottom-0 inset-x-0 p-4">
           <Button variant="outline" size="sm" onClick={signOut} className="w-full justify-start gap-2">
             <LogOut className="h-4 w-4" /> Sair
           </Button>
