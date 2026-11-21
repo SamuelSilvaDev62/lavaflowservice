@@ -5,6 +5,7 @@ import { safeBookingBranding } from "@/lib/booking-branding";
 import { appointmentForecast, countOperationStages } from "@/lib/dashboard-metrics";
 import { bookingPhoneLookupSuffix, isSameBookingPhone, normalizeBookingPhone } from "@/lib/booking-customer-phone";
 import { orderPeriodStart, selectOrderPage, summarizeOrders, type OrderIndex } from "@/lib/ordens-model";
+import { canAdvanceWorkOrder } from "@/lib/os-transitions";
 
 // ============ DASHBOARD METRICS ============
 type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
@@ -1140,8 +1141,7 @@ export const updateOrdemStatus = createServerFn({ method: "POST" })
     if (readError) throw readError;
     if (!current) throw new Error("Ordem de serviço não encontrada.");
     if (current.status === data.status) return { ok: true };
-    const order: OsStatus[] = ["aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"];
-    if (order.indexOf(data.status) <= order.indexOf(current.status as OsStatus)) {
+    if (!canAdvanceWorkOrder(current.status, data.status)) {
       throw new Error("Não é permitido retroceder uma OS ou reabrir um atendimento entregue.");
     }
     const patch: any = { status: data.status };
