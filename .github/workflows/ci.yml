@@ -50,6 +50,9 @@ jobs:
       - name: Booking branding regression tests
         run: node --experimental-strip-types --test tests/booking-branding.test.mjs
 
+      - name: Booking customer phone regression tests
+        run: node --experimental-strip-types --test tests/booking-customer-phone.test.mjs
+
       - name: Install dependencies
         # package.json is currently ahead of the committed lockfile. We validate
         # the declared dependency graph without mutating/depending on that stale lock.
