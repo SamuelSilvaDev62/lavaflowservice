@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
+import { safeBookingBranding } from "@/lib/booking-branding";
 
 // ============ DASHBOARD METRICS ============
 type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
@@ -2059,6 +2060,37 @@ export const updateEmpresa = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+export const getBookingBranding = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { ownerId } = await getOwnerScope(context.supabase, context.userId);
+    const { data, error } = await context.supabase
+      .from("booking_branding" as any)
+      .select("primary_color, secondary_color, cover_url, logo_url, tagline")
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+    if (error) throw new Error("Não foi possível carregar a identidade da página.");
+    return safeBookingBranding(data as any);
+  });
+
+export const updateBookingBranding = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({
+    primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    secondary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/),
+    cover_url: z.string().url().startsWith("https://").max(1000).nullable(),
+    logo_url: z.string().url().startsWith("https://").max(1000).nullable(),
+    tagline: z.string().max(120).nullable(),
+  }).parse(d))
+  .handler(async ({ context, data }) => {
+    const { ownerId, role } = await getOwnerScope(context.supabase, context.userId);
+    assertTenantRole(role, ADMIN_ROLES, "Apenas administradores podem personalizar a página.");
+    const { error } = await context.supabase.from("booking_branding" as any)
+      .upsert({ ...data, owner_id: ownerId, updated_at: new Date().toISOString() }, { onConflict: "owner_id" });
+    if (error) throw new Error("Não foi possível salvar a identidade da página.");
+    return { ok: true };
+  });
+
 // Link público do estabelecimento (slug). Único por tenant, estável.
 function normalizeSlug(input: string) {
   return input
@@ -3977,8 +4009,17 @@ export const getEmpresaPublica = createServerFn({ method: "GET" })
       evento: "visualizacao",
       metadata: { origem: "pagina_publica" },
     } as any);
+    const { data: bookingBranding, error: brandingError } = await supabaseAdmin
+      .from("booking_branding" as any)
+      .select("primary_color, secondary_color, cover_url, logo_url, tagline")
+      .eq("owner_id", empresa.owner_id)
+      .maybeSingle();
+    // Old establishments keep the default theme if they have no row.
+    // Query errors are logged and do not block public booking.
+    if (brandingError) console.error("[booking-branding] leitura pública falhou", brandingError.code);
     return {
       empresa,
+      branding: safeBookingBranding(bookingBranding as any),
       servicos: servicos ?? [],
       recompensas: recompensas ?? [],
       config: (cfg ?? [])[0] ?? { hora_inicio: "08:00", hora_fim: "18:00", dias_semana: [1,2,3,4,5,6], intervalo_min: 30, capacidade_simultanea: 1 },

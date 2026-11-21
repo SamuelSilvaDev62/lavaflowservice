@@ -8,8 +8,9 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { getEmpresa, updateEmpresa, listServicos, upsertServico, getAgendaConfig, updateAgendaConfig, listTenantMembers, setMemberRole, listUpsellRegras, upsertUpsellRegra } from "@/lib/lavaflow.functions";
+import { getEmpresa, updateEmpresa, getBookingBranding, updateBookingBranding, listServicos, upsertServico, getAgendaConfig, updateAgendaConfig, listTenantMembers, setMemberRole, listUpsellRegras, upsertUpsellRegra } from "@/lib/lavaflow.functions";
 import { brl } from "@/lib/format";
+import { accessibleForeground, DEFAULT_BOOKING_BRANDING, type BookingBranding } from "@/lib/booking-branding";
 import { allTemplates, setTemplate, type WhatsAppTemplateKey } from "@/lib/whatsapp";
 import { FIDELIDADE_DEFAULTS, type TplKey as FidTplKey } from "@/lib/fidelidade-messages";
 import { Textarea } from "@/components/ui/textarea";
@@ -39,6 +40,7 @@ function Page() {
         <TabsList className="mb-4 flex-wrap h-auto">
           <TabsTrigger value="empresa">Empresa</TabsTrigger>
           <TabsTrigger value="servicos">Serviços</TabsTrigger>
+          <TabsTrigger value="booking-visual">Página de agendamento</TabsTrigger>
           <TabsTrigger value="upsell">Upsell</TabsTrigger>
           <TabsTrigger value="agenda">Agenda</TabsTrigger>
           <TabsTrigger value="membros">Membros e papéis</TabsTrigger>
@@ -47,6 +49,7 @@ function Page() {
         </TabsList>
         <TabsContent value="empresa"><EmpresaTab /></TabsContent>
         <TabsContent value="servicos"><ServicosTab /></TabsContent>
+        <TabsContent value="booking-visual"><BookingVisualTab /></TabsContent>
         <TabsContent value="upsell"><UpsellTab /></TabsContent>
         <TabsContent value="agenda"><AgendaTab /></TabsContent>
         <TabsContent value="membros"><MembrosTab /></TabsContent>
@@ -54,6 +57,87 @@ function Page() {
         <TabsContent value="assinatura"><AssinaturaTab /></TabsContent>
       </Tabs>
     </>
+  );
+}
+
+function BookingVisualTab() {
+  const get = useServerFn(getBookingBranding);
+  const save = useServerFn(updateBookingBranding);
+  const getEmp = useServerFn(getEmpresa);
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({ queryKey: ["booking-branding"], queryFn: () => get() });
+  const { data: business } = useQuery({ queryKey: ["empresa"], queryFn: () => getEmp() });
+  const [form, setForm] = useState<BookingBranding>({ ...DEFAULT_BOOKING_BRANDING });
+  useEffect(() => { if (data) setForm(data); }, [data]);
+  const mutation = useMutation({
+    mutationFn: () => save({ data: form }),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["booking-branding"] });
+      toast.success("Identidade visual atualizada.");
+    },
+    onError: (error: any) => toast.error(error?.message ?? "Não foi possível salvar."),
+  });
+  const name = business?.empresa?.nome_fantasia || "Seu estabelecimento";
+  const mainText = accessibleForeground(form.primary_color);
+  const secondaryText = accessibleForeground(form.secondary_color);
+  return (
+    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_350px]">
+      <Card><CardContent className="space-y-5 p-5">
+        <div>
+          <h3 className="font-display text-lg font-semibold">Identidade da sua página</h3>
+          <p className="text-sm text-muted-foreground">Essas opções afetam apenas a página pública de agendamento, não o painel administrativo.</p>
+        </div>
+        {isLoading ? <div className="h-36 animate-pulse rounded-lg bg-muted" /> : (
+          <>
+            <div className="grid gap-4 sm:grid-cols-2">
+              <div className="space-y-2">
+                <Label htmlFor="booking-primary">Cor principal</Label>
+                <div className="flex items-center gap-2">
+                  <Input id="booking-primary" type="color" aria-label="Escolher cor principal" className="h-10 w-16 p-1" value={form.primary_color} onChange={(e) => setForm({ ...form, primary_color: e.target.value })} />
+                  <Input aria-label="Código da cor principal" value={form.primary_color} maxLength={7} onChange={(e) => setForm({ ...form, primary_color: e.target.value })} />
+                </div>
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="booking-secondary">Cor secundária</Label>
+                <div className="flex items-center gap-2">
+                  <Input id="booking-secondary" type="color" aria-label="Escolher cor secundária" className="h-10 w-16 p-1" value={form.secondary_color} onChange={(e) => setForm({ ...form, secondary_color: e.target.value })} />
+                  <Input aria-label="Código da cor secundária" value={form.secondary_color} maxLength={7} onChange={(e) => setForm({ ...form, secondary_color: e.target.value })} />
+                </div>
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="booking-tagline">Mensagem de apresentação</Label>
+              <Input id="booking-tagline" value={form.tagline ?? ""} maxLength={120} placeholder="Seu carro merece o melhor cuidado." onChange={(e) => setForm({ ...form, tagline: e.target.value || null })} />
+            </div>
+            <ImageUploadField bucket="company-logos" prefix="booking-logo" aspect="square" label="Logo da página de agendamento" value={form.logo_url} onChange={(url) => setForm((current) => ({ ...current, logo_url: url }))} />
+            <ImageUploadField bucket="company-logos" prefix="booking-cover" aspect="wide" label="Imagem de capa" hint="Prefira uma imagem horizontal. Sem capa, o layout atual é preservado." value={form.cover_url} onChange={(url) => setForm((current) => ({ ...current, cover_url: url }))} />
+            <div className="flex flex-wrap gap-2">
+              <Button disabled={mutation.isPending || !/^#[0-9a-fA-F]{6}$/.test(form.primary_color) || !/^#[0-9a-fA-F]{6}$/.test(form.secondary_color)} onClick={() => mutation.mutate()}>{mutation.isPending ? "Salvando..." : "Salvar personalização"}</Button>
+              <Button variant="outline" onClick={() => setForm({ ...DEFAULT_BOOKING_BRANDING })}>Restaurar padrão na prévia</Button>
+            </div>
+            <p className="text-xs text-muted-foreground">A opção Restaurar padrão só é aplicada à página pública depois de salvar. Fotos são armazenadas no espaço de imagens do estabelecimento.</p>
+          </>
+        )}
+      </CardContent></Card>
+      <Card><CardContent className="space-y-3 p-4">
+        <h3 className="font-semibold">Prévia no celular</h3>
+        <div className="mx-auto max-w-[310px] overflow-hidden rounded-[28px] border-4 border-slate-700 bg-white shadow-md">
+          <div className="h-6" style={{ backgroundColor: form.secondary_color }} />
+          <div className="flex items-center gap-2 p-3" style={{ color: secondaryText, backgroundColor: form.secondary_color }}>
+            {form.logo_url ? <img src={form.logo_url} alt="" className="h-10 w-10 rounded-lg object-cover" /> : <div className="h-10 w-10 rounded-lg" style={{ backgroundColor: form.primary_color }} />}
+            <span className="truncate text-sm font-bold">{name}</span>
+          </div>
+          {form.cover_url && <img src={form.cover_url} alt="" className="h-32 w-full object-cover" />}
+          <div className="space-y-4 p-4 text-slate-900">
+            <p className="text-lg font-bold">{name}</p>
+            <p className="text-sm text-slate-600">{form.tagline || "Agende seu serviço de forma rápida e prática."}</p>
+            <div className="rounded-xl border border-slate-200 p-3 text-xs">Escolha seu serviço · Data · Horário</div>
+            <div className="rounded-xl px-4 py-3 text-center text-sm font-semibold" style={{ backgroundColor: form.primary_color, color: mainText }}>Continuar</div>
+          </div>
+        </div>
+        <p className="text-xs text-muted-foreground">Prévia ilustrativa. O formulário e a confirmação permanecem os mesmos.</p>
+      </CardContent></Card>
+    </div>
   );
 }
 

@@ -14,6 +14,7 @@ import { ServiceCard } from "@/components/service-card";
 import { TimeSlotPicker } from "@/components/booking/time-slot-picker";
 import { brl, dateBr } from "@/lib/format";
 import { googleMapsDirectionsUrl } from "@/lib/business-location";
+import { accessibleForeground, safeBookingBranding } from "@/lib/booking-branding";
 import { getEmpresaPublica, getHorariosDisponiveis, solicitarAgendamentoPublico } from "@/lib/lavaflow.functions";
 import {
   ArrowLeft,
@@ -111,6 +112,7 @@ function Page() {
 
   const servicos = ((data?.servicos ?? []) as Servico[]);
   const empresa: any = data?.empresa;
+  const branding = safeBookingBranding(data?.branding);
   const selectedServico = servicos.find((s) => s.id === servicoId);
 
   const diasSemana = (data?.config?.dias_semana as number[] | undefined) ?? [1, 2, 3, 4, 5, 6];
@@ -156,11 +158,15 @@ function Page() {
   }
 
   return (
-    <div className="min-h-dvh bg-background pb-32">
-      <Header empresa={empresa} />
+    <div className="min-h-dvh bg-background pb-32" style={{
+      ["--primary" as any]: branding.primary_color,
+      ["--primary-foreground" as any]: accessibleForeground(branding.primary_color),
+      ["--ring" as any]: branding.primary_color,
+    }}>
+      <Header empresa={empresa} branding={branding} />
 
       <main className="mx-auto w-full max-w-2xl space-y-5 px-4 py-5">
-        <Hero empresa={empresa} />
+        <Hero empresa={empresa} branding={branding} />
 
         <BookingStepper steps={STEPS} currentIndex={step} />
 
@@ -228,14 +234,14 @@ function Page() {
   );
 }
 
-function Header({ empresa }: { empresa: any }) {
+function Header({ empresa, branding }: { empresa: any; branding: ReturnType<typeof safeBookingBranding> }) {
   const whats = phoneHref(empresa.whatsapp ?? empresa.telefone);
   return (
-    <header className="border-b bg-card/85 backdrop-blur-xl">
+    <header className="border-b backdrop-blur-xl" style={{ backgroundColor: branding.secondary_color, color: accessibleForeground(branding.secondary_color) }}>
       <div className="mx-auto flex max-w-2xl items-center justify-between gap-3 px-4 py-3">
         <div className="flex min-w-0 items-center gap-3">
-          {empresa.logo_url ? (
-            <img src={empresa.logo_url} alt={empresa.nome_fantasia} className="h-10 w-10 shrink-0 rounded-2xl object-cover" />
+          {(branding.logo_url || empresa.logo_url) ? (
+            <img src={branding.logo_url || empresa.logo_url} alt={empresa.nome_fantasia} className="h-10 w-10 shrink-0 rounded-2xl object-cover" />
           ) : (
             <div className="grid h-10 w-10 shrink-0 place-content-center rounded-2xl bg-primary">
               <Car className="h-5 w-5 text-primary-foreground" />
@@ -262,12 +268,13 @@ function Header({ empresa }: { empresa: any }) {
   );
 }
 
-function Hero({ empresa }: { empresa: any }) {
+function Hero({ empresa, branding }: { empresa: any; branding: ReturnType<typeof safeBookingBranding> }) {
   return (
-    <Card>
+    <Card className="overflow-hidden">
+      {branding.cover_url && <img src={branding.cover_url} alt="" className="h-36 w-full object-cover sm:h-48" />}
       <CardContent className="flex items-start gap-4 p-4 sm:p-5">
-        {empresa.logo_url ? (
-          <img src={empresa.logo_url} alt="" className="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-[var(--shadow-neo-sm)]" />
+        {(branding.logo_url || empresa.logo_url) ? (
+          <img src={branding.logo_url || empresa.logo_url} alt="" className="h-16 w-16 shrink-0 rounded-2xl object-cover shadow-[var(--shadow-neo-sm)]" />
         ) : (
           <div className="grid h-16 w-16 shrink-0 place-content-center rounded-2xl bg-primary text-primary-foreground shadow-[var(--shadow-neo-sm)]">
             <Sparkles className="h-7 w-7" />
@@ -275,6 +282,7 @@ function Hero({ empresa }: { empresa: any }) {
         )}
         <div className="min-w-0 flex-1 space-y-1.5">
           <h1 className="font-display text-xl font-bold leading-tight sm:text-2xl">{empresa.nome_fantasia}</h1>
+          {branding.tagline && <p className="text-sm text-muted-foreground">{branding.tagline}</p>}
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
             {empresa.endereco && (
               googleMapsDirectionsUrl(empresa.endereco) ? (
