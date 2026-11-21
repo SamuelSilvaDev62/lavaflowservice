@@ -2,6 +2,7 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 import { safeBookingBranding } from "@/lib/booking-branding";
+import { appointmentForecast, countOperationStages } from "@/lib/dashboard-metrics";
 
 // ============ DASHBOARD METRICS ============
 type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
@@ -266,15 +267,8 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
     const agHoje = agendamentos ?? [];
     const osAbertas = ordens ?? [];
     // Contagem completa antes de limitar a lista de veículos para prévias.
-    const statusOperacao = {
-      aguardando: osAbertas.filter((o: any) => o.status === "aguardando").length,
-      em_lavagem: osAbertas.filter((o: any) => o.status === "em_lavagem").length,
-      finalizacao: osAbertas.filter((o: any) => o.status === "finalizacao").length,
-      pronto: osAbertas.filter((o: any) => o.status === "pronto").length,
-    };
-    const previstosAgenda = agHoje
-      .filter((a: any) => isActiveStatus(a.status))
-      .reduce((s: number, a: any) => s + Number(a.servicos?.preco_padrao ?? 0) + Number(a.taxa_leva_traz ?? 0), 0);
+    const statusOperacao = countOperationStages(osAbertas);
+    const previstosAgenda = appointmentForecast(agHoje);
     // OS e agendamentos podem descrever o mesmo atendimento. Para não duplicar
     // previsões, o indicador da agenda considera somente reservas ativas.
     // OS abertas permanecem disponíveis para as métricas operacionais.
