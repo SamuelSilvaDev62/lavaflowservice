@@ -1,0 +1,24 @@
+name: Public browser smoke
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  browser-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Install isolated browser harness
+        run: |
+          npm install --prefix /tmp/lavaflow-browser-smoke --no-audit --no-fund --save-exact playwright@1.56.1
+          /tmp/lavaflow-browser-smoke/node_modules/.bin/playwright install --with-deps chromium
+      - name: Check public website with Chromium
+        run: node scripts/browser-smoke.mjs
