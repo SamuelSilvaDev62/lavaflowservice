@@ -154,7 +154,7 @@ export function AppLayout({ children }: { children: ReactNode }) {
         </div>
       </header>
 
-      <aside id="lavaflow-sidebar" className={cn(
+      <aside id="lavaflow-sidebar" inert={sidebarHidden && !open} aria-hidden={sidebarHidden && !open} className={cn(
         "fixed inset-y-0 left-0 z-40 w-64 bg-sidebar text-sidebar-foreground transform transition-transform duration-300 ease-out shadow-[var(--shadow-neo)]",
         open ? "translate-x-0" : "-translate-x-full",
         sidebarHidden ? "lg:-translate-x-full" : "lg:translate-x-0",
