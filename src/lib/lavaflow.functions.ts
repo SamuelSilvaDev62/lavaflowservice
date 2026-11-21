@@ -265,10 +265,19 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
 
     const agHoje = agendamentos ?? [];
     const osAbertas = ordens ?? [];
+    // Contagem completa antes de limitar a lista de veículos para prévias.
+    const statusOperacao = {
+      aguardando: osAbertas.filter((o: any) => o.status === "aguardando").length,
+      em_lavagem: osAbertas.filter((o: any) => o.status === "em_lavagem").length,
+      finalizacao: osAbertas.filter((o: any) => o.status === "finalizacao").length,
+      pronto: osAbertas.filter((o: any) => o.status === "pronto").length,
+    };
     const previstosAgenda = agHoje
       .filter((a: any) => isActiveStatus(a.status))
       .reduce((s: number, a: any) => s + Number(a.servicos?.preco_padrao ?? 0) + Number(a.taxa_leva_traz ?? 0), 0);
-    const faturamentoAberto = osAbertas.reduce((s: number, o: any) => s + Number(o.valor ?? 0), 0);
+    // OS e agendamentos podem descrever o mesmo atendimento. Para não duplicar
+    // previsões, o indicador da agenda considera somente reservas ativas.
+    // OS abertas permanecem disponíveis para as métricas operacionais.
 
     // Agenda do dia (fuso do app): todos os ativos, ordenados por hora, com marcacoes.
     const nowHm = localTimeHm();
@@ -388,7 +397,7 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         agendamentosHoje: agendaAtiva.length,
         veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao"].includes(o.status)).length,
         servicosPendentes: osAbertas.filter((o: any) => ["aguardando", "pronto"].includes(o.status)).length,
-        previsaoFaturamentoDia: previstosAgenda + faturamentoAberto,
+        previsaoFaturamentoDia: previstosAgenda,
         finalizadosHoje: (ordensFinalizadas ?? []).length,
         ticketMedio,
         capacidadeDia,
@@ -398,6 +407,8 @@ export const getDashboardOperacional = createServerFn({ method: "GET" })
         potencialFaturamento,
       },
       agendaHoje: agendaAtiva,
+      statusOperacao,
+      dataLocal: hoje,
       veiculosEmAtendimento: osAbertas.filter((o: any) => ["em_lavagem", "finalizacao", "pronto"].includes(o.status)).slice(0, 6),
       alertas,
     };
