@@ -13,6 +13,7 @@ import { BookingStepper } from "@/components/booking-stepper";
 import { ServiceCard } from "@/components/service-card";
 import { TimeSlotPicker } from "@/components/booking/time-slot-picker";
 import { brl, dateBr } from "@/lib/format";
+import { googleMapsDirectionsUrl } from "@/lib/business-location";
 import { getEmpresaPublica, getHorariosDisponiveis, solicitarAgendamentoPublico } from "@/lib/lavaflow.functions";
 import {
   ArrowLeft,
@@ -24,7 +25,6 @@ import {
   MapPin,
   MessageCircle,
   Sparkles,
-  Star,
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -276,9 +276,22 @@ function Hero({ empresa }: { empresa: any }) {
         <div className="min-w-0 flex-1 space-y-1.5">
           <h1 className="font-display text-xl font-bold leading-tight sm:text-2xl">{empresa.nome_fantasia}</h1>
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-            <span className="inline-flex items-center gap-1"><Star className="h-3.5 w-3.5 fill-warning text-warning" aria-hidden /> 4,9</span>
             {empresa.endereco && (
-              <span className="inline-flex min-w-0 items-center gap-1"><MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden /><span className="truncate">{empresa.endereco}</span></span>
+              googleMapsDirectionsUrl(empresa.endereco) ? (
+                <a
+                  className="inline-flex min-w-0 items-center gap-1 text-primary underline-offset-2 hover:underline focus-visible:underline"
+                  href={googleMapsDirectionsUrl(empresa.endereco)!}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  aria-label={`Como chegar a ${empresa.nome_fantasia} pelo Google Maps`}
+                >
+                  <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                  <span className="truncate">{empresa.endereco}</span>
+                  <span className="shrink-0">· Como chegar</span>
+                </a>
+              ) : (
+                <span className="inline-flex min-w-0 items-center gap-1"><MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden /><span className="truncate">{empresa.endereco}</span></span>
+              )
             )}
             {empresa.horario_funcionamento && (
               <span className="inline-flex items-center gap-1"><Clock className="h-3.5 w-3.5" aria-hidden />{empresa.horario_funcionamento}</span>
@@ -458,6 +471,13 @@ function SentScreen({ empresa, servico, dataSel, hora, onReset }: { empresa: any
               <p className="font-semibold">{servico.nome}</p>
               <p className="text-xs text-muted-foreground">{dateBr(dataSel)} às {hora} · {brl(Number(servico.preco_padrao ?? 0))}</p>
             </div>
+          )}
+          {googleMapsDirectionsUrl(empresa.endereco) && (
+            <Button asChild variant="outline" className="w-full">
+              <a href={googleMapsDirectionsUrl(empresa.endereco)!} target="_blank" rel="noopener noreferrer">
+                <MapPin className="mr-2 h-4 w-4" />Como chegar · Google Maps
+              </a>
+            </Button>
           )}
           <div className="grid gap-2 sm:grid-cols-2">
             {whats && (
