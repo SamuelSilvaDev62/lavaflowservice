@@ -4009,7 +4009,6 @@ export const getEmpresaPublica = createServerFn({ method: "GET" })
       evento: "visualizacao",
       metadata: { origem: "pagina_publica" },
     } as any);
-    return {
     const { data: bookingBranding, error: brandingError } = await supabaseAdmin
       .from("booking_branding" as any)
       .select("primary_color, secondary_color, cover_url, logo_url, tagline")
@@ -4018,6 +4017,7 @@ export const getEmpresaPublica = createServerFn({ method: "GET" })
     // Old establishments keep the default theme if they have no row.
     // Query errors are logged and do not block public booking.
     if (brandingError) console.error("[booking-branding] leitura pública falhou", brandingError.code);
+    return {
       empresa,
       branding: safeBookingBranding(bookingBranding as any),
       servicos: servicos ?? [],
