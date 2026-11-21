@@ -42,7 +42,7 @@ export function GrowthEngineCard({ agendaOpportunity }: { agendaOpportunity?: Ag
     onError: (e: any) => toast.error(e?.message ?? "Não foi possível ativar o teste"),
   });
 
-  if (isLoading) return <div className="mt-4 h-32 rounded-2xl skeleton-shimmer" />;
+  if (isLoading) return <div className="h-32 rounded-3xl skeleton-shimmer" />;
   if (!data) return null;
 
   const growthAtivo = data.tier === "growth";
@@ -54,11 +54,11 @@ export function GrowthEngineCard({ agendaOpportunity }: { agendaOpportunity?: Ag
   // Growth ativo: card operacional direto para as oportunidades.
   if (growthAtivo) {
     return (
-      <Card className="mt-4">
-        <CardContent className="p-4">
+      <Card className="border border-border/60 shadow-sm">
+        <CardContent className="p-5 sm:p-6">
           <div className="mb-3 flex flex-wrap items-center gap-2">
             <TrendingUp className="h-4 w-4 text-primary" />
-            <h2 className="font-display font-semibold">Oportunidades de crescimento</h2>
+            <h2 className="font-display text-lg font-bold">Oportunidades de crescimento</h2>
             {data.isTrial && data.trialDiasRestantes !== null && (
               <Badge variant="secondary" className="text-[10px] font-normal">
                 Teste Growth · {data.trialDiasRestantes}{" "}
@@ -118,7 +118,7 @@ export function GrowthEngineCard({ agendaOpportunity }: { agendaOpportunity?: Ag
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-3 gap-2">
+              <div className="grid grid-cols-3 gap-2.5">
                 <Metric label="Retorno" value={op.candidatosRetorno} />
                 <Metric label="Recorrência" value={op.candidatosAssinatura} />
                 <Metric label="Categorias" value={op.categorias.length} />
@@ -153,11 +153,11 @@ export function GrowthEngineCard({ agendaOpportunity }: { agendaOpportunity?: Ag
   // Free ainda sem histórico: sem promessa, só orientação honesta.
   if (!data.growthReady) {
     return (
-      <Card className="mt-4">
-        <CardContent className="p-4">
+      <Card className="border border-border/60 shadow-sm">
+        <CardContent className="p-5 sm:p-6">
           <div className="mb-2 flex items-center gap-2">
             <Users className="h-4 w-4 text-primary" />
-            <h2 className="font-display font-semibold">Seu LavaFlow está aprendendo</h2>
+            <h2 className="font-display text-lg font-bold">Seu LavaFlow está aprendendo</h2>
           </div>
           <p className="text-sm text-muted-foreground">
             Continue registrando clientes e ordens de serviço. Assim que houver histórico suficiente,
@@ -170,17 +170,17 @@ export function GrowthEngineCard({ agendaOpportunity }: { agendaOpportunity?: Ag
 
   // Free com histórico: convite contextual com números reais agregados.
   return (
-    <Card className="mt-4 border-primary/40">
-      <CardContent className="p-4">
+    <Card className="overflow-hidden border border-primary/20 bg-gradient-to-br from-primary/[0.04] via-card to-card shadow-sm">
+      <CardContent className="p-5 sm:p-6">
         <div className="mb-3 flex flex-wrap items-center gap-2">
           <Sparkles className="h-4 w-4 text-primary" />
-          <h2 className="font-display font-semibold">Encontramos oportunidades na sua operação</h2>
+          <h2 className="font-display text-lg font-bold">Oportunidades identificadas na operação</h2>
           <Badge variant="secondary" className="gap-1 text-[10px]">
             <Lock className="h-3 w-3" /> Growth
           </Badge>
         </div>
 
-        <div className="grid grid-cols-3 gap-2">
+        <div className="grid grid-cols-3 gap-2.5">
           <Metric label="Podem voltar" value={op.candidatosRetorno} />
           <Metric label="Perfil de plano" value={op.candidatosAssinatura} />
           <Metric label="Frentes de ação" value={op.categorias.length} />
@@ -218,8 +218,8 @@ export function GrowthEngineCard({ agendaOpportunity }: { agendaOpportunity?: Ag
 
 function Metric({ label, value }: { label: string; value: number }) {
   return (
-    <div className="rounded-2xl border bg-card p-3 text-center">
-      <p className="font-display text-2xl font-bold tabular-nums text-primary">{value}</p>
+    <div className="min-w-0 rounded-2xl border border-border/60 bg-card/90 p-3.5 text-center shadow-sm">
+      <p className="font-display text-2xl font-bold tracking-tight tabular-nums text-primary">{value}</p>
       <p className="mt-0.5 text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
     </div>
   );
