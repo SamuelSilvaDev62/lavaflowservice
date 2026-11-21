@@ -23,6 +23,8 @@ import { RequireRole } from "@/components/require-role";
 import { ImageUploadField } from "@/components/image-upload-field";
 import { ADMINS } from "@/lib/rbac";
 import { AssinaturaTab } from "@/components/configuracoes/assinatura-tab";
+import { googleMapsDirectionsUrl } from "@/lib/business-location";
+import { Building2, Pencil, MapPin, Phone, MessageCircle, Mail, Clock3, Instagram, ExternalLink, Copy, CheckCircle2, AlertCircle, Link2, ArrowLeft, Globe, ShieldCheck } from "lucide-react";
 
 export const Route = createFileRoute("/_authenticated/configuracoes")({
   component: () => <RequireRole roles={ADMINS}><Page /></RequireRole>,
@@ -270,33 +272,235 @@ function MembrosTab() {
 }
 
 
+type BusinessProfileForm = {
+  nome_fantasia: string;
+  telefone: string;
+  whatsapp: string;
+  email: string;
+  endereco: string;
+  horario_funcionamento: string;
+  instagram: string;
+};
+
+const PROFILE_FIELDS: (keyof BusinessProfileForm)[] = [
+  "nome_fantasia", "telefone", "whatsapp", "email", "endereco", "horario_funcionamento", "instagram",
+];
+
+function profileFromEmpresa(empresa: any): BusinessProfileForm {
+  return {
+    nome_fantasia: empresa?.nome_fantasia ?? "",
+    telefone: empresa?.telefone ?? "",
+    whatsapp: empresa?.whatsapp ?? "",
+    email: empresa?.email ?? "",
+    endereco: empresa?.endereco ?? "",
+    horario_funcionamento: empresa?.horario_funcionamento ?? "",
+    instagram: empresa?.instagram ?? "",
+  };
+}
+
+function ProfileItem({ icon: Icon, label, value, href }: {
+  icon: any;
+  label: string;
+  value: string | null | undefined;
+  href?: string | null;
+}) {
+  const content = value?.trim() || "Não informado";
+  return (
+    <div className="flex min-w-0 items-start gap-3 py-3">
+      <span className="grid h-10 w-10 shrink-0 place-content-center rounded-xl bg-primary/10 text-primary">
+        <Icon className="h-4.5 w-4.5" aria-hidden />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-xs font-medium text-muted-foreground">{label}</p>
+        {href && value ? (
+          <a href={href} target="_blank" rel="noopener noreferrer" className="mt-0.5 inline-flex max-w-full items-center gap-1 break-words text-sm font-medium text-primary hover:underline">
+            {content} <ExternalLink className="h-3.5 w-3.5 shrink-0" aria-hidden />
+          </a>
+        ) : (
+          <p className={value ? "mt-0.5 break-words text-sm font-medium" : "mt-0.5 text-sm text-muted-foreground"}>
+            {content}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function EmpresaTab() {
   const fn = useServerFn(getEmpresa);
   const up = useServerFn(updateEmpresa);
   const qc = useQueryClient();
-  const { data } = useQuery({ queryKey: ["empresa"], queryFn: () => fn() });
-  const [f, setF] = useState<any>({ nome_fantasia: "" });
-  useEffect(() => { if (data?.empresa) setF(data.empresa); }, [data?.empresa]);
+  const { data, isLoading, isError, refetch } = useQuery({ queryKey: ["empresa"], queryFn: () => fn() });
+  const [editing, setEditing] = useState(false);
+  const [f, setF] = useState<BusinessProfileForm>(profileFromEmpresa(null));
+
+  const saved = profileFromEmpresa(data?.empresa);
+  const dirty = PROFILE_FIELDS.some((key) => f[key] !== saved[key]);
+  useEffect(() => {
+    if (!editing && data?.empresa) setF(profileFromEmpresa(data.empresa));
+  }, [data?.empresa, editing]);
 
   const mut = useMutation({
-    mutationFn: () => up({ data: f }),
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["empresa"] }); toast.success("Salvo"); },
-    onError: (e: any) => toast.error(e?.message ?? "Erro"),
+    mutationFn: () => up({ data: {
+      nome_fantasia: f.nome_fantasia.trim(),
+      telefone: f.telefone.trim() || null,
+      whatsapp: f.whatsapp.trim() || null,
+      email: f.email.trim() || null,
+      endereco: f.endereco.trim() || null,
+      horario_funcionamento: f.horario_funcionamento.trim() || null,
+      instagram: f.instagram.trim() || null,
+    } }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["empresa"] });
+      setEditing(false);
+      toast.success("Informações do estabelecimento atualizadas.");
+    },
+    onError: (e: any) => toast.error(e?.message ?? "Não foi possível salvar suas alterações."),
   });
 
+  const empresa = data?.empresa;
+  const slug = empresa?.slug;
+  const publicPath = slug ? "/agendar/" + encodeURIComponent(slug) : null;
+  const mapUrl = googleMapsDirectionsUrl(empresa?.endereco);
+  const instagramHandle = String(empresa?.instagram ?? "").replace(/^@/, "").trim();
+  const instagramUrl = /^[A-Za-z0-9._]{1,30}$/.test(instagramHandle)
+    ? "https://instagram.com/" + instagramHandle : null;
+  const whatsappDigits = String(empresa?.whatsapp ?? "").replace(/\D/g, "");
+  const whatsappUrl = whatsappDigits.length >= 10 && whatsappDigits.length <= 15
+    ? "https://wa.me/" + whatsappDigits : null;
+  const completeCount = PROFILE_FIELDS.filter((key) => saved[key]?.trim()).length;
+  const missing = PROFILE_FIELDS.filter((key) => !saved[key]?.trim());
+  const displayName = empresa?.nome_fantasia || "Meu estabelecimento";
+
+  async function copyPublicLink() {
+    if (!publicPath || typeof window === "undefined") return;
+    try {
+      await navigator.clipboard.writeText(new URL(publicPath, window.location.origin).href);
+      toast.success("Link de agendamento copiado.");
+    } catch {
+      toast.error("Não foi possível copiar. Abra a página e copie o endereço.");
+    }
+  }
+  function cancelEditing() {
+    setF(profileFromEmpresa(empresa));
+    setEditing(false);
+  }
+
+  if (isLoading) return <Card><CardContent className="space-y-4 p-5"><div className="h-20 animate-pulse rounded-2xl bg-muted" /><div className="h-44 animate-pulse rounded-2xl bg-muted" /></CardContent></Card>;
+  if (isError) return <Card><CardContent className="space-y-3 p-5"><p>Não foi possível carregar o perfil do estabelecimento.</p><Button variant="outline" onClick={() => refetch()}>Tentar novamente</Button></CardContent></Card>;
+
+  if (editing) {
+    return (
+      <Card className="overflow-hidden">
+        <CardContent className="space-y-5 p-4 sm:p-6">
+          <div className="flex items-start gap-3">
+            <Button type="button" size="icon" variant="outline" aria-label="Cancelar edição" onClick={cancelEditing} disabled={mut.isPending}>
+              <ArrowLeft className="h-4 w-4" />
+            </Button>
+            <div className="min-w-0 flex-1">
+              <h2 className="font-display text-xl font-semibold">Editar estabelecimento</h2>
+              <p className="text-sm text-muted-foreground">Altere os dados e confira antes de salvar.</p>
+            </div>
+          </div>
+          <form onSubmit={(e) => { e.preventDefault(); if (dirty) mut.mutate(); }} className="space-y-5">
+            <section className="space-y-3">
+              <h3 className="text-sm font-semibold">Informações principais</h3>
+              <div className="space-y-1.5"><Label htmlFor="empresa-nome">Nome do estabelecimento</Label><Input id="empresa-nome" required maxLength={120} value={f.nome_fantasia} onChange={(e) => setF({ ...f, nome_fantasia: e.target.value })} /></div>
+            </section>
+            <section className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold">Contato</h3>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5"><Label htmlFor="empresa-telefone">Telefone</Label><Input id="empresa-telefone" type="tel" maxLength={20} value={f.telefone} onChange={(e) => setF({ ...f, telefone: e.target.value })} /></div>
+                <div className="space-y-1.5"><Label htmlFor="empresa-whatsapp">WhatsApp</Label><Input id="empresa-whatsapp" type="tel" maxLength={20} value={f.whatsapp} onChange={(e) => setF({ ...f, whatsapp: e.target.value })} /></div>
+              </div>
+              <div className="space-y-1.5"><Label htmlFor="empresa-email">E-mail</Label><Input id="empresa-email" type="email" maxLength={120} value={f.email} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
+            </section>
+            <section className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold">Localização e atendimento</h3>
+              <div className="space-y-1.5"><Label htmlFor="empresa-endereco">Endereço</Label><Input id="empresa-endereco" maxLength={200} placeholder="Rua, número, bairro, cidade e estado" value={f.endereco} onChange={(e) => setF({ ...f, endereco: e.target.value })} /><p className="text-xs text-muted-foreground">Este endereço aparece na página pública e nas novas mensagens de confirmação.</p></div>
+              <div className="space-y-1.5"><Label htmlFor="empresa-horario">Horário de funcionamento</Label><Input id="empresa-horario" maxLength={120} placeholder="Seg a Sex, 08h às 18h" value={f.horario_funcionamento} onChange={(e) => setF({ ...f, horario_funcionamento: e.target.value })} /></div>
+            </section>
+            <section className="space-y-3 border-t pt-4">
+              <h3 className="text-sm font-semibold">Presença digital</h3>
+              <div className="space-y-1.5"><Label htmlFor="empresa-instagram">Instagram</Label><Input id="empresa-instagram" maxLength={80} placeholder="@seunegocio" value={f.instagram} onChange={(e) => setF({ ...f, instagram: e.target.value })} /></div>
+            </section>
+            <div className="sticky bottom-16 z-20 -mx-4 flex gap-2 border-t bg-card/95 px-4 py-3 backdrop-blur-xl sm:static sm:mx-0 sm:justify-end sm:border-0 sm:px-0 lg:bottom-0">
+              <Button type="button" variant="outline" className="flex-1 sm:flex-none" onClick={cancelEditing} disabled={mut.isPending}>Cancelar</Button>
+              <Button type="submit" className="flex-1 sm:flex-none" disabled={mut.isPending || !dirty || !f.nome_fantasia.trim()}>{mut.isPending ? "Salvando..." : "Salvar alterações"}</Button>
+            </div>
+          </form>
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
-    <Card><CardContent className="p-5 space-y-3">
-      <div><Label>Nome fantasia</Label><Input value={f.nome_fantasia ?? ""} onChange={(e) => setF({ ...f, nome_fantasia: e.target.value })} /></div>
-      <div className="grid sm:grid-cols-2 gap-3">
-        <div><Label>Telefone</Label><Input value={f.telefone ?? ""} onChange={(e) => setF({ ...f, telefone: e.target.value })} /></div>
-        <div><Label>WhatsApp</Label><Input value={f.whatsapp ?? ""} onChange={(e) => setF({ ...f, whatsapp: e.target.value })} /></div>
+    <div className="space-y-4">
+      <Card className="overflow-hidden">
+        <div className="h-16 bg-gradient-to-r from-primary/20 via-primary/10 to-background" />
+        <CardContent className="-mt-7 space-y-4 px-4 pb-5 sm:px-6">
+          <div className="flex items-end justify-between gap-3">
+            <div className="grid h-16 w-16 shrink-0 place-content-center overflow-hidden rounded-2xl border-4 border-card bg-primary text-primary-foreground shadow-md">
+              {empresa?.logo_url ? <img src={empresa.logo_url} alt="" className="h-full w-full object-cover" /> : <Building2 className="h-7 w-7" aria-hidden />}
+            </div>
+            <Badge variant="secondary" className="mb-1 gap-1"><ShieldCheck className="h-3.5 w-3.5" /> Perfil do negócio</Badge>
+          </div>
+          <div>
+            <h2 className="break-words font-display text-2xl font-bold tracking-tight">{displayName}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Gerencie sua presença e informações comerciais em um só lugar.</p>
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+            <Button type="button" className="col-span-2 gap-2 sm:col-span-1" onClick={() => setEditing(true)}><Pencil className="h-4 w-4" /> Editar informações</Button>
+            <Button asChild variant="outline" disabled={!publicPath} className="gap-2">
+              {publicPath ? <a href={publicPath} target="_blank" rel="noopener noreferrer"><ExternalLink className="h-4 w-4" /> Ver agendamento</a> : <span><ExternalLink className="h-4 w-4" /> Sem link</span>}
+            </Button>
+            <Button variant="outline" disabled={!publicPath} onClick={copyPublicLink} className="gap-2"><Copy className="h-4 w-4" /> Copiar link</Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {missing.length > 0 && (
+        <Card className="border-amber-500/25 bg-amber-500/5">
+          <CardContent className="flex items-start gap-3 p-4">
+            <AlertCircle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden />
+            <div className="min-w-0 flex-1 space-y-1">
+              <p className="text-sm font-semibold">Complete seu perfil — {completeCount} de {PROFILE_FIELDS.length} informações</p>
+              <p className="text-xs text-muted-foreground">Informações ausentes: {missing.map((key) => ({
+                nome_fantasia: "nome", telefone: "telefone", whatsapp: "WhatsApp", email: "e-mail", endereco: "endereço", horario_funcionamento: "horário", instagram: "Instagram",
+              })[key]).join(", ")}.</p>
+            </div>
+            <Button size="sm" variant="outline" onClick={() => setEditing(true)}>Completar</Button>
+          </CardContent>
+        </Card>
+      )}
+
+      <div className="grid items-start gap-4 lg:grid-cols-2">
+        <Card><CardContent className="p-4 sm:p-5">
+          <h3 className="mb-1 flex items-center gap-2 font-display text-base font-semibold"><Phone className="h-4 w-4 text-primary" /> Contato</h3>
+          <div className="divide-y">
+            <ProfileItem icon={Phone} label="Telefone" value={empresa?.telefone} />
+            <ProfileItem icon={MessageCircle} label="WhatsApp" value={empresa?.whatsapp} href={whatsappUrl} />
+            <ProfileItem icon={Mail} label="E-mail" value={empresa?.email} href={empresa?.email ? "mailto:" + encodeURIComponent(empresa.email) : null} />
+          </div>
+        </CardContent></Card>
+        <Card><CardContent className="p-4 sm:p-5">
+          <h3 className="mb-1 flex items-center gap-2 font-display text-base font-semibold"><MapPin className="h-4 w-4 text-primary" /> Localização e horário</h3>
+          <div className="divide-y">
+            <ProfileItem icon={MapPin} label="Endereço" value={empresa?.endereco} href={mapUrl} />
+            <ProfileItem icon={Clock3} label="Funcionamento" value={empresa?.horario_funcionamento} />
+          </div>
+          {mapUrl && <Button asChild variant="outline" size="sm" className="mt-3 gap-2"><a href={mapUrl} target="_blank" rel="noopener noreferrer"><MapPin className="h-4 w-4" /> Abrir no Google Maps</a></Button>}
+        </CardContent></Card>
+        <Card><CardContent className="p-4 sm:p-5">
+          <h3 className="mb-1 flex items-center gap-2 font-display text-base font-semibold"><Globe className="h-4 w-4 text-primary" /> Presença digital</h3>
+          <div className="divide-y">
+            <ProfileItem icon={Instagram} label="Instagram" value={empresa?.instagram} href={instagramUrl} />
+            <ProfileItem icon={Link2} label="Agendamento público" value={publicPath ? "Página de reservas disponível" : null} href={publicPath} />
+          </div>
+          {publicPath ? <p className="mt-2 flex items-center gap-1.5 text-xs text-emerald-700"><CheckCircle2 className="h-4 w-4" /> Link configurado para compartilhamento</p> : <p className="mt-2 text-xs text-muted-foreground">Configure um link público para receber reservas online.</p>}
+        </CardContent></Card>
       </div>
-      <div><Label>Email</Label><Input type="email" value={f.email ?? ""} onChange={(e) => setF({ ...f, email: e.target.value })} /></div>
-      <div><Label>Endereço</Label><Input value={f.endereco ?? ""} onChange={(e) => setF({ ...f, endereco: e.target.value })} /></div>
-      <div><Label>Horário</Label><Input value={f.horario_funcionamento ?? ""} onChange={(e) => setF({ ...f, horario_funcionamento: e.target.value })} /></div>
-      <div><Label>Instagram</Label><Input value={f.instagram ?? ""} onChange={(e) => setF({ ...f, instagram: e.target.value })} /></div>
-      <Button onClick={() => mut.mutate()} disabled={mut.isPending}>Salvar</Button>
-    </CardContent></Card>
+    </div>
   );
 }
 
