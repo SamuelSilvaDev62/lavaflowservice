@@ -12,7 +12,8 @@ type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "col
 
 /** Resolve o tenant (owner_id) e o papel do usuário autenticado. */
 export async function resolveOwnerScope(supabase: any, userId: string) {
-  const { data } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
+  const { data, error: rolesError } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
+  if (rolesError) throw new Error("Não foi possível verificar as permissões desta conta.");
   const priority: Record<TenantRole, number> = {
     owner: 1, admin: 2, gerente: 3, atendente: 4, lavador: 5, colaborador: 5,
   };
@@ -24,7 +25,8 @@ export async function resolveOwnerScope(supabase: any, userId: string) {
     return String(a.created_at ?? "").localeCompare(String(b.created_at ?? ""));
   });
   const current = selfOwner ?? sorted[0];
-  return { ownerId: current?.owner_id ?? userId, role: (current?.role ?? "owner") as TenantRole };
+  if (!current) throw new Error("Acesso negado: usuário sem vínculo com estabelecimento.");
+  return { ownerId: current.owner_id, role: current.role };
 }
 
 export async function fetchEntitlement(supabase: any, ownerId: string): Promise<Entitlement> {

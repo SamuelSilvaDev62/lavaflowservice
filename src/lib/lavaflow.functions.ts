@@ -5,6 +5,7 @@ import { safeBookingBranding } from "@/lib/booking-branding";
 import { appointmentForecast, countOperationStages } from "@/lib/dashboard-metrics";
 import { bookingPhoneLookupSuffix, isSameBookingPhone, normalizeBookingPhone } from "@/lib/booking-customer-phone";
 import { orderPeriodStart, selectOrderPage, summarizeOrders, type OrderIndex } from "@/lib/ordens-model";
+import { canAdvanceWorkOrder } from "@/lib/os-transitions";
 
 // ============ DASHBOARD METRICS ============
 type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
@@ -1127,7 +1128,22 @@ export const updateOrdemStatus = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid(), status: z.enum(["aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"]) }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { ownerId } = await getOwnerScope(supabase, userId);
+    const { ownerId, role } = await getOwnerScope(supabase, userId);
+    assertTenantRole(role, [...GESTAO_ROLES, "atendente"]);
+    // Explicit, monotonic work-order lifecycle. The update uses compare-and-swap
+    // to prevent two operators from both triggering side effects for one OS.
+    const { data: current, error: readError } = await supabase
+      .from("ordens_servico")
+      .select("status")
+      .eq("id", data.id)
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!current) throw new Error("Ordem de serviço não encontrada.");
+    if (current.status === data.status) return { ok: true };
+    if (!canAdvanceWorkOrder(current.status, data.status)) {
+      throw new Error("Não é permitido retroceder uma OS ou reabrir um atendimento entregue.");
+    }
     const patch: any = { status: data.status };
     if (data.status === "em_lavagem") {
       await assertPodeIniciarLavagem(supabase, ownerId, data.id);
@@ -1135,8 +1151,11 @@ export const updateOrdemStatus = createServerFn({ method: "POST" })
     }
     if (data.status === "pronto") patch.finalizado_em = new Date().toISOString();
     if (data.status === "entregue") patch.entregue_em = new Date().toISOString();
-    const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", ownerId);
+    const { data: updated, error } = await supabase.from("ordens_servico")
+      .update(patch).eq("id", data.id).eq("owner_id", ownerId)
+      .eq("status", current.status).select("id").maybeSingle();
     if (error) throw error;
+    if (!updated) throw new Error("Esta OS foi alterada em outra sessão. Atualize a tela.");
     if (data.status === "entregue") {
       const { data: ordem } = await supabase
         .from("ordens_servico")
@@ -2508,7 +2527,8 @@ async function getOwnerScope(
   userId: string,
   opts?: { skipSubscription?: boolean },
 ) {
-  const { data } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
+  const { data, error: rolesError } = await supabase.from("user_roles").select("owner_id, role, created_at").eq("user_id", userId);
+  if (rolesError) throw new Error("Não foi possível verificar as permissões desta conta.");
   const priority: Record<TenantRole, number> = {
     owner: 1,
     admin: 2,
@@ -2529,7 +2549,8 @@ async function getOwnerScope(
       return String(a.owner_id).localeCompare(String(b.owner_id));
     });
   const current = selfOwner ?? sorted[0];
-  const ownerId = current?.owner_id ?? userId;
+  if (!current) throw new Error("Acesso negado: usuário sem vínculo com estabelecimento.");
+  const ownerId = current.owner_id;
 
   // Free organiza: a operação núcleo NUNCA depende de assinatura.
   // Recursos Growth continuam protegidos por assertPlanFeature/assertFeature.
@@ -2537,7 +2558,7 @@ async function getOwnerScope(
 
   return {
     ownerId,
-    role: current?.role ?? "owner",
+    role: current.role,
   };
 }
 
@@ -4084,74 +4105,26 @@ export const getEmpresaPublica = createServerFn({ method: "GET" })
     };
   });
 
+/** Public history lookup is disabled until a verified OTP/magic-link flow is implemented.
+ * A phone number, even combined with a business slug, does not prove identity.
+ * Keep the response shape so the public client can show a verification-required state.
+ * Never fetch customer records with service_role from unverified input.
+ */
 export const getClientePublico = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     slug: z.string().min(1).max(80),
     telefone: z.string().min(8).max(20),
   }).parse(d))
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data: emp } = await supabaseAdmin.rpc("get_empresa_by_slug", { _slug: data.slug });
-    const empresa = (emp ?? [])[0];
-    if (!empresa) throw new Error("Empresa nao encontrada");
-    const owner_id = empresa.owner_id;
-    const digits = data.telefone.replace(/\D/g, "");
-
-    const { data: clientes } = await supabaseAdmin
-      .from("clientes")
-      .select("id, nome, telefone, whatsapp, pontos_saldo")
-      .eq("owner_id", owner_id)
-      .or(`telefone.ilike.%${digits}%,whatsapp.ilike.%${digits}%`)
-      .limit(5);
-
-    const cliente = (clientes ?? []).find((row: any) => {
-      const tel = String(row.telefone ?? row.whatsapp ?? "").replace(/\D/g, "");
-      return tel.endsWith(digits.slice(-8));
-    }) ?? clientes?.[0];
-
-    if (!cliente) return { cliente: null, agendamentos: [], historico: [], veiculos: [], recompensas: [], resgates: [], avaliacoes: [] };
-
-    const [{ data: agendamentos }, { data: historico }, { data: veiculos }, { data: recompensas }, { data: movimentos }] = await Promise.all([
-      supabaseAdmin.from("agendamentos")
-        .select("id, data_agendada, hora_agendada, status, servicos:servico_id(nome)")
-        .eq("owner_id", owner_id).eq("cliente_id", cliente.id)
-        .gte("data_agendada", localDateIso())
-        .order("data_agendada", { ascending: true })
-        .order("hora_agendada", { ascending: true })
-        .limit(5),
-      supabaseAdmin.from("ordens_servico")
-        .select("id, valor, status, created_at, servicos:servico_id(nome)")
-        .eq("owner_id", owner_id).eq("cliente_id", cliente.id)
-        .order("created_at", { ascending: false })
-        .limit(5),
-      supabaseAdmin.from("veiculos")
-        .select("id, placa, marca, modelo, cor, vehicle_year")
-        .eq("owner_id", owner_id).eq("cliente_id", cliente.id)
-        .limit(5),
-      supabaseAdmin.from("recompensas")
-        .select("id, nome, custo_pontos, ativo")
-        .eq("owner_id", owner_id).eq("ativo", true)
-        .order("custo_pontos"),
-      supabaseAdmin.from("pontos_movimentos")
-        .select("id, pontos, tipo, criado_em")
-        .eq("owner_id", owner_id).eq("cliente_id", cliente.id)
-        .order("criado_em", { ascending: false })
-        .limit(5),
-    ]);
-
-    const totalServicos = historico?.length ?? 0;
-    const economiaEstimada = Math.round(Number(cliente.pontos_saldo ?? 0) * 0.5);
-
-    return {
-      cliente: { ...cliente, total_servicos: totalServicos, economia_estimada: economiaEstimada },
-      agendamentos: agendamentos ?? [],
-      historico: historico ?? [],
-      veiculos: veiculos ?? [],
-      recompensas: recompensas ?? [],
-      resgates: (movimentos ?? []).filter((m: any) => m.tipo === "debito"),
-      avaliacoes: [],
-    };
-  });
+  .handler(async () => ({
+    cliente: null,
+    agendamentos: [],
+    historico: [],
+    veiculos: [],
+    recompensas: [],
+    resgates: [],
+    avaliacoes: [],
+    verification_required: true,
+  }));
 
 export const getHorariosDisponiveis = createServerFn({ method: "GET" })
   .inputValidator((d: { slug: string; data: string; tz?: string }) => z.object({

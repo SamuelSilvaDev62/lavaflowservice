@@ -12,8 +12,9 @@ import { getFila, updateOrdemStatus, logWhatsappEnvio, getWhatsappLogs, getDados
 import { brl, dateTimeBr } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import { buildReadyVehicleMessage, getFidelidadeTemplates } from "@/lib/fidelidade-messages";
+import { canAdvanceWorkOrder } from "@/lib/os-transitions";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, PointerSensor, useSensor, useSensors, TouchSensor } from "@dnd-kit/core";
-import { MessageCircle, Check, Send, Phone, ChevronRight, ChevronLeft, X, Filter, ArrowUpRight } from "lucide-react";
+import { MessageCircle, Check, Send, Phone, ChevronRight, X, Filter, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 
 const filaSearchSchema = z.object({
@@ -46,6 +47,14 @@ async function disparaWhatsappPronto(
     toast.warning(`${nome} sem telefone — envio manual necessário.`);
     return;
   }
+  // Abrir a aba imediatamente pelo clique do usuário evita bloqueio de pop-up.
+  // Não fazemos abertura automática após a mutation nem afirmamos que houve envio.
+  const win = window.open("about:blank", "_blank");
+  if (!win) {
+    toast.error("Habilite pop-ups ou use o link do WhatsApp para abrir a mensagem.");
+    return;
+  }
+  win.opener = null;
   let msg = `Olá ${nome.split(" ")[0]}! Seu veículo ${placa} está pronto para retirada. 🚗`;
   let cenario = "padrao";
   try {
@@ -62,23 +71,22 @@ async function disparaWhatsappPronto(
   } catch (err) {
     console.warn("Falha ao gerar mensagem de fidelidade, usando fallback", err);
   }
-  const win = window.open(waLink(tel, msg), "_blank", "noopener");
-  if (!win) {
-    toast.error("Bloqueio de pop-up impediu o envio. Use o botão WhatsApp do card.");
+  try {
+    win.location.replace(waLink(tel, msg));
+  } catch {
+    win.close();
+    toast.error("Não foi possível abrir o WhatsApp.");
     return;
   }
-  logFn({ cliente_id, descricao: `OS pronta · ${placa || nome} · fidelidade:${cenario}` })
-    .then(() => toast.success(`WhatsApp aberto para ${nome.split(" ")[0]} ✓ registrado nos logs`))
-    .catch(() => toast.success(`WhatsApp aberto para ${nome.split(" ")[0]}`));
+  // Registro de abertura NÃO é uma confirmação de mensagem enviada.
+  logFn({ cliente_id, descricao: `WhatsApp aberto (envio não confirmado) · OS pronta · ${placa || nome} · fidelidade:${cenario}` })
+    .then(() => toast.info(`WhatsApp aberto para ${nome.split(" ")[0]}. Confirme o envio no aplicativo.`))
+    .catch(() => toast.info("WhatsApp aberto. Envio não confirmado."));
 }
 
 function nextStatus(s: OsStatus): OsStatus | null {
   const idx = columns.findIndex(c => c.key === s);
   return idx >= 0 && idx < columns.length - 1 ? columns[idx + 1].key : null;
-}
-function prevStatus(s: OsStatus): OsStatus | null {
-  const idx = columns.findIndex(c => c.key === s);
-  return idx > 0 ? columns[idx - 1].key : null;
 }
 
 function FilaPage() {
@@ -102,8 +110,7 @@ function FilaPage() {
       qc.invalidateQueries({ queryKey: ["fila"] });
       qc.invalidateQueries({ queryKey: ["wa-logs"] });
       if (vars.status === "pronto") {
-        const ordem = data?.ordens.find((o) => o.id === vars.id);
-        if (ordem) disparaWhatsappPronto(ordem, (p) => dadosFn({ data: p }), (p) => logFn({ data: p }));
+        toast.info("OS marcada como pronta. Abra o WhatsApp manualmente no card para avisar o cliente.");
       }
       setSelected(null);
     },
@@ -118,6 +125,10 @@ function FilaPage() {
     if (!status) return;
     const ordem = data?.ordens.find((o) => o.id === id);
     if (ordem?.status === status) return;
+    if (!ordem || !canAdvanceWorkOrder(ordem.status, status)) {
+      toast.warning("A OS só pode avançar. Para corrigir uma etapa anterior, procure a liderança.");
+      return;
+    }
     mut.mutate({ id, status });
   }
 
@@ -148,7 +159,7 @@ function FilaPage() {
         <p className="text-xs text-muted-foreground mb-3">Toque num card para mover de etapa.</p>
       </div>
       <div className="hidden sm:block">
-        <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', o WhatsApp dispara automaticamente." />
+        <PageHeader title="Fila de atendimento" subtitle="Arraste os cards para mudar de etapa. Ao marcar 'Pronto', abra o WhatsApp pelo card e confirme o envio." />
       </div>
 
       {colunaFoco && (
@@ -302,12 +313,6 @@ function FilaPage() {
                   <Button className="w-full h-12" onClick={() => mut.mutate({ id: selected.id, status: nextStatus(selected.status)! })}>
                     <Check className="h-4 w-4 mr-2" />
                     Avançar para {columns.find(c => c.key === nextStatus(selected.status))?.label}
-                  </Button>
-                )}
-                {prevStatus(selected.status) && (
-                  <Button variant="outline" className="w-full h-11" onClick={() => mut.mutate({ id: selected.id, status: prevStatus(selected.status)! })}>
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                    Voltar para {columns.find(c => c.key === prevStatus(selected.status))?.label}
                   </Button>
                 )}
                 {selected.clientes?.telefone && (

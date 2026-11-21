@@ -17,6 +17,7 @@ import { useFeature } from "@/hooks/use-entitlement";
 import { OPERACIONAL } from "@/lib/rbac";
 import { listOrdensPage, createOrdem, listClientes, listServicos, listFuncionarios, updateOrdemStatus, atualizarUpsellOportunidade, type OsStatus } from "@/lib/lavaflow.functions";
 import { DEFAULT_ORDER_FILTERS, ORDER_STATUS_LABELS, ORDER_PAGE_SIZE, type OrderFilters } from "@/lib/ordens-model";
+import { canAdvanceWorkOrder } from "@/lib/os-transitions";
 import { brl, dateTimeBr } from "@/lib/format";
 import { Plus, ClipboardList, Search, SlidersHorizontal, RotateCcw, ChevronDown, ChevronUp, ChevronLeft, ChevronRight, Eye, Car, UserRound, Clock3, CheckCheck, CircleDollarSign, ListChecks, LoaderCircle, AlertCircle } from "lucide-react";
 import { toast } from "sonner";
@@ -129,7 +130,7 @@ const OrderRow = memo(function OrderRow({ order: o, mode }: { order: Order; mode
     onError: (e) => toast.error(e.message || "Falha ao atualizar status"),
   });
   const status = o.status as OsStatus;
-  const control = <Select value={status} disabled={mut.isPending} onValueChange={(v) => mut.mutate(v as OsStatus)}><SelectTrigger aria-label={`Alterar status da OS ${o.id.slice(0, 8)}`} className={`h-11 min-w-0 rounded-full border-0 text-xs font-medium shadow-none ${statusTone[status]} [&>span]:truncate`}><SelectValue />{mut.isPending && <LoaderCircle className="h-3 w-3 animate-spin" />}</SelectTrigger><SelectContent>{STATUS_OPTIONS.map((s) => <SelectItem key={s} value={s}>{ORDER_STATUS_LABELS[s]}</SelectItem>)}</SelectContent></Select>;
+  const control = <Select value={status} disabled={mut.isPending} onValueChange={(v) => mut.mutate(v as OsStatus)}><SelectTrigger aria-label={`Alterar status da OS ${o.id.slice(0, 8)}`} className={`h-11 min-w-0 rounded-full border-0 text-xs font-medium shadow-none ${statusTone[status]} [&>span]:truncate`}><SelectValue />{mut.isPending && <LoaderCircle className="h-3 w-3 animate-spin" />}</SelectTrigger><SelectContent>{STATUS_OPTIONS.filter((s) => canAdvanceWorkOrder(status, s)).map((s) => <SelectItem key={s} value={s}>{ORDER_STATUS_LABELS[s]}</SelectItem>)}</SelectContent></Select>;
   const detailsId = `order-${mode}-${o.id}`;
   const toggle = <Button variant="ghost" size="icon" className="min-h-11 min-w-11 text-primary" title={expanded ? "Recolher detalhes" : "Ver detalhes"} aria-label={`${expanded ? "Recolher" : "Ver"} detalhes da OS ${o.id.slice(0, 8)}`} aria-expanded={expanded} aria-controls={detailsId} onClick={() => setExpanded(!expanded)}>{expanded ? <ChevronUp /> : <Eye />}</Button>;
   const identity = <><p className="break-words font-semibold">{o.clientes?.nome ?? "Cliente não informado"}</p><p className="mt-1 break-words text-xs text-muted-foreground">{o.servicos?.nome ?? "Sem serviço vinculado"}</p><p className="mt-1 font-mono text-[11px] text-muted-foreground">#{o.id.slice(0, 8)}</p></>;
