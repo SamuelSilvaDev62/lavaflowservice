@@ -403,7 +403,7 @@ function EmpresaTab() {
   function changeAddress(key: keyof BusinessAddress, value: string) {
     setAddress((current) => ({ ...current, [key]: key === "cep" ? formatCep(value) : key === "uf" ? value.toUpperCase().slice(0, 2) : value }));
     setAddressTouched(true);
-    if (key === "cep") cepRequestRef.current += 1;
+    if (key === "cep") { cepRequestRef.current += 1; setCepLoading(false); }
     setCepNotice("");
   }
   async function lookupCep() {
