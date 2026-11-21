@@ -12,8 +12,9 @@ import { getFila, updateOrdemStatus, logWhatsappEnvio, getWhatsappLogs, getDados
 import { brl, dateTimeBr } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import { buildReadyVehicleMessage, getFidelidadeTemplates } from "@/lib/fidelidade-messages";
+import { canAdvanceWorkOrder } from "@/lib/os-transitions";
 import { DndContext, useDraggable, useDroppable, type DragEndEvent, PointerSensor, useSensor, useSensors, TouchSensor } from "@dnd-kit/core";
-import { MessageCircle, Check, Send, Phone, ChevronRight, ChevronLeft, X, Filter, ArrowUpRight } from "lucide-react";
+import { MessageCircle, Check, Send, Phone, ChevronRight, X, Filter, ArrowUpRight } from "lucide-react";
 import { toast } from "sonner";
 
 const filaSearchSchema = z.object({
@@ -87,10 +88,6 @@ function nextStatus(s: OsStatus): OsStatus | null {
   const idx = columns.findIndex(c => c.key === s);
   return idx >= 0 && idx < columns.length - 1 ? columns[idx + 1].key : null;
 }
-function prevStatus(s: OsStatus): OsStatus | null {
-  const idx = columns.findIndex(c => c.key === s);
-  return idx > 0 ? columns[idx - 1].key : null;
-}
 
 function FilaPage() {
   const { etapa: etapaFoco } = Route.useSearch();
@@ -128,6 +125,10 @@ function FilaPage() {
     if (!status) return;
     const ordem = data?.ordens.find((o) => o.id === id);
     if (ordem?.status === status) return;
+    if (!ordem || !canAdvanceWorkOrder(ordem.status, status)) {
+      toast.warning("A OS só pode avançar. Para corrigir uma etapa anterior, procure a liderança.");
+      return;
+    }
     mut.mutate({ id, status });
   }
 
@@ -312,12 +313,6 @@ function FilaPage() {
                   <Button className="w-full h-12" onClick={() => mut.mutate({ id: selected.id, status: nextStatus(selected.status)! })}>
                     <Check className="h-4 w-4 mr-2" />
                     Avançar para {columns.find(c => c.key === nextStatus(selected.status))?.label}
-                  </Button>
-                )}
-                {prevStatus(selected.status) && (
-                  <Button variant="outline" className="w-full h-11" onClick={() => mut.mutate({ id: selected.id, status: prevStatus(selected.status)! })}>
-                    <ChevronLeft className="h-4 w-4 mr-2" />
-                    Voltar para {columns.find(c => c.key === prevStatus(selected.status))?.label}
                   </Button>
                 )}
                 {selected.clientes?.telefone && (
