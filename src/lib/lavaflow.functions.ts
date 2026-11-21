@@ -1720,7 +1720,7 @@ export const getClienteDetalhe = createServerFn({ method: "GET" })
       supabase.from("veiculos").select("*").eq("cliente_id", data.id).eq("owner_id", ownerId),
       supabase.from("ordens_servico").select("id, valor, status, created_at, servicos:servico_id(nome)").eq("cliente_id", data.id).eq("owner_id", ownerId).order("created_at", { ascending: false }),
       supabase.from("interacoes_clientes").select("*").eq("cliente_id", data.id).eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(30),
-      supabase.from("agendamentos").select("id, data_agendada, hora_agendada, status, observacoes, servicos:servico_id(nome)").eq("cliente_id", data.id).eq("owner_id", ownerId).order("data_agendada", { ascending: false }).order("hora_agendada", { ascending: false }).limit(20),
+      supabase.from("agendamentos").select("id, data_agendada, hora_agendada, status, origem, observacoes, servicos:servico_id(nome)").eq("cliente_id", data.id).eq("owner_id", ownerId).order("data_agendada", { ascending: false }).order("hora_agendada", { ascending: false }).limit(20),
     ]);
     const totalGasto = (ordens ?? []).reduce((s, o) => s + Number(o.valor ?? 0), 0);
     const visitas = (ordens ?? []).length;
