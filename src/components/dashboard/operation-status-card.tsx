@@ -37,12 +37,12 @@ export function OperationStatusCard({ counts }: { counts: OperationCounts }) {
 
         <div className="mt-5 grid grid-cols-2 gap-2.5">
           {STAGES.map(({ key, label, icon: Icon, tone, bg }) => (
-            <Link key={key} to="/fila" className="group rounded-2xl border border-border/60 bg-muted/20 p-3.5 transition-colors hover:border-primary/25 hover:bg-muted/40 focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
+            <Link key={key} to="/fila" search={{ etapa: key }} aria-label={`${label}: ${counts[key]} ordens. Abrir esta etapa na fila`} className="group rounded-2xl border border-border/60 bg-muted/20 p-3.5 transition-all hover:-translate-y-0.5 hover:border-primary/25 hover:bg-muted/40 hover:shadow-sm focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary">
               <div className="flex items-center justify-between">
                 <span className={`grid h-8 w-8 place-items-center rounded-xl ${bg} ${tone}`}><Icon className="h-4 w-4" /></span>
                 <span className="font-display text-[27px] font-bold tracking-tight tabular-nums">{Math.max(0, Number(counts[key]) || 0)}</span>
               </div>
-              <p className="mt-3 text-xs font-medium text-muted-foreground">{label}</p>
+              <p className="mt-3 flex items-center justify-between gap-2 text-xs font-medium text-muted-foreground">{label}<ArrowUpRight className="h-3.5 w-3.5 shrink-0 opacity-50 group-hover:text-primary group-hover:opacity-100" aria-hidden /></p>
             </Link>
           ))}
         </div>
