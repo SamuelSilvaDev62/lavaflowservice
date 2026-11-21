@@ -2,7 +2,6 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
-import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +17,7 @@ import {
 } from "@/lib/lavaflow.functions";
 import { brl, dateBr } from "@/lib/format";
 import {
-  Plus, Trophy, UsersRound, Car, DollarSign, Link2, Pencil, Wallet, Sliders, CheckCircle2, ExternalLink, ShieldCheck,
+  Plus, Trophy, UsersRound, Car, DollarSign, Link2, Pencil, Wallet, Sliders, CheckCircle2, ExternalLink, ShieldCheck, Search, Copy, CalendarDays, CreditCard, Filter,
 } from "lucide-react";
 import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
@@ -73,6 +72,8 @@ function Page() {
 
   const [periodo, setPeriodo] = useState<Periodo>("mes");
   const [custom, setCustom] = useState({ inicio: firstOfMonthIso(), fim: todayIso() });
+  const [busca, setBusca] = useState("");
+  const [filtro, setFiltro] = useState<"todos" | "pendentes" | "sem_comissao" | "inativos">("todos");
 
   const queryArgs = periodo === "custom"
     ? { periodo, inicio: custom.inicio, fim: custom.fim }
@@ -135,63 +136,75 @@ function Page() {
   const periodoFim = data?.periodo.fim ?? todayIso();
   const equipeSlug = data?.empresa?.slug;
   const equipeUrl = equipeSlug && typeof window !== "undefined" ? `${window.location.origin}/equipe/${equipeSlug}` : "";
+  const colaboradoresFiltrados = colaboradores.filter((c: any) => {
+    if (!String(c.nome ?? "").toLocaleLowerCase("pt-BR").includes(busca.trim().toLocaleLowerCase("pt-BR"))) return false;
+    if (filtro === "pendentes") return c.status === "a_receber" && Number(c.comissao_acumulada ?? 0) > 0;
+    if (filtro === "sem_comissao") return c.status === "sem_comissao";
+    if (filtro === "inativos") return !c.ativo;
+    return true;
+  });
+
+  async function copiarLink() {
+    if (!equipeUrl) return;
+    try { await navigator.clipboard.writeText(equipeUrl); toast.success("Link do portal copiado."); }
+    catch { toast.error("Não foi possível copiar o link."); }
+  }
 
   return (
     <>
-      <PageHeader
-        title="Equipe"
-        subtitle="Produtividade, comissões e pagamentos da sua equipe."
-        actions={<Button onClick={openNew}><Plus className="h-4 w-4 mr-1" />Novo</Button>}
-      />
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-primary">Gestão de pessoas</p>
+          <h1 className="font-display text-3xl font-bold tracking-tight">Equipe</h1>
+          <p className="mt-1 text-sm text-muted-foreground">Acompanhe produção, comissões e pagamentos com clareza.</p>
+        </div>
+        <Button className="w-full gap-2 sm:w-auto" onClick={openNew}><Plus className="h-4 w-4" /> Novo colaborador</Button>
+      </div>
 
-      {/* Filtro de período */}
-      <div className="mb-4 flex flex-col sm:flex-row sm:items-center gap-2">
-        <Tabs value={periodo} onValueChange={(v) => setPeriodo(v as Periodo)}>
-          <TabsList>
-            <TabsTrigger value="semana">Semana</TabsTrigger>
-            <TabsTrigger value="quinzena">15 dias</TabsTrigger>
-            <TabsTrigger value="mes">Mês</TabsTrigger>
-            <TabsTrigger value="custom">Personalizado</TabsTrigger>
-          </TabsList>
-        </Tabs>
-        {periodo === "custom" && (
-          <div className="flex gap-2">
-            <Input type="date" value={custom.inicio} onChange={(e) => setCustom({ ...custom, inicio: e.target.value })} className="h-9" />
-            <Input type="date" value={custom.fim} onChange={(e) => setCustom({ ...custom, fim: e.target.value })} className="h-9" />
+      <Card className="mb-4 border-border/70">
+        <CardContent className="flex flex-col gap-3 p-3 sm:p-4">
+          <div className="flex items-center gap-2 text-sm font-semibold"><CalendarDays className="h-4 w-4 text-primary" /> Período de análise</div>
+          <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
+            <Tabs value={periodo} onValueChange={(v) => setPeriodo(v as Periodo)}>
+              <TabsList className="grid h-auto w-full grid-cols-4 sm:w-auto">
+                <TabsTrigger className="px-2 text-xs sm:text-sm" value="semana">Semana</TabsTrigger>
+                <TabsTrigger className="px-2 text-xs sm:text-sm" value="quinzena">15 dias</TabsTrigger>
+                <TabsTrigger className="px-2 text-xs sm:text-sm" value="mes">Mês</TabsTrigger>
+                <TabsTrigger className="px-2 text-xs sm:text-sm" value="custom">Personalizado</TabsTrigger>
+              </TabsList>
+            </Tabs>
+            {periodo === "custom" && (
+              <div className="flex flex-wrap items-center gap-2">
+                <Input aria-label="Data inicial" type="date" value={custom.inicio} onChange={(e) => setCustom({ ...custom, inicio: e.target.value })} className="h-10 min-w-0 flex-1 sm:w-40" />
+                <span className="text-xs text-muted-foreground">até</span>
+                <Input aria-label="Data final" type="date" value={custom.fim} min={custom.inicio} onChange={(e) => setCustom({ ...custom, fim: e.target.value })} className="h-10 min-w-0 flex-1 sm:w-40" />
+              </div>
+            )}
+            <span className="text-xs text-muted-foreground lg:ml-auto">{dateBr(periodoInicio)} a {dateBr(periodoFim)}</span>
           </div>
-        )}
+        </CardContent>
+      </Card>
+
+      <div className="mb-5 grid grid-cols-2 gap-3 xl:grid-cols-4">
+        {canVerComissoes && <Kpi icon={Wallet} label="Comissões no período" value={isLoading ? "—" : brl(cards?.totalAPagar ?? 0)} tone="success" sub="Saldo de comissões a pagar" />}
+        <Kpi icon={Car} label="Lavagens realizadas" value={isLoading ? "—" : String(cards?.totalLavagens ?? 0)} sub="No período selecionado" />
+        <Kpi icon={UsersRound} label="Ativos hoje" value={isLoading ? "—" : String(cards?.ativosHoje ?? 0)} sub="Colaboradores em atividade" />
+        <Kpi icon={Trophy} label="Destaque do período" value={isLoading ? "—" : cards?.melhor?.nome ?? "—"} sub={cards?.melhor ? `${cards.melhor.lavagens} lavagens` : "Nenhum resultado registrado"} />
       </div>
 
-      {/* KPIs da equipe */}
-      <div className={`grid grid-cols-2 ${canVerComissoes ? "lg:grid-cols-4" : "lg:grid-cols-3"} gap-2 mb-6`}>
-        <Kpi icon={Wallet} label="Comissão a pagar" value={brl(cards?.totalAPagar ?? 0)} tone="success" />
-        <Kpi icon={Car} label="Lavagens no período" value={String(cards?.totalLavagens ?? 0)} />
-        <Kpi icon={UsersRound} label="Ativos hoje" value={String(cards?.ativosHoje ?? 0)} />
-        <Kpi icon={Trophy} label="Melhor do período" value={cards?.melhor?.nome ?? "—"} sub={cards?.melhor ? `${cards.melhor.lavagens} lav.` : undefined} />
-      </div>
-
-      <Card className="mb-6">
-        <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="min-w-0">
-            <div className="flex items-center gap-2 font-semibold">
-              <ShieldCheck className="h-4 w-4 text-primary" /> Acesso rapido da equipe
+      <Card className="mb-6 overflow-hidden border-primary/15 bg-gradient-to-r from-primary/[0.07] via-card to-card">
+        <CardContent className="flex flex-col gap-4 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="flex min-w-0 items-start gap-3">
+            <span className="grid h-11 w-11 shrink-0 place-items-center rounded-2xl bg-primary/10 text-primary"><ShieldCheck className="h-5 w-5" /></span>
+            <div className="min-w-0 space-y-1">
+              <h2 className="text-sm font-semibold">Portal da equipe</h2>
+              <p className="text-xs text-muted-foreground">Compartilhe o acesso por PIN com seus colaboradores.</p>
+              <p className="break-all text-xs font-medium text-foreground/80">{equipeUrl || "Configure o link público da empresa para habilitar o portal."}</p>
             </div>
-            <p className="mt-1 break-all text-xs text-muted-foreground">
-              {equipeUrl || "Configure o link publico da empresa para liberar o acesso por PIN."}
-            </p>
           </div>
-          <div className="flex gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!equipeUrl}
-              onClick={() => equipeUrl && navigator.clipboard?.writeText(equipeUrl).then(() => toast.success("Link copiado"))}
-            >
-              Copiar link
-            </Button>
-            <Button type="button" variant="outline" disabled={!equipeUrl} onClick={() => equipeUrl && window.open(equipeUrl, "_blank")}>
-              <ExternalLink className="h-4 w-4" />
-            </Button>
+          <div className="flex shrink-0 flex-wrap gap-2">
+            <Button type="button" size="sm" variant="outline" disabled={!equipeUrl} className="flex-1 gap-2 sm:flex-none" onClick={copiarLink}><Copy className="h-4 w-4" /> Copiar link</Button>
+            <Button type="button" size="sm" variant="outline" disabled={!equipeUrl} className="flex-1 gap-2 sm:flex-none" onClick={() => equipeUrl && window.open(equipeUrl, "_blank", "noopener,noreferrer")}><ExternalLink className="h-4 w-4" /> Abrir</Button>
           </div>
         </CardContent>
       </Card>
@@ -311,74 +324,92 @@ function Page() {
         </DialogContent>
       </Dialog>
 
-      <h2 className="font-display font-semibold mb-3">Colaboradores</h2>
-      {isLoading && <div className="h-64 rounded-xl bg-muted animate-pulse" />}
-      {!isLoading && colaboradores.length === 0 && (
-        <EmptyState
-          icon={UsersRound}
-          title="Cadastre sua equipe"
-          description="Acompanhe receita, comissão acumulada e registre os pagamentos."
-          ctas={[{ label: "Adicionar colaborador", onClick: openNew }]}
-        />
-      )}
+      <section className="space-y-4" aria-label="Colaboradores">
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <h2 className="font-display text-lg font-semibold">Colaboradores <span className="ml-1 text-sm font-normal text-muted-foreground">({colaboradores.length})</span></h2>
+            <p className="text-xs text-muted-foreground">Consulte o desempenho e gerencie pagamentos por pessoa.</p>
+          </div>
+          <div className="flex flex-col gap-2 sm:flex-row">
+            <div className="relative min-w-0 sm:w-64">
+              <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <Input aria-label="Buscar colaborador" placeholder="Buscar colaborador..." className="h-10 pl-9" value={busca} onChange={(e) => setBusca(e.target.value)} />
+            </div>
+            <div className="relative">
+              <Filter className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+              <select aria-label="Filtrar colaboradores" value={filtro} onChange={(e) => setFiltro(e.target.value as typeof filtro)} className="h-10 w-full rounded-lg border border-input bg-background pl-9 pr-4 text-sm sm:w-48">
+                <option value="todos">Todos</option>
+                {canVerComissoes && <option value="pendentes">Comissão pendente</option>}
+                {canVerComissoes && <option value="sem_comissao">Sem comissão</option>}
+                <option value="inativos">Inativos</option>
+              </select>
+            </div>
+          </div>
+        </div>
 
-      <div className="space-y-2">
-        {colaboradores.map((c: any) => (
-          <Card key={c.id}>
-            <CardContent className="p-4 space-y-3">
-              <div className="flex items-start gap-3">
-                <div className="h-10 w-10 rounded-lg grid place-content-center font-display font-bold bg-muted shrink-0">
-                  {c.nome.split(" ").map((n: string) => n[0]).slice(0, 2).join("")}
+        {isLoading && <div className="h-64 animate-pulse rounded-2xl bg-muted" />}
+        {!isLoading && colaboradores.length === 0 && (
+          <EmptyState icon={UsersRound} title="Cadastre sua equipe" description="Acompanhe produção, comissão acumulada e registre pagamentos." ctas={[{ label: "Adicionar colaborador", onClick: openNew }]} />
+        )}
+        {!isLoading && colaboradores.length > 0 && colaboradoresFiltrados.length === 0 && (
+          <div className="rounded-2xl border border-dashed px-4 py-12 text-center text-sm text-muted-foreground">Nenhum colaborador encontrado para esses filtros.</div>
+        )}
+        <div className="grid gap-3">
+          {colaboradoresFiltrados.map((c: any) => (
+            <Card key={c.id} className="overflow-hidden border-border/70 shadow-sm transition-shadow hover:shadow-md">
+              <CardContent className="space-y-4 p-4 sm:p-5">
+                <div className="flex items-start gap-3">
+                  <div className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-2xl bg-primary/10 font-display text-sm font-bold text-primary">
+                    {c.avatar_url ? <img src={c.avatar_url} alt="" className="h-full w-full object-cover" /> : String(c.nome ?? "").split(" ").filter(Boolean).map((n: string) => n[0]).slice(0, 2).join("").toUpperCase()}
+                  </div>
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="min-w-0 break-words text-base font-semibold">{c.nome}</h3>
+                      {c.ativo ? <Badge variant="secondary">Ativo</Badge> : <Badge variant="outline">Inativo</Badge>}
+                    </div>
+                    <p className="text-xs text-muted-foreground">{c.cargo || "Função não informada"} · {c.tipo_label}</p>
+                    <div className="flex flex-wrap gap-2">
+                      {c.vinculado && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><Link2 className="h-3 w-3" /> Conta vinculada</span>}
+                      {c.pin_configurado && <span className="inline-flex items-center gap-1 text-[11px] text-muted-foreground"><ShieldCheck className="h-3 w-3" /> PIN configurado</span>}
+                    </div>
+                  </div>
+                  <Button type="button" size="icon" variant="ghost" aria-label={`Editar colaborador ${c.nome}`} onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="font-semibold flex items-center gap-2 truncate">
-                    {c.nome}
-                    {!c.ativo && <Badge variant="outline" className="shrink-0">Inativo</Badge>}
-                    {c.vinculado && <Badge variant="secondary" className="gap-1 shrink-0"><Link2 className="h-3 w-3" /></Badge>}
-                    {c.pin_configurado && <Badge variant="outline" className="shrink-0">PIN</Badge>}
-                  </p>
-                  <p className="text-xs text-muted-foreground truncate">{c.cargo ?? "—"} · {c.tipo_label}</p>
+
+                <div className={`grid gap-2 ${canVerComissoes ? "grid-cols-2 sm:grid-cols-3" : "grid-cols-2"}`}>
+                  <Stat icon={Car} label="Lavagens" value={String(c.lavagens ?? 0)} />
+                  <Stat icon={DollarSign} label="Faturamento" value={brl(c.receita ?? 0)} />
+                  {canVerComissoes && <Stat icon={Wallet} label="Comissão" value={brl(c.comissao_acumulada ?? 0)} highlight />}
                 </div>
-                <Button size="icon" variant="ghost" onClick={() => openEdit(c)}><Pencil className="h-4 w-4" /></Button>
-              </div>
 
-              <div className="grid grid-cols-3 gap-2 text-center">
-                <Stat label="🚗 Lavagens" value={String(c.lavagens)} />
-                <Stat label="💰 Faturamento" value={brl(c.receita)} />
-                <Stat label="💵 Comissão" value={brl(c.comissao_acumulada)} highlight />
-              </div>
-
-              <div className="flex items-center justify-between text-xs text-muted-foreground">
-                <span>📅 {dateBr(periodoInicio)} – {dateBr(periodoFim)}</span>
-                {c.status === "a_receber" && <Badge className="bg-warning/15 text-warning-foreground gap-1">🟢 A receber</Badge>}
-                {c.status === "pago" && <Badge className="bg-success/15 text-success gap-1"><CheckCircle2 className="h-3 w-3" /> Pago</Badge>}
-                {c.status === "sem_comissao" && <Badge variant="outline">Sem comissão</Badge>}
-              </div>
-
-              {c.ultimo_pagamento && (
-                <p className="text-[11px] text-muted-foreground">
-                  Último pagamento: {dateBr(c.ultimo_pagamento.pago_em)} · {brl(c.ultimo_pagamento.valor)}
-                </p>
-              )}
-
-              <div className="flex gap-2">
-                <Button
-                  size="sm" className="flex-1"
-                  disabled={c.comissao_acumulada <= 0}
-                  onClick={() => setPagamentoOpen({ id: c.id, nome: c.nome, telefone: c.telefone, valor: c.comissao_acumulada })}
-                >
-                  <DollarSign className="h-4 w-4 mr-1" /> Marcar como pago
-                </Button>
-                {c.comissao_modo === "por_servico" && (
-                  <Button size="sm" variant="outline" onClick={() => setComissaoOpen({ id: c.id, nome: c.nome })}>
-                    <Sliders className="h-4 w-4" />
-                  </Button>
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t pt-3 text-xs text-muted-foreground">
+                  <span className="inline-flex items-center gap-1.5"><CalendarDays className="h-3.5 w-3.5" /> {dateBr(periodoInicio)} — {dateBr(periodoFim)}</span>
+                  {canVerComissoes && c.status === "a_receber" && <Badge variant="secondary" className="gap-1 text-amber-700"><Wallet className="h-3 w-3" /> A receber</Badge>}
+                  {canVerComissoes && c.status === "pago" && <Badge variant="secondary" className="gap-1 text-emerald-700"><CheckCircle2 className="h-3 w-3" /> Pago</Badge>}
+                  {canVerComissoes && c.status === "sem_comissao" && <Badge variant="outline">Sem comissão</Badge>}
+                </div>
+                {canVerComissoes && c.ultimo_pagamento && (
+                  <p className="text-xs text-muted-foreground">Último pagamento: {dateBr(c.ultimo_pagamento.pago_em)} · {brl(c.ultimo_pagamento.valor)}</p>
                 )}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+                {canVerComissoes && (
+                  <div className="flex flex-wrap items-center justify-end gap-2">
+                    {c.comissao_modo === "por_servico" && (
+                      <Button type="button" size="sm" variant="outline" onClick={() => setComissaoOpen({ id: c.id, nome: c.nome })}>
+                        <Sliders className="mr-1.5 h-4 w-4" /> Tarifas
+                      </Button>
+                    )}
+                    {Number(c.comissao_acumulada ?? 0) > 0 ? (
+                      <Button type="button" size="sm" className="gap-1.5" onClick={() => setPagamentoOpen({ id: c.id, nome: c.nome, telefone: c.telefone, valor: c.comissao_acumulada })}>
+                        <CreditCard className="h-4 w-4" /> Registrar pagamento
+                      </Button>
+                    ) : <span className="text-xs text-muted-foreground">Sem valor a pagar neste período</span>}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </section>
 
       {comissaoOpen && (
         <ComissaoPorServicoDialog
@@ -401,21 +432,26 @@ function Page() {
 
 function Kpi({ icon: Icon, label, value, sub, tone }: { icon: any; label: string; value: string; sub?: string; tone?: "success" }) {
   return (
-    <Card>
-      <CardContent className="p-3">
-        <div className="flex items-center gap-2 text-muted-foreground text-xs"><Icon className="h-3.5 w-3.5" />{label}</div>
-        <p className={`font-display font-bold text-xl mt-1 truncate ${tone === "success" ? "text-success" : ""}`}>{value}</p>
-        {sub && <p className="text-[10px] text-muted-foreground">{sub}</p>}
+    <Card className="h-full border-border/70 shadow-sm">
+      <CardContent className="flex h-full flex-col gap-3 p-4 sm:p-5">
+        <div className="flex items-start justify-between gap-2">
+          <p className="text-xs font-medium text-muted-foreground">{label}</p>
+          <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-primary/10 text-primary"><Icon className="h-4 w-4" /></span>
+        </div>
+        <div className="mt-auto min-w-0">
+          <p className={`break-words font-display text-xl font-bold leading-tight sm:text-2xl ${tone === "success" ? "text-emerald-700 dark:text-emerald-400" : ""}`}>{value}</p>
+          {sub && <p className="mt-1 text-xs text-muted-foreground">{sub}</p>}
+        </div>
       </CardContent>
     </Card>
   );
 }
 
-function Stat({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
+function Stat({ icon: Icon, label, value, highlight }: { icon: any; label: string; value: string; highlight?: boolean }) {
   return (
-    <div className={`rounded-md p-2 ${highlight ? "bg-success/10" : "bg-muted"}`}>
-      <p className="text-[10px] text-muted-foreground">{label}</p>
-      <p className={`font-display font-bold text-sm ${highlight ? "text-success" : ""}`}>{value}</p>
+    <div className={`min-w-0 rounded-xl border p-3 ${highlight ? "border-emerald-500/20 bg-emerald-500/[0.06]" : "border-border/60 bg-muted/30"}`}>
+      <div className="mb-2 flex items-center gap-1.5 text-[11px] text-muted-foreground"><Icon className="h-3.5 w-3.5 shrink-0" />{label}</div>
+      <p className={`break-words font-display text-base font-bold sm:text-lg ${highlight ? "text-emerald-700 dark:text-emerald-400" : ""}`}>{value}</p>
     </div>
   );
 }
