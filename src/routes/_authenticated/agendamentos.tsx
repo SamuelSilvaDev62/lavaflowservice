@@ -25,6 +25,7 @@ import {
 } from "@/lib/lavaflow.functions";
 import { brl, dateBr } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
+import { appendBusinessLocation } from "@/lib/business-location";
 import { toast } from "sonner";
 import {
   Plus, MessageCircle, Play, Check, X as XIcon, AlertTriangle, CalendarDays,
@@ -307,7 +308,7 @@ function Page() {
               <>
                 <DistribuicaoEquipe agendamentos={ag!.agendamentos} />
                 <div className="space-y-2 pb-24">
-                  {ag!.agendamentos.map((a: any) => <AgendamentoCard key={a.id} a={a} />)}
+                  {ag!.agendamentos.map((a: any) => <AgendamentoCard key={a.id} a={a} empresa={empresa?.empresa} />)}
                 </div>
               </>
             )}
@@ -436,7 +437,7 @@ function KpiCard({ label, value, tone, sub, wide }: { label: string; value: numb
   );
 }
 
-function AgendamentoCard({ a }: { a: any }) {
+function AgendamentoCard({ a, empresa }: { a: any; empresa?: { nome_fantasia?: string | null; endereco?: string | null } }) {
   const [open, setOpen] = useState(false);
   const upd = useServerFn(updateAgendamentoStatus);
   const ini = useServerFn(iniciarAtendimento);
@@ -459,8 +460,8 @@ function AgendamentoCard({ a }: { a: any }) {
   });
 
   const tel = a.clientes?.telefone;
-  const msgConfirm = `Olá ${a.clientes?.nome}!\n\nSeu horário foi reservado com sucesso.\n\nData: ${dateBr(a.data_agendada)}\nHorário: ${a.hora_agendada?.slice(0,5)}\nServiço: ${a.servicos?.nome ?? "-"}\n\nAguardamos você.`;
-  const msgLembrete = `Olá ${a.clientes?.nome}!\n\nPassando para lembrar do seu agendamento ${dateBr(a.data_agendada)} às ${a.hora_agendada?.slice(0,5)}.\n\nEstamos te esperando.`;
+  const msgConfirm = appendBusinessLocation(`Olá ${a.clientes?.nome}!\n\nSeu horário foi reservado com sucesso.\n\nData: ${dateBr(a.data_agendada)}\nHorário: ${a.hora_agendada?.slice(0,5)}\nServiço: ${a.servicos?.nome ?? "-"}\n\nAguardamos você.`, empresa?.nome_fantasia, empresa?.endereco);
+  const msgLembrete = appendBusinessLocation(`Olá ${a.clientes?.nome}!\n\nPassando para lembrar do seu agendamento ${dateBr(a.data_agendada)} às ${a.hora_agendada?.slice(0,5)}.\n\nEstamos te esperando.`, empresa?.nome_fantasia, empresa?.endereco);
   const ativo = a.status !== "concluido" && a.status !== "cancelado" && a.status !== "nao_compareceu";
 
   return (
