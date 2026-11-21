@@ -14,7 +14,7 @@ import { brl, daysBetween } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import {
   ArrowUpRight, CalendarClock, CheckCircle2, ChevronRight, Gift, MessageCircle,
-  Plus, RotateCw, Search, SlidersHorizontal, TrendingUp, UserRoundPlus, UsersRound,
+  Plus, RotateCw, Search, SlidersHorizontal, UsersRound,
   Wallet, X,
 } from "lucide-react";
 import { toast } from "sonner";
