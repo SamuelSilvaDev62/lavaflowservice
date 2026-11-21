@@ -1127,7 +1127,23 @@ export const updateOrdemStatus = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({ id: z.string().uuid(), status: z.enum(["aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"]) }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { ownerId } = await getOwnerScope(supabase, userId);
+    const { ownerId, role } = await getOwnerScope(supabase, userId);
+    assertTenantRole(role, [...GESTAO_ROLES, "atendente"]);
+    // Explicit, monotonic work-order lifecycle. The update uses compare-and-swap
+    // to prevent two operators from both triggering side effects for one OS.
+    const { data: current, error: readError } = await supabase
+      .from("ordens_servico")
+      .select("status")
+      .eq("id", data.id)
+      .eq("owner_id", ownerId)
+      .maybeSingle();
+    if (readError) throw readError;
+    if (!current) throw new Error("Ordem de serviço não encontrada.");
+    if (current.status === data.status) return { ok: true };
+    const order: OsStatus[] = ["aguardando", "em_lavagem", "finalizacao", "pronto", "entregue"];
+    if (order.indexOf(data.status) <= order.indexOf(current.status as OsStatus)) {
+      throw new Error("Não é permitido retroceder uma OS ou reabrir um atendimento entregue.");
+    }
     const patch: any = { status: data.status };
     if (data.status === "em_lavagem") {
       await assertPodeIniciarLavagem(supabase, ownerId, data.id);
@@ -1135,8 +1151,11 @@ export const updateOrdemStatus = createServerFn({ method: "POST" })
     }
     if (data.status === "pronto") patch.finalizado_em = new Date().toISOString();
     if (data.status === "entregue") patch.entregue_em = new Date().toISOString();
-    const { error } = await supabase.from("ordens_servico").update(patch).eq("id", data.id).eq("owner_id", ownerId);
+    const { data: updated, error } = await supabase.from("ordens_servico")
+      .update(patch).eq("id", data.id).eq("owner_id", ownerId)
+      .eq("status", current.status).select("id").maybeSingle();
     if (error) throw error;
+    if (!updated) throw new Error("Esta OS foi alterada em outra sessão. Atualize a tela.");
     if (data.status === "entregue") {
       const { data: ordem } = await supabase
         .from("ordens_servico")
