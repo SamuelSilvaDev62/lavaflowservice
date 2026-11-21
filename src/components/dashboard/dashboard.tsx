@@ -103,10 +103,10 @@ export function Dashboard() {
       </header>
 
       <section aria-label="Indicadores do dia" className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-        <DashboardKpiCard icon={CalendarDays} label="Agendamentos" value={String(totalAgenda)} hint="Confirmados e programados para hoje" />
-        <DashboardKpiCard icon={Wallet} label="Previsão da agenda" value={brl(Number(cards.previsaoFaturamentoDia ?? 0))} hint="Estimativa de reservas ativas, não receita recebida" accent="green" />
-        <DashboardKpiCard icon={Play} label="Em atendimento" value={String(countEmAtendimento)} hint="Veículos em lavagem ou finalização" accent="amber" />
-        <DashboardKpiCard icon={Clock3} label="Horários disponíveis" value={String(horariosLivres)} hint={cards.fechadoHoje ? "Sem expediente programado hoje" : cards.expedienteEncerrado ? "Expediente encerrado" : "Vagas restantes para hoje"} accent="slate" />
+        <DashboardKpiCard icon={CalendarDays} to="/agendamentos" actionLabel="Abrir agenda" label="Agendamentos" value={String(totalAgenda)} hint="Confirmados e programados para hoje" />
+        <DashboardKpiCard icon={Wallet} to="/agendamentos" actionLabel="Conferir reservas" label="Previsão da agenda" value={brl(Number(cards.previsaoFaturamentoDia ?? 0))} hint="Estimativa de reservas ativas, não receita recebida" accent="green" />
+        <DashboardKpiCard icon={Play} to="/fila" actionLabel="Abrir fila" label="Em atendimento" value={String(countEmAtendimento)} hint="Veículos em lavagem ou finalização" accent="amber" />
+        <DashboardKpiCard icon={Clock3} to="/agendamentos" actionLabel="Ver horários" label="Horários disponíveis" value={String(horariosLivres)} hint={cards.fechadoHoje ? "Sem expediente programado hoje" : cards.expedienteEncerrado ? "Expediente encerrado" : "Vagas restantes para hoje"} accent="slate" />
       </section>
 
       <MorningBriefCard />
