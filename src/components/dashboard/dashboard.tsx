@@ -91,7 +91,7 @@ export function Dashboard() {
               <span className="inline-flex items-center gap-1.5"><RotateCw className={isFetching ? "h-3.5 w-3.5 animate-spin text-primary" : "h-3.5 w-3.5 text-primary"} />Atualiza a cada minuto</span>
             </div>
           </div>
-          <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap lg:shrink-0">
+          <div className="grid grid-cols-1 gap-2 min-[430px]:grid-cols-2 sm:flex sm:flex-wrap lg:shrink-0">
             <Button asChild variant="premium" className="gap-2">
               <Link to="/agendamentos"><CalendarPlus className="h-4 w-4" /> Novo agendamento</Link>
             </Button>
