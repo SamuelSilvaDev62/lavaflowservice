@@ -1,6 +1,6 @@
 export const DEFAULT_BOOKING_BRANDING = {
   primary_color: "#2563EB",
-  secondary_color: "#0F172A",
+  secondary_color: "#F8FAFC",
   cover_url: null as string | null,
   logo_url: null as string | null,
   tagline: null as string | null,
