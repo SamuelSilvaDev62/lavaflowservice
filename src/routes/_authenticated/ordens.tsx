@@ -61,7 +61,7 @@ export const Route = createFileRoute("/_authenticated/ordens")({
 const STATUS_OPTIONS = Object.keys(ORDER_STATUS_LABELS) as OsStatus[];
 const statusTone: Record<OsStatus, string> = {
   aguardando: "bg-warning/10 text-warning", em_lavagem: "bg-primary/10 text-primary",
-  finalizacao: "bg-accent text-accent-foreground", pronto: "bg-success/10 text-success", entregue: "bg-muted text-muted-foreground",
+  finalizacao: "bg-accent text-accent-foreground", pronto: "bg-success/10 text-success", entregue: "bg-success/10 text-success",
 };
 const checklistLabel = (status: string) => status === "concluido" ? "Concluído" : status === "pulado" ? "Pulado" : status === "pendente" ? "Pendente" : "Não informado";
 type Order = Awaited<ReturnType<typeof listOrdensPage>>["ordens"][number];
