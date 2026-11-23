@@ -1858,6 +1858,14 @@ export type Database = {
           whatsapp: string
         }[]
       }
+      iniciar_atendimento_atomico: {
+        Args: {
+          p_owner_id: string
+          p_agendamento_id: string
+          p_funcionario_id?: string | null
+        }
+        Returns: string
+      }
       get_my_funcionario_id: { Args: never; Returns: string }
       get_my_subscription: {
         Args: never
