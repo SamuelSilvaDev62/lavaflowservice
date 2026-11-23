@@ -4003,43 +4003,18 @@ export const iniciarAtendimento = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
     const { ownerId } = await getOwnerScope(supabase, userId);
-    const { data: ag, error: e1 } = await supabase.from("agendamentos")
-      .select("id, cliente_id, veiculo_id, servico_id, funcionario_id, ordem_id, observacoes, leva_traz, taxa_leva_traz")
-      .eq("id", data.id).eq("owner_id", ownerId).single();
-    if (e1) throw e1;
-    if (ag.ordem_id) {
-      return { ok: true, ordem_id: ag.ordem_id };
-    }
-    let valor = 0;
-    if (ag.servico_id) {
-      const { data: s } = await supabase.from("servicos").select("preco_padrao").eq("id", ag.servico_id).maybeSingle();
-      valor = Number(s?.preco_padrao ?? 0);
-    }
-    valor += Number(ag.taxa_leva_traz ?? 0);
-    // Se já tem funcionario no agendamento, usa; senão tenta o usuário logado (colaborador)
-    let funcionario_id: string | null = ag.funcionario_id ?? null;
-    if (!funcionario_id) {
-      const { data: meFuncId } = await supabase.rpc("get_my_funcionario_id");
-      if (meFuncId) funcionario_id = meFuncId as string;
-    }
-    const { data: os, error: e2 } = await supabase.from("ordens_servico").insert({
-      owner_id: ownerId,
-      cliente_id: ag.cliente_id,
-      veiculo_id: ag.veiculo_id,
-      servico_id: ag.servico_id,
-      funcionario_id,
-      valor,
-      observacoes: ag.observacoes,
-      status: "aguardando",
-    }).select("id").single();
-    if (e2) throw e2;
-    const { error: e3 } = await supabase.from("agendamentos").update({
-      status: "em_andamento",
-      ordem_id: os.id,
-      ...(ag.leva_traz ? { leva_traz_status: "em_servico" } : {}),
-    }).eq("id", data.id).eq("owner_id", ownerId);
-    if (e3) throw e3;
-    return { ok: true, ordem_id: os.id };
+    // Uma única transação no banco bloqueia o agendamento, cria a OS e vincula ambos.
+    // Nunca retornar ao fluxo anterior de INSERT + UPDATE separados: ele pode duplicar OS.
+    const { data: meFuncId, error: employeeError } = await supabase.rpc("get_my_funcionario_id");
+    if (employeeError) throw employeeError;
+    const { data: ordemId, error: conversionError } = await supabase.rpc("iniciar_atendimento_atomico", {
+      p_owner_id: ownerId,
+      p_agendamento_id: data.id,
+      p_funcionario_id: (meFuncId as string | null) ?? null,
+    });
+    if (conversionError) throw conversionError;
+    if (!ordemId) throw new Error("Não foi possível iniciar o atendimento.");
+    return { ok: true, ordem_id: ordemId };
   });
 
 
