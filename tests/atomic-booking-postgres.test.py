@@ -4,6 +4,8 @@ Run: python3 tests/atomic-booking-postgres.test.py
 Never connects to the application's backend or consumes production credentials.
 """
 import concurrent.futures
+import hashlib
+import json
 import os
 from pathlib import Path
 import pwd
@@ -38,11 +40,9 @@ class AtomicBookingTests(unittest.TestCase):
         subprocess.run(cls.prefix + ['pg_ctl', '-D', str(cls.datadir), '-l', str(cls.folder / 'postgres.log'), '-o', f"-k {cls.folder} -c listen_addresses=''", '-w', 'start'], check=True, capture_output=True)
         cls.sql((ROOT / 'tests/fixtures/atomic-booking-schema.sql').read_text())
         cls.sql((ROOT / 'supabase/migrations/20261121180500_agendamento_capacity_atomic_guard.sql').read_text())
-        cls.sql((ROOT / 'supabase/migrations/20261121180700_atomic_booking_to_work_order.sql').read_text())
-        # During development use the reviewed candidate; after migration use its saved copy.
-        candidate = ROOT / 'tests/fixtures/atomic-booking-hardening.sql'
-        saved = list((ROOT / 'supabase/migrations').glob('*atomic_booking_reference_validation*.sql'))
-        cls.sql((saved[0] if saved else candidate).read_text())
+        # Exercise the exact files applied to Cloud, not a draft SQL fixture.
+        for name in ['0000_atomic_booking_to_work_order.sql', '0001_atomic_booking_reference_validation.sql', '0002_distributed_access_limits.sql']:
+            cls.sql((ROOT / 'drizzle/migrations' / name).read_text())
 
     @classmethod
     def tearDownClass(cls):
@@ -62,7 +62,7 @@ class AtomicBookingTests(unittest.TestCase):
         return result.stdout.strip() if ok else result.stderr
 
     def setUp(self):
-        self.sql('TRUNCATE public.agendamentos,public.ordens_servico;')
+        self.sql('TRUNCATE public.agendamentos,public.ordens_servico,public.access_limit_buckets;')
 
     def booking(self, patch=''):
         ident = str(uuid.uuid4())
@@ -157,6 +157,56 @@ class AtomicBookingTests(unittest.TestCase):
             self.assertEqual(self.sql(f"SELECT status||'|'||coalesce(ordem_id::text,'NULL') FROM public.agendamentos WHERE id='{ident}';"), 'agendado|NULL')
         finally:
             self.sql('DROP TRIGGER fixture_fail_update ON public.agendamentos; DROP FUNCTION public.fixture_fail_update();')
+
+    def limit(self, buckets, role='service_role', ok=True):
+        payload = json.dumps(buckets)
+        return self.sql(f"SELECT allowed||'|'||retry_after FROM public.consume_access_limits('{payload}'::jsonb);", user='', role=role, ok=ok)
+
+    def bucket(self, identity, maximum=5, seconds=300):
+        return {'key': hashlib.sha256(identity.encode()).hexdigest(), 'max': maximum, 'seconds': seconds}
+
+    def test_rate_limit_five_attempts_under_concurrency(self):
+        buckets = [self.bucket('tenant-a:identity-a')]
+        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+            results = list(pool.map(lambda _: self.limit(buckets), range(24)))
+        self.assertEqual(sum(r.startswith('true|') for r in results), 5)
+        denied = [r for r in results if r.startswith('false|')]
+        self.assertEqual(len(denied), 19)
+        self.assertTrue(all(1 <= int(r.split('|')[1]) <= 300 for r in denied))
+        self.assertEqual(self.sql('SELECT used FROM public.access_limit_buckets;'), '6')
+
+    def test_rate_limit_identity_is_tenant_scoped(self):
+        for _ in range(5):
+            self.assertEqual(self.limit([self.bucket('tenant-a:same-identity')]), 'true|0')
+        self.assertTrue(self.limit([self.bucket('tenant-a:same-identity')]).startswith('false|'))
+        self.assertEqual(self.limit([self.bucket('tenant-b:same-identity')]), 'true|0')
+
+    def test_rate_limit_shared_tenant_and_sorted_overlapping_locks(self):
+        tenant = self.bucket('tenant-a', maximum=5)
+        def consume(i):
+            buckets = [tenant, self.bucket(f'identity-{i}', maximum=30)]
+            return self.limit(buckets if i % 2 else list(reversed(buckets)))
+        with concurrent.futures.ThreadPoolExecutor(max_workers=12) as pool:
+            results = list(pool.map(consume, range(24)))
+        self.assertEqual(sum(r.startswith('true|') for r in results), 5)
+
+    def test_rate_limit_expired_window_resets(self):
+        b = self.bucket('expired', maximum=1)
+        self.assertEqual(self.limit([b]), 'true|0')
+        self.assertTrue(self.limit([b]).startswith('false|'))
+        self.sql(f"UPDATE public.access_limit_buckets SET reset_at=clock_timestamp()-interval '1 second' WHERE bucket_key='{b['key']}';")
+        self.assertEqual(self.limit([b]), 'true|0')
+
+    def test_rate_limit_clients_cannot_consume_or_read_counters(self):
+        for role in ['anon', 'authenticated']:
+            self.assertIn('permission denied', self.limit([self.bucket('private')], role=role, ok=False))
+            self.assertIn('permission denied', self.sql('SELECT * FROM public.access_limit_buckets;', user='', role=role, ok=False))
+
+    def test_rate_limit_invalid_batch_rolls_back(self):
+        b = self.bucket('valid')
+        self.assertIn('Invalid limit policy', self.limit([b, self.bucket('invalid', maximum=0)], ok=False))
+        self.assertEqual(self.sql('SELECT count(*) FROM public.access_limit_buckets;'), '0')
+        self.assertIn('Invalid limit policy', self.limit([b, b], ok=False))
 
 
 if __name__ == '__main__':

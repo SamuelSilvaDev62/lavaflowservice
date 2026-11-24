@@ -6,7 +6,7 @@ import {
 import { buildSkillContext } from "@/lib/skill-context";
 
 // Contexto de negócio para o Consultor IA (server-only).
-// Não há tabelas de log de IA neste projeto: rate limit é em memória por worker.
+// Access limits are durable PostgreSQL counters, applied by the chat handler.
 export type ConsultorContexto = {
   empresa: string;
   identidade: {
@@ -226,20 +226,3 @@ export function consultorSystemPrompt(ctx: ConsultorContexto) {
   ].join("\n");
 }
 
-// ---- Rate limit simples em memória (por worker) ----
-const buckets = new Map<string, { count: number; resetAt: number }>();
-const LIMITE_HORA = 30;
-
-export function checkAiRateLimit(ownerId: string) {
-  const now = Date.now();
-  const b = buckets.get(ownerId);
-  if (!b || b.resetAt < now) {
-    buckets.set(ownerId, { count: 1, resetAt: now + 3_600_000 });
-    return { ok: true as const, restante: LIMITE_HORA - 1 };
-  }
-  if (b.count >= LIMITE_HORA) {
-    return { ok: false as const, restante: 0, resetAt: b.resetAt };
-  }
-  b.count += 1;
-  return { ok: true as const, restante: LIMITE_HORA - b.count };
-}

@@ -24,17 +24,26 @@ export async function enforceAccessLimit(
   const headers = scope.headers ?? getRequest().headers;
   const ip = trustedEdgeIp(headers, process.env["VERIFIED_EDGE_IP_HEADER"]);
   const buckets: { key: string; max: number; seconds: number }[] = [];
-  const add = async (key: string, max: number) => buckets.push({ key: await digest(key), max, seconds: policy.seconds });
+  const add = async (key: string, max: number) =>
+    buckets.push({ key: await digest(key), max, seconds: policy.seconds });
   if (!scope.tenant) {
     await add(`${action}:global`, policy.global);
     if (ip) await add(`${action}:ip:${ip}`, policy.ip);
   } else {
     await add(`${action}:tenant:${scope.tenant}`, policy.tenant);
-    if (scope.identity) await add(`${action}:identity:${scope.tenant}:${scope.identity}`, policy.identity);
+    if (scope.identity)
+      await add(`${action}:identity:${scope.tenant}:${scope.identity}`, policy.identity);
   }
   const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
   const { data, error } = await supabaseAdmin.rpc("consume_access_limits", { p_buckets: buckets });
-  if (error || !data?.[0]) throw new Error("Proteção de acesso temporariamente indisponível. Tente novamente mais tarde.");
+  if (error || !data?.[0]) {
+    setResponseStatus(503);
+    const unavailable = new Error(
+      "Proteção de acesso temporariamente indisponível. Tente novamente mais tarde.",
+    );
+    Object.assign(unavailable, { statusCode: 503 });
+    throw unavailable;
+  }
   const result = data[0];
   if (!result.allowed) {
     const retryAfter = Math.max(1, result.retry_after);

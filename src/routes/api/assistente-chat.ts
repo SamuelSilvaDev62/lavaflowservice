@@ -2,10 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 
 /** Resumo sanitizado do erro do provider (sem chaves, tokens ou conteúdo da conversa). */
 function sanitizar(err: any): string {
-  const partes = [err?.name, err?.statusCode, err?.message]
-    .filter(Boolean)
-    .map((p) => String(p));
-  return partes.join(":").replace(/sb_[A-Za-z0-9_-]+|Bearer\s+\S+|sk_[A-Za-z0-9_-]+/g, "[redacted]").slice(0, 200);
+  const partes = [err?.name, err?.statusCode, err?.message].filter(Boolean).map((p) => String(p));
+  return partes
+    .join(":")
+    .replace(/sb_[A-Za-z0-9_-]+|Bearer\s+\S+|sk_[A-Za-z0-9_-]+/g, "[redacted]")
+    .slice(0, 200);
 }
 
 /**
@@ -41,9 +42,8 @@ export const Route = createFileRoute("/api/assistente-chat")({
         const userId = (claims as any)?.claims?.sub as string | undefined;
         if (claimsError || !userId) return new Response("Token inválido", { status: 401 });
 
-        const { resolveOwnerScope, assertFeature, FeatureBlockedError } = await import(
-          "@/lib/entitlements.server"
-        );
+        const { resolveOwnerScope, assertFeature, FeatureBlockedError } =
+          await import("@/lib/entitlements.server");
         const { ownerId, role } = await resolveOwnerScope(supabase, userId);
         if (!["owner", "admin", "gerente"].includes(role)) {
           return new Response("Sem permissão", { status: 403 });
@@ -68,18 +68,30 @@ export const Route = createFileRoute("/api/assistente-chat")({
           return new Response("Não foi possível confirmar a configuração de IA.", { status: 503 });
         }
         if (aiSettings?.ai_enabled !== true) {
-          return new Response("O proprietário ainda não habilitou o consultor IA.", { status: 403 });
+          return new Response("O proprietário ainda não habilitou o consultor IA.", {
+            status: 403,
+          });
         }
 
-        const { buildConsultorContexto, consultorSystemPrompt, checkAiRateLimit } = await import(
-          "@/lib/assistente.server"
-        );
+        const { buildConsultorContexto, consultorSystemPrompt } =
+          await import("@/lib/assistente.server");
 
-        const limite = checkAiRateLimit(ownerId);
-        if (!limite.ok) {
-          return new Response("Muitas perguntas em pouco tempo. Tente novamente mais tarde.", {
-            status: 429,
+        const { enforceAccessLimit, AccessLimitError } = await import("@/lib/access-limit.server");
+        try {
+          await enforceAccessLimit("ai", { headers: request.headers });
+          await enforceAccessLimit("ai", {
+            tenant: ownerId,
+            identity: userId,
+            headers: request.headers,
           });
+        } catch (error) {
+          if (error instanceof AccessLimitError) {
+            return new Response(error.message, {
+              status: 429,
+              headers: { "Retry-After": String(error.retryAfter) },
+            });
+          }
+          return new Response("Proteção de acesso temporariamente indisponível.", { status: 503 });
         }
 
         let body: any;
