@@ -28,9 +28,10 @@ class AtomicBookingTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
         cls.folder = Path(tempfile.mkdtemp(prefix='lavaflow-pg-', dir='/tmp'))
-        account = pwd.getpwnam('nobody') if os.geteuid() == 0 else pwd.getpwuid(os.geteuid())
+        # The sandbox provides 'lovable', not the distro-specific 'nobody'.
+        account = pwd.getpwnam('lovable') if os.geteuid() == 0 else pwd.getpwuid(os.geteuid())
         cls.dbuser = account.pw_name
-        cls.prefix = ['runuser', '-u', account.pw_name, '--'] if os.geteuid() == 0 else []
+        cls.prefix = ['setpriv', f'--reuid={account.pw_uid}', f'--regid={account.pw_gid}', '--clear-groups'] if os.geteuid() == 0 else []
         os.chown(cls.folder, account.pw_uid, account.pw_gid)
         cls.datadir = cls.folder / 'data'
         subprocess.run(cls.prefix + ['initdb', '-D', str(cls.datadir), '--no-locale', '-A', 'trust'], check=True, capture_output=True)

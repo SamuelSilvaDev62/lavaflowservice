@@ -1240,7 +1240,7 @@ export const listOrdens = createServerFn({ method: "GET" })
       .from("ordens_servico")
       .select(`id, status, valor, created_at, checklist_inicial_status, checklist_inicial_em,
                clientes:cliente_id(nome), veiculos:veiculo_id(placa), servicos:servico_id(nome),
-               funcionarios:funcionario_id(nome), checklist_funcionario:checklist_inicial_funcionario_id(nome)`)
+               funcionarios:funcionarios!ordens_servico_funcionario_id_fkey(nome), checklist_funcionario:funcionarios!ordens_servico_checklist_inicial_funcionario_id_fkey(nome)`)
       .eq("owner_id", ownerId).order("created_at", { ascending: false }).limit(200);
     if (error) throw error;
     const ids = (data ?? []).map((o: any) => o.id);
@@ -1301,7 +1301,7 @@ export const listOrdensPage = createServerFn({ method: "GET" })
       .select(`id, status, valor, created_at, observacoes, iniciado_em, finalizado_em, entregue_em,
         checklist_inicial_status, checklist_inicial_em,
         clientes:cliente_id(nome), veiculos:veiculo_id(placa), servicos:servico_id(nome),
-        funcionarios:funcionario_id(nome), checklist_funcionario:checklist_inicial_funcionario_id(nome)`)
+        funcionarios:funcionarios!ordens_servico_funcionario_id_fkey(nome), checklist_funcionario:funcionarios!ordens_servico_checklist_inicial_funcionario_id_fkey(nome)`)
       .eq("owner_id", ownerId).in("id", ids);
     if (error) throw error;
     const [upsells, origins] = await Promise.all([

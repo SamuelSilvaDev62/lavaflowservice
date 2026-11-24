@@ -6,4 +6,4 @@
 # Segurança — piloto Founders
 - [ ] Portal por e-mail: OTP, prova de identidade e histórico isolado; depende de remetente configurado.
 - [ ] Revisar/aplicar conversão atômica agendamento → OS, integrar RPC e testar concorrência/rollback.
-- [ ] Limites atômicos em PostgreSQL; aguarda confirmação da solução específica solicitada.
+- [ ] Implementar e testar limites atômicos em PostgreSQL para OTP, agendamento público, PIN e assistente; solução específica confirmada.

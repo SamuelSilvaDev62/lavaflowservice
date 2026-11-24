@@ -14,6 +14,24 @@ export type Database = {
   }
   public: {
     Tables: {
+      access_limit_buckets: {
+        Row: {
+          bucket_key: string
+          reset_at: string
+          used: number
+        }
+        Insert: {
+          bucket_key: string
+          reset_at: string
+          used?: number
+        }
+        Update: {
+          bucket_key?: string
+          reset_at?: string
+          used?: number
+        }
+        Relationships: []
+      }
       agenda_config: {
         Row: {
           capacidade_simultanea: number
@@ -1826,6 +1844,23 @@ export type Database = {
       }
     }
     Functions: {
+      booking_references_valid: {
+        Args: {
+          p_cliente_id: string
+          p_funcionario_id: string
+          p_owner_id: string
+          p_servico_id: string
+          p_veiculo_id: string
+        }
+        Returns: boolean
+      }
+      consume_access_limits: {
+        Args: { p_buckets: Json }
+        Returns: {
+          allowed: boolean
+          retry_after: number
+        }[]
+      }
       current_owner_id: { Args: never; Returns: string }
       current_user_role: {
         Args: never
@@ -1905,6 +1940,14 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      iniciar_atendimento_atomico: {
+        Args: {
+          p_agendamento_id: string
+          p_funcionario_id?: string
+          p_owner_id: string
+        }
+        Returns: string
       }
       list_tenant_members: {
         Args: never
