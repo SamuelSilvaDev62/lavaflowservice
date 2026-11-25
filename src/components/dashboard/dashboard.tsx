@@ -93,10 +93,10 @@ export function Dashboard() {
           </div>
           <div className="grid grid-cols-1 gap-2 min-[430px]:grid-cols-2 sm:flex sm:flex-wrap lg:shrink-0">
             <Button asChild variant="premium" className="gap-2">
-              <Link to="/agendamentos"><CalendarPlus className="h-4 w-4" /> Novo agendamento</Link>
+              <Link to="/agendamentos" search={{ criar: true }}><CalendarPlus className="h-4 w-4" /> Novo agendamento</Link>
             </Button>
             <Button asChild variant="outline" className="gap-2 bg-card/90">
-              <Link to="/clientes"><UserPlus className="h-4 w-4" /> Novo cliente</Link>
+              <Link to="/clientes" search={{ criar: true }}><UserPlus className="h-4 w-4" /> Novo cliente</Link>
             </Button>
           </div>
         </div>

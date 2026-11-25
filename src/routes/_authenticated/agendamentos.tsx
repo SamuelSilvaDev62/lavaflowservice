@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useMemo } from "react";
@@ -35,6 +36,7 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/agendamentos")({
   component: Page,
+  validateSearch: z.object({ criar: z.literal(true).optional().catch(undefined) }),
 });
 
 const STATUS_LABEL: Record<AgendamentoStatus, string> = {
@@ -105,7 +107,11 @@ function estimatedValue(items: any[]) {
 
 function Page() {
   const [date, setDate] = useState(todayIso());
-  const [open, setOpen] = useState(false);
+  const open = Route.useSearch().criar === true;
+  const navigate = Route.useNavigate();
+  const setOpen = (next: boolean) => {
+    void navigate({ search: { criar: next ? true : undefined }, replace: true, resetScroll: false });
+  };
   const [linkOpen, setLinkOpen] = useState(false);
   const [levaOnly, setLevaOnly] = useState(false);
   const isMobile = useIsMobile();

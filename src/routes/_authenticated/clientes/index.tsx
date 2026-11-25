@@ -21,6 +21,7 @@ import { toast } from "sonner";
 import { EmptyState } from "@/components/empty-state";
 
 const searchSchema = z.object({
+  criar: z.literal(true).optional().catch(undefined),
   filtro: z.enum(["recompensa_disponivel"]).optional(),
 });
 
@@ -84,7 +85,10 @@ function Page() {
   const [q, setQ] = useState("");
   const [segmento, setSegmento] = useState<Segmento>("todos");
   const [ordenacao, setOrdenacao] = useState<Ordenacao>("nome");
-  const [open, setOpen] = useState(false);
+  const open = search.criar === true;
+  const setOpen = (next: boolean) => {
+    void navigate({ search: prev => ({ ...prev, criar: next ? true : undefined }), replace: true, resetScroll: false });
+  };
   const [expandedClienteId, setExpandedClienteId] = useState<string | null>(null);
   const [form, setForm] = useState({ nome: "", telefone: "", origem_cliente: "Indicação" });
   const mut = useMutation({
