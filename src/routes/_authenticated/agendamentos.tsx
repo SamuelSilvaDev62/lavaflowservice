@@ -1,10 +1,11 @@
+import { CustomerCombobox } from "@/components/customer-combobox";
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState, useMemo, useRef } from "react";
 import { CustomerRegistrationForm } from "@/components/customer-registration-form";
-import { matchesCustomer, submissionGuard, type RegisteredCustomer } from "@/lib/customer-registration";
+import { submissionGuard, type RegisteredCustomer } from "@/lib/customer-registration";
 import { useRole } from "@/hooks/use-role";
 import { canAny, OPERACIONAL } from "@/lib/rbac";
 import { PageHeader } from "@/components/app-layout";
@@ -25,7 +26,7 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { useIsMobile } from "@/hooks/use-mobile";
 import {
   listAgendamentos, createAgendamento, agendamentoStats, updateAgendamentoStatus,
-  iniciarAtendimento, listClientes, listServicos, getEmpresa, listFuncionarios, updateAgendamento,
+  iniciarAtendimento, listCustomerOptions, listServicos, getEmpresa, listFuncionarios, updateAgendamento,
   getColaboradoresDisponiveis, getClienteDetalhe, type AgendamentoStatus,
 } from "@/lib/lavaflow.functions";
 import { brl, dateBr } from "@/lib/format";
@@ -617,19 +618,18 @@ function colaboradorDisponibilidadeLabel(x: any) {
 }
 
 function NovoAgendamentoForm({ onClose, defaultDate, initialCustomerId }: { onClose: () => void; defaultDate: string; initialCustomerId: string }) {
-  const cli = useServerFn(listClientes);
+  const cli = useServerFn(listCustomerOptions);
   const detail = useServerFn(getClienteDetalhe);
   const { role } = useRole();
   const canCreate = canAny(role, OPERACIONAL);
   const [quickCreate, setQuickCreate] = useState(false);
-  const [customerSearch, setCustomerSearch] = useState("");
   const [createdCustomer, setCreatedCustomer] = useState<RegisteredCustomer | null>(null);
   const guard = useRef(submissionGuard());
   const sv = useServerFn(listServicos);
   const dispFn = useServerFn(getColaboradoresDisponiveis);
   const create = useServerFn(createAgendamento);
   const qc = useQueryClient();
-  const { data: clientes, isLoading: loadingCustomers, isError: customersError, refetch: retryCustomers } = useQuery({ queryKey: ["clientes"], queryFn: () => cli() });
+  const { data: clientes, isLoading: loadingCustomers, isError: customersError, refetch: retryCustomers } = useQuery({ queryKey: ["customer-options"], queryFn: () => cli() });
   const { data: initialCustomer, isError: initialCustomerError } = useQuery({
     queryKey: ["cliente", initialCustomerId], queryFn: () => detail({ data: { id: initialCustomerId } }), enabled: !!initialCustomerId,
   });
@@ -675,14 +675,12 @@ function NovoAgendamentoForm({ onClose, defaultDate, initialCustomerId }: { onCl
     if (customer && !customerOptions.some(c => c.id === customer.id)) customerOptions.push(customer);
   }
   const selectedCustomer = customerOptions.find(c => c.id === f.cliente_id);
-  const visibleCustomers = customerOptions.filter(c => c.id === f.cliente_id || matchesCustomer(c, customerSearch));
 
   if (quickCreate) return <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 sm:px-5">
     <h3 className="mb-4 font-display font-semibold">Cadastrar cliente</h3>
     <CustomerRegistrationForm onCancel={() => setQuickCreate(false)} onSaved={(customer) => {
       setCreatedCustomer(customer);
       setF(prev => ({ ...prev, cliente_id: customer.id }));
-      setCustomerSearch("");
       setQuickCreate(false);
     }} />
   </div>;
@@ -692,13 +690,7 @@ function NovoAgendamentoForm({ onClose, defaultDate, initialCustomerId }: { onCl
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4 pt-1 sm:px-5">
       <div className="space-y-2">
         <div className="flex items-center justify-between gap-2"><Label>Cliente</Label><Button type="button" variant="ghost" className="min-h-11" disabled={!canCreate || mut.isPending} onClick={() => setQuickCreate(true)}><Plus className="mr-1 h-4 w-4" /> Novo cliente</Button></div>
-        <Input aria-label="Pesquisar cliente por nome ou telefone" placeholder="Pesquisar nome ou telefone" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} className="min-h-11" />
-        <Select value={f.cliente_id} onValueChange={(v) => setF({ ...f, cliente_id: v })}>
-          <SelectTrigger aria-label="Selecionar cliente" className="min-h-11"><SelectValue placeholder={loadingCustomers ? "Carregando clientes..." : "Selecione o cliente"}>{selectedCustomer?.nome}</SelectValue></SelectTrigger>
-          <SelectContent>{visibleCustomers.map(c => <SelectItem key={c.id} value={c.id} className="min-h-11">{c.nome}{c.telefone ? ` · ${c.telefone}` : ""}</SelectItem>)}</SelectContent>
-        </Select>
-        {!loadingCustomers && !customersError && !visibleCustomers.length && <p className="text-sm text-muted-foreground">Nenhum cliente encontrado.</p>}
-        {customersError && <Button type="button" variant="outline" onClick={() => retryCustomers()}>Tentar carregar clientes novamente</Button>}
+        <CustomerCombobox customers={customerOptions} value={f.cliente_id} onValueChange={v => setF(prev => ({ ...prev, cliente_id: v }))} loading={loadingCustomers} error={customersError} onRetry={() => void retryCustomers()} disabled={!canCreate || mut.isPending} />
         {(initialCustomerError || (initialCustomer && !initialCustomer.cliente)) && <p role="alert" className="text-sm text-destructive">Não foi possível selecionar o cliente. Pesquise um cadastro da sua empresa.</p>}
       </div>
       <div className="space-y-2"><Label>Serviço</Label>
