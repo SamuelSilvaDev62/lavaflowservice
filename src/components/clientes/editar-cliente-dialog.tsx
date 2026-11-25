@@ -61,6 +61,7 @@ export function EditarClienteDialog({
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["cliente", cliente.id] });
       qc.invalidateQueries({ queryKey: ["clientes"] });
+      void qc.invalidateQueries({ queryKey: ["customer-options"] });
       toast.success("Cliente atualizado");
       onOpenChange(false);
     },

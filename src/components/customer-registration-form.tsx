@@ -36,6 +36,7 @@ export function CustomerRegistrationForm({
     }),
     onSuccess: (result) => {
       void qc.invalidateQueries({ queryKey: ["clientes"] });
+      void qc.invalidateQueries({ queryKey: ["customer-options"] });
       if (result.existente) {
         setExisting({ customer: result.cliente, book: result.book });
         return;
