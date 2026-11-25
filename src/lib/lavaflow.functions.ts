@@ -1320,6 +1320,25 @@ export const listOrdensPage = createServerFn({ method: "GET" })
   });
 
 // ============ CLIENTES ============
+export const listCustomerOptions = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { supabase, userId } = context;
+    const { ownerId } = await getOwnerScope(supabase, userId);
+    const clientes: { id: string; nome: string; telefone: string | null }[] = [];
+    const pageSize = 500;
+    for (let offset = 0; ; offset += pageSize) {
+      const { data, error } = await supabase.from("clientes")
+        .select("id, nome, telefone").eq("owner_id", ownerId)
+        .order("id").range(offset, offset + pageSize - 1);
+      if (error) throw new Error("Não foi possível carregar os clientes.");
+      clientes.push(...(data ?? []));
+      if (!data || data.length < pageSize) break;
+    }
+    clientes.sort((a, b) => a.nome.localeCompare(b.nome, "pt-BR"));
+    return { clientes };
+  });
+
 export const listClientes = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
