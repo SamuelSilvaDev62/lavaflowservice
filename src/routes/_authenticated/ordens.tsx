@@ -1,3 +1,4 @@
+import { CustomerCombobox } from "@/components/customer-combobox";
 import { createFileRoute, useRouter } from "@tanstack/react-router";
 import { fallback, zodValidator } from "@tanstack/zod-adapter";
 import { z } from "zod";
@@ -15,7 +16,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { RequireRole } from "@/components/require-role";
 import { useFeature } from "@/hooks/use-entitlement";
 import { OPERACIONAL } from "@/lib/rbac";
-import { listOrdensPage, createOrdem, listClientes, listServicos, listFuncionarios, updateOrdemStatus, atualizarUpsellOportunidade, type OsStatus } from "@/lib/lavaflow.functions";
+import { listOrdensPage, createOrdem, listCustomerOptions, listServicos, listFuncionarios, updateOrdemStatus, atualizarUpsellOportunidade, type OsStatus } from "@/lib/lavaflow.functions";
 import { DEFAULT_ORDER_FILTERS, ORDER_STATUS_LABELS, ORDER_PAGE_SIZE, type OrderFilters } from "@/lib/ordens-model";
 import { canAdvanceWorkOrder } from "@/lib/os-transitions";
 import { brl, dateTimeBr } from "@/lib/format";
@@ -158,15 +159,15 @@ function NewOrder({ services, employees }: { services: { id: string; nome: strin
   const [open, setOpen] = useState(false);
   const [form, setForm] = useState({ cliente_id: "", servico_id: "", funcionario_id: "", valor: 0 });
   const create = useServerFn(createOrdem);
-  const clientsFn = useServerFn(listClientes);
+  const clientsFn = useServerFn(listCustomerOptions);
   const qc = useQueryClient();
-  const { data: clients, isError } = useQuery({ queryKey: ["clientes"], queryFn: () => clientsFn(), enabled: open });
+  const { data: clients, isError, isLoading, refetch } = useQuery({ queryKey: ["customer-options"], queryFn: () => clientsFn(), enabled: open });
   const mut = useMutation({ mutationFn: () => create({ data: { ...form, servico_id: form.servico_id || null, funcionario_id: form.funcionario_id || null, valor: Number(form.valor) } }),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["ordens"] }); qc.invalidateQueries({ queryKey: ["fila"] }); setOpen(false); toast.success("OS criada"); setForm({ cliente_id: "", servico_id: "", funcionario_id: "", valor: 0 }); },
     onError: (e) => toast.error(e.message || "Falha ao criar OS"),
   });
   return <Dialog open={open} onOpenChange={(v) => { if (!mut.isPending) setOpen(v); }}><DialogTrigger asChild><Button variant="premium" className="min-h-11"><Plus />Nova OS</Button></DialogTrigger><DialogContent><DialogHeader><DialogTitle>Nova ordem de serviço</DialogTitle></DialogHeader><form onSubmit={(e) => { e.preventDefault(); if (!form.cliente_id) { toast.error("Selecione um cliente"); return; } mut.mutate(); }} className="space-y-4">
-    <div className="space-y-1.5"><Label htmlFor="os-client">Cliente</Label><Select value={form.cliente_id} onValueChange={(cliente_id) => setForm((f) => ({ ...f, cliente_id }))}><SelectTrigger id="os-client" className="h-11"><SelectValue placeholder="Selecione um cliente" /></SelectTrigger><SelectContent>{clients?.clientes.map((c) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent></Select>{isError && <p className="text-xs text-destructive">Não foi possível carregar os clientes.</p>}</div>
+    <div className="space-y-1.5"><Label htmlFor="os-client">Cliente</Label><CustomerCombobox id="os-client" customers={clients?.clientes ?? []} value={form.cliente_id} onValueChange={cliente_id => setForm(f => ({ ...f, cliente_id }))} loading={isLoading} error={isError} onRetry={() => void refetch()} disabled={mut.isPending} /></div>
     <div className="space-y-1.5"><Label htmlFor="os-service">Serviço (opcional)</Label><Select value={form.servico_id || "none"} onValueChange={(v) => { const s = services.find((x) => x.id === v); setForm((f) => ({ ...f, servico_id: v === "none" ? "" : v, valor: s?.preco_padrao ?? f.valor })); }}><SelectTrigger id="os-service" className="h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sem serviço vinculado</SelectItem>{services.map((s) => <SelectItem key={s.id} value={s.id}>{s.nome} · {brl(s.preco_padrao)}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5"><Label htmlFor="os-employee">Responsável (opcional)</Label><Select value={form.funcionario_id || "none"} onValueChange={(v) => setForm((f) => ({ ...f, funcionario_id: v === "none" ? "" : v }))}><SelectTrigger id="os-employee" className="h-11"><SelectValue /></SelectTrigger><SelectContent><SelectItem value="none">Sem responsável</SelectItem>{employees.map((f) => <SelectItem key={f.id} value={f.id}>{f.nome}</SelectItem>)}</SelectContent></Select></div>
     <div className="space-y-1.5"><Label htmlFor="os-value">Valor (R$)</Label><Input id="os-value" className="h-11" type="number" min="0" step="0.01" inputMode="decimal" placeholder="0,00" value={form.valor === 0 ? "" : form.valor} onChange={(e) => setForm((f) => ({ ...f, valor: e.target.value === "" ? 0 : Number(e.target.value) }))} /></div><Button type="submit" className="min-h-11 w-full" disabled={mut.isPending || !form.cliente_id}>{mut.isPending && <LoaderCircle className="animate-spin" />}{mut.isPending ? "Criando…" : "Criar OS"}</Button>
