@@ -6,6 +6,8 @@ import { appointmentForecast, countOperationStages } from "@/lib/dashboard-metri
 import { bookingPhoneLookupSuffix, isSameBookingPhone, normalizeBookingPhone } from "@/lib/booking-customer-phone";
 import { orderPeriodStart, selectOrderPage, summarizeOrders, type OrderIndex } from "@/lib/ordens-model";
 import { canAdvanceWorkOrder } from "@/lib/os-transitions";
+import { customerRegistrationSchema } from "@/lib/customer-registration";
+import type { Database } from "@/integrations/supabase/types";
 
 // ============ DASHBOARD METRICS ============
 type TenantRole = "owner" | "admin" | "gerente" | "atendente" | "lavador" | "colaborador";
@@ -1766,17 +1768,21 @@ export const processarConversoesCampanhas = createServerFn({ method: "POST" })
 
 export const createCliente = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((d) => z.object({
-    nome: z.string().min(1).max(120),
-    telefone: z.string().max(20).optional().nullable(),
-    origem_cliente: z.string().max(50).optional().nullable(),
-  }).parse(d))
+  .inputValidator((d) => customerRegistrationSchema.parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { ownerId } = await getOwnerScope(supabase, userId);
-    const { data: row, error } = await supabase.from("clientes").insert({ ...data, owner_id: ownerId }).select().single();
+    const { role } = await getOwnerScope(supabase, userId);
+    assertTenantRole(role, [...GESTAO_ROLES, "atendente"]);
+    const { data: result, error } = await supabase.rpc("cadastrar_cliente_seguro", {
+      p_nome: data.nome,
+      p_telefone: data.telefone ?? "",
+      p_origem: data.origem_cliente ?? "",
+    });
     if (error) throw error;
-    return { cliente: row };
+    return z.object({
+      cliente: z.object({ id: z.string().uuid(), nome: z.string(), telefone: z.string().nullable() }),
+      existente: z.boolean(),
+    }).parse(result);
   });
 
 export const getClienteDetalhe = createServerFn({ method: "GET" })
@@ -3915,7 +3921,19 @@ export const createAgendamento = createServerFn({ method: "POST" })
   }).parse(d))
   .handler(async ({ data, context }) => {
     const { supabase, userId } = context;
-    const { ownerId } = await getOwnerScope(supabase, userId);
+    const { ownerId, role } = await getOwnerScope(supabase, userId);
+    assertTenantRole(role, [...GESTAO_ROLES, "atendente"]);
+    // Generated PostgreSQL argument types omit NULL even for nullable SQL arguments.
+    // The existing role-gated validator checks every reference without exposing employees.
+    const { data: validReferences, error: referenceError } = await supabase.rpc("booking_references_valid", {
+      p_owner_id: ownerId,
+      p_cliente_id: data.cliente_id,
+      p_veiculo_id: data.veiculo_id ?? null,
+      p_servico_id: data.servico_id ?? null,
+      p_funcionario_id: data.funcionario_id ?? null,
+    } as Database["public"]["Functions"]["booking_references_valid"]["Args"]);
+    if (referenceError) throw referenceError;
+    if (!validReferences) throw new Error("Cliente, veículo, serviço ou colaborador não pertence à sua empresa.");
     const hora = data.hora_agendada.length === 5 ? data.hora_agendada + ":00" : data.hora_agendada;
     const { data: cfg } = await supabase.from("agenda_config").select("capacidade_simultanea").eq("owner_id", ownerId).maybeSingle();
     const cap = cfg?.capacidade_simultanea ?? 1;

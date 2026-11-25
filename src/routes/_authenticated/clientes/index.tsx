@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { z } from "zod";
@@ -9,7 +9,10 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { listClientes, createCliente, getClientesComRecompensa } from "@/lib/lavaflow.functions";
+import { listClientes, getClientesComRecompensa } from "@/lib/lavaflow.functions";
+import { CustomerRegistrationForm } from "@/components/customer-registration-form";
+import { useRole } from "@/hooks/use-role";
+import { canAny, OPERACIONAL } from "@/lib/rbac";
 import { brl, daysBetween } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
 import {
@@ -28,6 +31,13 @@ const searchSchema = z.object({
 export const Route = createFileRoute("/_authenticated/clientes/")({
   component: Page,
   validateSearch: searchSchema,
+  head: () => ({ meta: [
+    { title: "Clientes | LavaFlow" },
+    { name: "description", content: "Cadastros e histórico de clientes do seu estabelecimento no LavaFlow." },
+    { property: "og:title", content: "Clientes | LavaFlow" },
+    { property: "og:description", content: "Cadastros e histórico de clientes do seu estabelecimento no LavaFlow." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
+  ] }),
 });
 
 type Segmento = "todos" | "com_visitas" | "sem_visitas";
@@ -69,9 +79,9 @@ function ClientSummary({ label, value, icon: Icon, hint, tone, onClick, active, 
 
 function Page() {
   const list = useServerFn(listClientes);
-  const create = useServerFn(createCliente);
   const recFn = useServerFn(getClientesComRecompensa);
-  const qc = useQueryClient();
+  const { role } = useRole();
+  const canCreate = canAny(role, OPERACIONAL);
   const { data, isLoading, isError, refetch } = useQuery({ queryKey: ["clientes"], queryFn: () => list() });
   const search = Route.useSearch();
   const navigate = Route.useNavigate();
@@ -90,17 +100,6 @@ function Page() {
     void navigate({ search: prev => ({ ...prev, criar: next ? true : undefined }), replace: true, resetScroll: false });
   };
   const [expandedClienteId, setExpandedClienteId] = useState<string | null>(null);
-  const [form, setForm] = useState({ nome: "", telefone: "", origem_cliente: "Indicação" });
-  const mut = useMutation({
-    mutationFn: () => create({ data: { ...form, nome: form.nome.trim() } }),
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["clientes"] });
-      setOpen(false);
-      setForm({ nome: "", telefone: "", origem_cliente: "Indicação" });
-      toast.success("Cliente cadastrado");
-    },
-    onError: (e: any) => toast.error(e?.message ?? "Não foi possível cadastrar o cliente."),
-  });
 
   const clientes = data?.clientes ?? [];
   const totalClientes = clientes.length;
@@ -143,23 +142,19 @@ function Page() {
             </p>
             <p className="mt-3 text-xs font-medium text-muted-foreground">{totalClientes} {totalClientes === 1 ? "cliente cadastrado" : "clientes cadastrados"}</p>
           </div>
-          <Dialog open={open} onOpenChange={setOpen}>
+          <Dialog open={open && canCreate} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-              <Button className="w-full shrink-0 gap-2 sm:w-auto" variant="premium">
+              <Button className="w-full shrink-0 gap-2 sm:w-auto" variant="premium" disabled={!canCreate}>
                 <Plus className="h-4 w-4" /> Novo cliente
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-md">
+            <DialogContent className="max-h-[90dvh] max-w-md overflow-y-auto">
               <DialogHeader><DialogTitle>Cadastrar cliente</DialogTitle></DialogHeader>
               <p className="text-sm text-muted-foreground">Comece com nome e contato. As demais informações ficam disponíveis no perfil.</p>
-              <form onSubmit={e => { e.preventDefault(); if (!mut.isPending && form.nome.trim()) mut.mutate(); }} className="space-y-4">
-                <div className="space-y-1.5"><Label htmlFor="novo-cliente-nome">Nome</Label><Input id="novo-cliente-nome" required maxLength={120} value={form.nome} onChange={e => setForm({ ...form, nome: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label htmlFor="novo-cliente-whatsapp">WhatsApp</Label><Input id="novo-cliente-whatsapp" type="tel" placeholder="(11) 99999-0000" value={form.telefone} onChange={e => setForm({ ...form, telefone: e.target.value })} /></div>
-                <div className="space-y-1.5"><Label htmlFor="novo-cliente-origem">Origem do cliente</Label><Input id="novo-cliente-origem" value={form.origem_cliente} onChange={e => setForm({ ...form, origem_cliente: e.target.value })} /></div>
-                <Button type="submit" className="w-full" disabled={mut.isPending || !form.nome.trim()}>
-                  {mut.isPending ? "Cadastrando..." : "Cadastrar cliente"}
-                </Button>
-              </form>
+              <CustomerRegistrationForm allowBooking onCancel={() => setOpen(false)} onSaved={(customer, book) => {
+                if (book) void navigate({ to: "/agendamentos", search: { criar: true, cliente_id: customer.id } });
+                else setOpen(false);
+              }} />
             </DialogContent>
           </Dialog>
         </div>

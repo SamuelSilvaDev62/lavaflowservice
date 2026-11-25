@@ -1,3 +1,8 @@
+# Integração clientes ↔ agendamentos
+- [x] Reutilizar cadastro rápido, selecionar cliente e preservar reserva no cadastro/cancelamento.
+- [x] Conectar Salvar e agendar à reserva com cliente pré-selecionado.
+- [x] Verificar duplicidades, concorrência, permissões e ambos os fluxos com dados sintéticos.
+
 # Ordens de Serviço
 - [x] Implementar consulta paginada e métricas reais sem alterar listOrdens.
 - [x] Reformular /ordens, preservar criação, status e upsell.

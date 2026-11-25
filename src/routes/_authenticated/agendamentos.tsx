@@ -2,7 +2,11 @@ import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
+import { CustomerRegistrationForm } from "@/components/customer-registration-form";
+import { matchesCustomer, submissionGuard, type RegisteredCustomer } from "@/lib/customer-registration";
+import { useRole } from "@/hooks/use-role";
+import { canAny, OPERACIONAL } from "@/lib/rbac";
 import { PageHeader } from "@/components/app-layout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -22,7 +26,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import {
   listAgendamentos, createAgendamento, agendamentoStats, updateAgendamentoStatus,
   iniciarAtendimento, listClientes, listServicos, getEmpresa, listFuncionarios, updateAgendamento,
-  getColaboradoresDisponiveis, type AgendamentoStatus,
+  getColaboradoresDisponiveis, getClienteDetalhe, type AgendamentoStatus,
 } from "@/lib/lavaflow.functions";
 import { brl, dateBr } from "@/lib/format";
 import { waLink } from "@/lib/whatsapp";
@@ -36,7 +40,14 @@ import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/_authenticated/agendamentos")({
   component: Page,
-  validateSearch: z.object({ criar: z.literal(true).optional().catch(undefined) }),
+  validateSearch: z.object({ criar: z.literal(true).optional().catch(undefined), cliente_id: z.string().uuid().optional().catch(undefined) }),
+  head: () => ({ meta: [
+    { title: "Agendamentos | LavaFlow" },
+    { name: "description", content: "Agenda e reservas do seu estabelecimento no LavaFlow." },
+    { property: "og:title", content: "Agendamentos | LavaFlow" },
+    { property: "og:description", content: "Agenda e reservas do seu estabelecimento no LavaFlow." },
+    { property: "og:type", content: "website" }, { name: "twitter:card", content: "summary" },
+  ] }),
 });
 
 const STATUS_LABEL: Record<AgendamentoStatus, string> = {
@@ -108,9 +119,10 @@ function estimatedValue(items: any[]) {
 function Page() {
   const [date, setDate] = useState(todayIso());
   const open = Route.useSearch().criar === true;
+  const initialCustomerId = Route.useSearch().cliente_id ?? "";
   const navigate = Route.useNavigate();
   const setOpen = (next: boolean) => {
-    void navigate({ search: { criar: next ? true : undefined }, replace: true, resetScroll: false });
+    void navigate({ search: { criar: next ? true : undefined, ...(next && initialCustomerId ? { cliente_id: initialCustomerId } : {}) }, replace: true, resetScroll: false });
   };
   const [linkOpen, setLinkOpen] = useState(false);
   const [levaOnly, setLevaOnly] = useState(false);
@@ -165,7 +177,7 @@ function Page() {
           !isMobile && (
             <Dialog open={open} onOpenChange={setOpen}>
               <DialogTrigger asChild><Button><Plus className="h-4 w-4 mr-1" /> Nova reserva</Button></DialogTrigger>
-              <NovoAgendamentoDialog onClose={() => setOpen(false)} defaultDate={date} />
+              <NovoAgendamentoDialog onClose={() => setOpen(false)} defaultDate={date} initialCustomerId={initialCustomerId} />
             </Dialog>
           )
         }
@@ -353,7 +365,7 @@ function Page() {
           </DrawerTrigger>
           <DrawerContent className="flex max-h-[92vh] flex-col overflow-hidden px-0 pb-0">
             <DrawerHeader className="px-4 text-left"><DrawerTitle>Nova reserva</DrawerTitle></DrawerHeader>
-            <NovoAgendamentoForm onClose={() => setOpen(false)} defaultDate={date} />
+            <NovoAgendamentoForm onClose={() => setOpen(false)} defaultDate={date} initialCustomerId={initialCustomerId} />
           </DrawerContent>
         </Drawer>
       )}
@@ -584,11 +596,11 @@ function Row({ label, value }: { label: string; value: string }) {
   );
 }
 
-function NovoAgendamentoDialog({ onClose, defaultDate }: { onClose: () => void; defaultDate: string }) {
+function NovoAgendamentoDialog({ onClose, defaultDate, initialCustomerId }: { onClose: () => void; defaultDate: string; initialCustomerId: string }) {
   return (
     <DialogContent className="flex max-h-[90vh] w-[calc(100vw-2rem)] max-w-2xl flex-col overflow-hidden p-0">
       <DialogHeader className="px-5 pt-5"><DialogTitle>Nova reserva</DialogTitle></DialogHeader>
-      <NovoAgendamentoForm onClose={onClose} defaultDate={defaultDate} />
+      <NovoAgendamentoForm onClose={onClose} defaultDate={defaultDate} initialCustomerId={initialCustomerId} />
     </DialogContent>
   );
 }
@@ -604,16 +616,26 @@ function colaboradorDisponibilidadeLabel(x: any) {
   return `${x.nome} - ${vagas} ${vagas === 1 ? "vaga disponível" : "vagas disponíveis"}`;
 }
 
-function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; defaultDate: string }) {
+function NovoAgendamentoForm({ onClose, defaultDate, initialCustomerId }: { onClose: () => void; defaultDate: string; initialCustomerId: string }) {
   const cli = useServerFn(listClientes);
+  const detail = useServerFn(getClienteDetalhe);
+  const { role } = useRole();
+  const canCreate = canAny(role, OPERACIONAL);
+  const [quickCreate, setQuickCreate] = useState(false);
+  const [customerSearch, setCustomerSearch] = useState("");
+  const [createdCustomer, setCreatedCustomer] = useState<RegisteredCustomer | null>(null);
+  const guard = useRef(submissionGuard());
   const sv = useServerFn(listServicos);
   const dispFn = useServerFn(getColaboradoresDisponiveis);
   const create = useServerFn(createAgendamento);
   const qc = useQueryClient();
-  const { data: clientes } = useQuery({ queryKey: ["clientes"], queryFn: () => cli() });
+  const { data: clientes, isLoading: loadingCustomers, isError: customersError, refetch: retryCustomers } = useQuery({ queryKey: ["clientes"], queryFn: () => cli() });
+  const { data: initialCustomer, isError: initialCustomerError } = useQuery({
+    queryKey: ["cliente", initialCustomerId], queryFn: () => detail({ data: { id: initialCustomerId } }), enabled: !!initialCustomerId,
+  });
   const { data: servicos } = useQuery({ queryKey: ["servicos"], queryFn: () => sv() });
   const [f, setF] = useState({
-    cliente_id: "", servico_id: "", funcionario_id: "", data_agendada: defaultDate, hora_agendada: "09:00", observacoes: "",
+    cliente_id: initialCustomerId, servico_id: "", funcionario_id: "", data_agendada: defaultDate, hora_agendada: "09:00", observacoes: "",
     leva_traz: false, endereco_retirada: "", endereco_devolucao: "", horario_retirada: "", horario_devolucao: "", observacoes_leva_traz: "", taxa_leva_traz: 0,
   });
   const { data: disponiveis } = useQuery({
@@ -643,19 +665,41 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
       onClose();
     },
     onError: (e: any) => toast.error(e?.message ?? "Erro"),
+    onSettled: () => guard.current.release(),
   });
 
   const colaboradores = disponiveis?.colaboradores ?? [];
   const semColaboradorDisponivel = colaboradores.length > 0 && colaboradores.every((x: any) => !x.disponivel);
+  const customerOptions: RegisteredCustomer[] = [...(clientes?.clientes ?? [])];
+  for (const customer of [createdCustomer, initialCustomer?.cliente]) {
+    if (customer && !customerOptions.some(c => c.id === customer.id)) customerOptions.push(customer);
+  }
+  const selectedCustomer = customerOptions.find(c => c.id === f.cliente_id);
+  const visibleCustomers = customerOptions.filter(c => c.id === f.cliente_id || matchesCustomer(c, customerSearch));
+
+  if (quickCreate) return <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-4 sm:px-5">
+    <h3 className="mb-4 font-display font-semibold">Cadastrar cliente</h3>
+    <CustomerRegistrationForm onCancel={() => setQuickCreate(false)} onSaved={(customer) => {
+      setCreatedCustomer(customer);
+      setF(prev => ({ ...prev, cliente_id: customer.id }));
+      setCustomerSearch("");
+      setQuickCreate(false);
+    }} />
+  </div>;
 
   return (
-    <form onSubmit={(e) => { e.preventDefault(); if (!f.cliente_id) return toast.error("Selecione um cliente"); mut.mutate(); }} className="flex min-h-0 flex-1 flex-col">
+    <form onSubmit={(e) => { e.preventDefault(); if (!selectedCustomer) return toast.error("Selecione um cliente válido"); if (!canCreate || !guard.current.enter()) return; mut.mutate(); }} className="flex min-h-0 flex-1 flex-col">
       <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4 pt-1 sm:px-5">
-      <div className="space-y-2"><Label>Cliente</Label>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between gap-2"><Label>Cliente</Label><Button type="button" variant="ghost" className="min-h-11" disabled={!canCreate || mut.isPending} onClick={() => setQuickCreate(true)}><Plus className="mr-1 h-4 w-4" /> Novo cliente</Button></div>
+        <Input aria-label="Pesquisar cliente por nome ou telefone" placeholder="Pesquisar nome ou telefone" value={customerSearch} onChange={e => setCustomerSearch(e.target.value)} className="min-h-11" />
         <Select value={f.cliente_id} onValueChange={(v) => setF({ ...f, cliente_id: v })}>
-          <SelectTrigger><SelectValue placeholder="Selecione o cliente" /></SelectTrigger>
-          <SelectContent>{clientes?.clientes.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.nome}</SelectItem>)}</SelectContent>
+          <SelectTrigger aria-label="Selecionar cliente" className="min-h-11"><SelectValue placeholder={loadingCustomers ? "Carregando clientes..." : "Selecione o cliente"}>{selectedCustomer?.nome}</SelectValue></SelectTrigger>
+          <SelectContent>{visibleCustomers.map(c => <SelectItem key={c.id} value={c.id} className="min-h-11">{c.nome}{c.telefone ? ` · ${c.telefone}` : ""}</SelectItem>)}</SelectContent>
         </Select>
+        {!loadingCustomers && !customersError && !visibleCustomers.length && <p className="text-sm text-muted-foreground">Nenhum cliente encontrado.</p>}
+        {customersError && <Button type="button" variant="outline" onClick={() => retryCustomers()}>Tentar carregar clientes novamente</Button>}
+        {(initialCustomerError || (initialCustomer && !initialCustomer.cliente)) && <p role="alert" className="text-sm text-destructive">Não foi possível selecionar o cliente. Pesquise um cadastro da sua empresa.</p>}
       </div>
       <div className="space-y-2"><Label>Serviço</Label>
         <Select value={f.servico_id} onValueChange={(v) => setF({ ...f, servico_id: v, funcionario_id: "" })}>
@@ -706,7 +750,7 @@ function NovoAgendamentoForm({ onClose, defaultDate }: { onClose: () => void; de
       </div>
       <div className="sticky bottom-0 flex gap-2 border-t bg-background p-4 sm:px-5">
         <Button type="button" variant="outline" className="h-11 flex-1" onClick={onClose}>Cancelar</Button>
-        <Button type="submit" className="h-11 flex-1" disabled={mut.isPending}>Salvar reserva</Button>
+        <Button type="submit" className="h-11 flex-1" disabled={mut.isPending || !canCreate || !selectedCustomer}>{mut.isPending ? "Salvando..." : "Salvar reserva"}</Button>
       </div>
     </form>
   );

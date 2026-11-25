@@ -1854,6 +1854,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      cadastrar_cliente_seguro: {
+        Args: { p_nome: string; p_origem?: string; p_telefone?: string }
+        Returns: Json
+      }
       consume_access_limits: {
         Args: { p_buckets: Json }
         Returns: {
