@@ -18,6 +18,8 @@ import { FeatureGate } from "@/components/feature-gate";
 import { PageHeader } from "@/components/app-layout";
 import { RequireRole } from "@/components/require-role";
 import { AgendaFillPanel } from "@/components/opportunities/agenda-fill-panel";
+import { DigitalPresencePanel } from "@/components/opportunities/digital-presence-panel";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -26,6 +28,14 @@ import { criarCampanhaRecovery, getRecoveryOverview } from "@/lib/recovery.funct
 import { GESTAO } from "@/lib/rbac";
 
 export const Route = createFileRoute("/_authenticated/oportunidades")({
+  head: () => ({ meta: [
+    { title: "Oportunidades e Presença Digital · LavaFlow" },
+    { name: "description", content: "Prepare sua presença no Google, acompanhe agendamentos associados e desenvolva oportunidades de crescimento." },
+    { property: "og:title", content: "Oportunidades e Presença Digital · LavaFlow" },
+    { property: "og:description", content: "Presença digital e crescimento com dados reais do estabelecimento." },
+    { property: "og:type", content: "website" },
+    { name: "twitter:card", content: "summary" },
+  ] }),
   component: () => (
     <RequireRole roles={GESTAO}>
       <FeatureGate feature="oportunidades">
@@ -73,6 +83,20 @@ function MetricCard({
 }
 
 function Page() {
+  return <>
+    <PageHeader title="Oportunidades" subtitle="Aquisição de clientes, presença local e crescimento do seu negócio." />
+    <Tabs defaultValue="digital">
+      <TabsList className="grid h-auto w-full grid-cols-2 sm:w-fit">
+        <TabsTrigger value="digital" className="min-h-11 whitespace-normal">Presença Digital</TabsTrigger>
+        <TabsTrigger value="operation" className="min-h-11 whitespace-normal">Recuperação e agenda</TabsTrigger>
+      </TabsList>
+      <TabsContent value="digital"><DigitalPresencePanel /></TabsContent>
+      <TabsContent value="operation"><OperationalOpportunities /></TabsContent>
+    </Tabs>
+  </>;
+}
+
+function OperationalOpportunities() {
   const overviewFn = useServerFn(getRecoveryOverview);
   const criarFn = useServerFn(criarCampanhaRecovery);
   const qc = useQueryClient();

@@ -29,6 +29,20 @@
       "when": 1795641564154,
       "tag": "0003_safe_customer_registration",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1795656809356,
+      "tag": "0004_digital_presence_foundation",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1795656879576,
+      "tag": "0005_digital_presence_atomic_confirmation",
+      "breakpoints": true
     }
   ]
 }

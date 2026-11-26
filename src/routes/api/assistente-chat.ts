@@ -113,6 +113,15 @@ export const Route = createFileRoute("/api/assistente-chat")({
         const { getAiModelId } = await import("@/lib/ai-config.server");
 
         const contexto = await buildConsultorContexto(ownerId);
+        let system = consultorSystemPrompt(contexto);
+        if (body?.digital_presence === true) {
+          const { digitalPresencePrompt } = await import("@/lib/digital-presence");
+          const presence = await supabase.from("digital_presence")
+            .select("profile_url, review_url, confirmations")
+            .eq("owner_id", ownerId).maybeSingle();
+          if (presence.error) return new Response("Não foi possível carregar as referências digitais.", { status: 503 });
+          system += "\n\n" + digitalPresencePrompt(presence.data ?? {});
+        }
         const initialRunId = getLovableAiGatewayRunId(request);
         const gateway = createLovableAiGatewayProvider(LOVABLE_API_KEY, initialRunId);
         const modelId = getAiModelId();
@@ -129,7 +138,7 @@ export const Route = createFileRoute("/api/assistente-chat")({
         try {
           const result = streamText({
             model: gateway(modelId),
-            system: consultorSystemPrompt(contexto),
+            system,
             messages: await convertToModelMessages(messages as any),
             abortSignal: request.signal,
             onError: ({ error }: { error: unknown }) => {

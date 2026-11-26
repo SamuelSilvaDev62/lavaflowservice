@@ -589,6 +589,33 @@ export type Database = {
           },
         ]
       }
+      digital_presence: {
+        Row: {
+          confirmations: Json
+          owner_id: string
+          profile_url: string
+          review_url: string
+          updated_at: string
+          updated_by: string
+        }
+        Insert: {
+          confirmations?: Json
+          owner_id: string
+          profile_url?: string
+          review_url?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Update: {
+          confirmations?: Json
+          owner_id?: string
+          profile_url?: string
+          review_url?: string
+          updated_at?: string
+          updated_by?: string
+        }
+        Relationships: []
+      }
       empresa: {
         Row: {
           created_at: string
@@ -1961,6 +1988,10 @@ export type Database = {
           role: Database["public"]["Enums"]["app_role"]
           user_id: string
         }[]
+      }
+      set_digital_presence_confirmation: {
+        Args: { p_done: boolean; p_step: string }
+        Returns: undefined
       }
       set_member_role: {
         Args: {

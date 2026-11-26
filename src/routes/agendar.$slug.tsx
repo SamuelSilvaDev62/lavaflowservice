@@ -29,8 +29,12 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { bookingChannel } from "@/lib/digital-presence";
 
 export const Route = createFileRoute("/agendar/$slug")({
+  validateSearch: (search: Record<string, unknown>) => ({
+    utm_source: search["utm_source"] === "google" ? "google" : undefined,
+  }),
   component: Page,
   head: ({ params }) => ({
     meta: [
@@ -38,6 +42,8 @@ export const Route = createFileRoute("/agendar/$slug")({
       { name: "description", content: "Reserve seu horário online em menos de um minuto." },
       { property: "og:title", content: "Agendar lavagem" },
       { property: "og:description", content: "Reserve seu horário online em menos de um minuto." },
+      { property: "og:type", content: "website" },
+      { name: "twitter:card", content: "summary" },
     ],
   }),
 });
@@ -79,6 +85,7 @@ const STEPS = [
 
 function Page() {
   const { slug } = Route.useParams();
+  const { utm_source } = Route.useSearch();
   const queryClient = useQueryClient();
   const emp = useServerFn(getEmpresaPublica);
   const slotsFn = useServerFn(getHorariosDisponiveis);
@@ -122,6 +129,7 @@ function Page() {
       enviar({
         data: {
           slug,
+          origem: bookingChannel(utm_source),
           nome,
           telefone,
           veiculo: veiculo || undefined,

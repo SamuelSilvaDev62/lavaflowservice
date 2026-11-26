@@ -4178,6 +4178,7 @@ export const getHorariosDisponiveis = createServerFn({ method: "GET" })
 export const solicitarAgendamentoPublico = createServerFn({ method: "POST" })
   .inputValidator((d) => z.object({
     slug: z.string().min(1).max(80),
+    origem: z.enum(["publico", "google"]).default("publico"),
     nome: z.string().trim().min(2).max(120),
     telefone: z.string().trim().min(8).max(20).refine(v => normalizeBookingPhone(v).length >= 8, "Informe um telefone válido."),
     veiculo: z.string().max(60).optional(),
@@ -4243,14 +4244,14 @@ export const solicitarAgendamentoPublico = createServerFn({ method: "POST" })
       owner_id, cliente_id, servico_id: data.servico_id ?? null,
       data_agendada: data.data, hora_agendada: hora,
       observacoes: data.veiculo ? `Veículo: ${data.veiculo}. ${data.observacoes ?? ""}`.trim() : data.observacoes ?? null,
-      origem: "publico",
+      origem: data.origem,
     });
     if (e2) throw e2;
     await supabaseAdmin.from("public_page_events").insert({
       owner_id,
       slug: data.slug,
       evento: "solicitacao_agendamento",
-      metadata: { servico_id: data.servico_id ?? null, data: data.data, hora: data.hora },
+      metadata: { servico_id: data.servico_id ?? null, data: data.data, hora: data.hora, origem: data.origem },
     } as any);
     return { ok: true };
   });
