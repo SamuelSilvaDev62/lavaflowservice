@@ -4,10 +4,10 @@
 - [x] Verificar duplicidades, concorrência, permissões e ambos os fluxos com dados sintéticos.
 
 # Presença Digital
-- [ ] Persistir checklist e referências por tenant, sem conexão externa simulada.
-- [ ] Reaproveitar contexto comercial, integrar geração ao Consultor e convites neutros de avaliação.
-- [ ] Rastrear origem Google nos links públicos e medir reservas/OS vinculadas.
-- [ ] Verificar regras, acesso, persistência e interface mobile sem dados reais nos testes.
+- [x] Persistir checklist e referências por tenant, sem conexão externa simulada.
+- [x] Reaproveitar contexto comercial, integrar geração ao Consultor e convites neutros de avaliação.
+- [x] Rastrear origem Google nos links públicos e medir reservas/OS vinculadas.
+- [ ] Verificar a tela com uma conta Growth de teste; a conta disponível é Free e mostra corretamente o bloqueio.
 
 # Ordens de Serviço
 - [x] Implementar consulta paginada e métricas reais sem alterar listOrdens.
