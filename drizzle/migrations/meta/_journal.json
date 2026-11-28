@@ -43,6 +43,13 @@
       "when": 1795656879576,
       "tag": "0005_digital_presence_atomic_confirmation",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1795839355545,
+      "tag": "0006_permanent_demo_tenant_policy",
+      "breakpoints": true
     }
   ]
 }

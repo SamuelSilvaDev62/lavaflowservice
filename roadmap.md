@@ -1,3 +1,9 @@
+# Conta de demonstração permanente
+- [x] Preparar identificação protegida de demo, acesso Growth permanente e bloqueio de cobrança.
+- [x] Preparar fonte de tenants reais para futuros indicadores administrativos e bloqueio para futuros disparos automáticos (hoje só existem ações manuais).
+- [x] Testar acesso Growth, RLS, classificação privilegiada, bloqueios e exclusão de métricas em banco descartável.
+- [ ] Liberar exclusivamente o cadastro confirmado e verificar Presença Digital nessa sessão; aguarda e-mail, pois existem dois estabelecimentos LavaFlow Demo.
+
 # Integração clientes ↔ agendamentos
 - [x] Reutilizar cadastro rápido, selecionar cliente e preservar reserva no cadastro/cancelamento.
 - [x] Conectar Salvar e agendar à reserva com cliente pré-selecionado.

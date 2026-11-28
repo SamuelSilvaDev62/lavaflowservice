@@ -1,6 +1,9 @@
 # Architecture rules
 
 - Read tenant billing state through the validated user's client and an explicit owner filter; reserve the administrative client for privileged writes so ordinary navigation does not require a service credential and remains protected by RLS.
+- Demo classification is a protected subscription flag granted only by privileged operations against a confirmed owner UUID, never by signup name/email; derive effective entitlements from it without fabricating Stripe subscriptions.
+- Future platform business metrics must scope all customer, revenue, retention and usage aggregates through service-only admin_real_tenants; tenant dashboards still show their own operational data.
+- Any future automatic message provider, queue or cron must call assertAutomaticMessagingAllowed before delivery; demo denial is fail-closed, while current manual WhatsApp actions remain manual and AI metering remains unchanged.
 - Keep the paginated orders contract separate from listOrdens; scan the tenant's lean period index in bounded batches for complete search and period KPIs, returning details only for the selected page without schema changes.
 - Convert appointments only through the authenticated invoker RPC with a booking row lock; use a role-gated boolean reference validator to support attendants without exposing employee records, so retries, tenant validation and rollback stay transactional.
 - Enforce abuse limits through the service-only PostgreSQL counter RPC with sorted bucket locks and server-owned policies; never trust forwarded IP headers unless the edge overwrite guarantee is explicitly verified, so spoofed headers cannot bypass identity/tenant limits.

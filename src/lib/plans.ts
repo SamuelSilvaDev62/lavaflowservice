@@ -164,6 +164,8 @@ export function requiredTierFor(feature: FeatureKey): Tier {
 }
 
 export type SubscriptionRow = {
+  /** Classificação protegida no backend; nunca derivada de nome ou cadastro. */
+  is_demo?: boolean | null;
   plan: PlanId | null;
   subscription_status: string | null;
   is_founders: boolean | null;
@@ -177,6 +179,7 @@ export type SubscriptionRow = {
 };
 
 export type Entitlement = {
+  isDemo: boolean;
   /** Tier comercial efetivo: só isso decide liberação de features. */
   tier: Tier;
   /** Growth liberado (assinatura paga, trial válido, carência ou Founders). */
@@ -214,6 +217,7 @@ const TRIAL_WINDOW_TOLERANCE_MS = 10 * 60_000;
  * - past_due/unpaid dentro da carência              => growth; fora => free
  */
 export function getEntitlement(row: SubscriptionRow | null | undefined): Entitlement {
+  const isDemo = row?.is_demo === true;
   const status = row?.subscription_status ?? "none";
   const isFounders = !!row?.is_founders;
   const planoAssinado = row?.plan ?? null;
@@ -246,23 +250,24 @@ export function getEntitlement(row: SubscriptionRow | null | undefined): Entitle
     !!currentPeriodEnd &&
     new Date(currentPeriodEnd).getTime() + GRACE_DAYS * 86_400_000 > now;
 
-  const growthActive = pagoAtivo || trialGrowthValido || dentroDaCarencia;
+  const growthActive = isDemo || pagoAtivo || trialGrowthValido || dentroDaCarencia;
   const growthCompat =
-    growthActive && !isFounders && !trialGrowthValido && planoAssinado !== "growth";
+    growthActive && !isDemo && !isFounders && !trialGrowthValido && planoAssinado !== "growth";
 
   return {
+    isDemo,
     tier: growthActive ? "growth" : "free",
     growthActive,
     growthCompat,
-    planoAssinado,
-    status,
-    isFounders,
-    isTrial: trialGrowthValido,
-    trialEndsAt,
+    planoAssinado: isDemo ? "growth" : planoAssinado,
+    status: isDemo ? "demo" : status,
+    isFounders: !isDemo && isFounders,
+    isTrial: !isDemo && trialGrowthValido,
+    trialEndsAt: isDemo ? null : trialEndsAt,
     trialUsado: !!trialEndsAt,
-    currentPeriodEnd,
-    cancelAtPeriodEnd: !!row?.cancel_at_period_end,
-    hasCustomer: !!row?.has_customer,
+    currentPeriodEnd: isDemo ? null : currentPeriodEnd,
+    cancelAtPeriodEnd: !isDemo && !!row?.cancel_at_period_end,
+    hasCustomer: !isDemo && !!row?.has_customer,
   };
 }
 
@@ -280,12 +285,14 @@ export function canUseFeature(
 
 export function tierLabel(entitlement: Entitlement | null | undefined): string {
   if (!entitlement) return "Free";
+  if (entitlement.isDemo) return "Growth · Demonstração";
   if (entitlement.isFounders && entitlement.growthActive) return "Founders";
   if (entitlement.tier === "growth") return entitlement.isTrial ? "Growth (teste)" : "Growth";
   return "Free";
 }
 
 export const STATUS_LABELS: Record<string, string> = {
+  demo: "Demonstração permanente · sem cobrança",
   active: "Ativa",
   trialing: "Em teste",
   past_due: "Pagamento pendente",

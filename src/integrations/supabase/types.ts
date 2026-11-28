@@ -1647,6 +1647,7 @@ export type Database = {
           created_at: string
           current_period_end: string | null
           id: string
+          is_demo: boolean
           is_founders: boolean
           owner_id: string
           plan: Database["public"]["Enums"]["app_plan"] | null
@@ -1662,6 +1663,7 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           id?: string
+          is_demo?: boolean
           is_founders?: boolean
           owner_id: string
           plan?: Database["public"]["Enums"]["app_plan"] | null
@@ -1677,6 +1679,7 @@ export type Database = {
           created_at?: string
           current_period_end?: string | null
           id?: string
+          is_demo?: boolean
           is_founders?: boolean
           owner_id?: string
           plan?: Database["public"]["Enums"]["app_plan"] | null
@@ -1809,6 +1812,21 @@ export type Database = {
       }
     }
     Views: {
+      admin_real_tenants: {
+        Row: {
+          empresa_id: string | null
+          owner_id: string | null
+        }
+        Insert: {
+          empresa_id?: string | null
+          owner_id?: string | null
+        }
+        Update: {
+          empresa_id?: string | null
+          owner_id?: string | null
+        }
+        Relationships: []
+      }
       funcionarios_self: {
         Row: {
           ativo: boolean | null

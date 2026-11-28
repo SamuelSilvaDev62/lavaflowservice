@@ -21,7 +21,7 @@ export const getMeuPlano = createServerFn({ method: "GET" })
       entitlement,
       role,
       stripeConfigurado: isStripeConfigured(),
-      assinaturaGerenciavel: hasManageableStripeSubscription(sub),
+      assinaturaGerenciavel: !entitlement.isDemo && hasManageableStripeSubscription(sub),
     };
   });
 
@@ -39,6 +39,10 @@ export const criarCheckoutAssinatura = createServerFn({ method: "POST" })
     const { appOrigin, requireGestao } = await import("@/lib/billing.server");
     const { trackGrowthEvent } = await import("@/lib/growth.server");
     const ownerId = await requireGestao(context.supabase, context.userId);
+
+    const { fetchEntitlement } = await import("@/lib/entitlements.server");
+    const { assertDemoActionAllowed } = await import("@/lib/demo-policy");
+    assertDemoActionAllowed((await fetchEntitlement(context.supabase, ownerId)).isDemo, "billing");
 
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { data: sub, error: subscriptionError } = await context.supabase
@@ -123,6 +127,10 @@ export const abrirPortalAssinatura = createServerFn({ method: "POST" })
     const { stripeRequest } = await import("@/lib/stripe.server");
     const { appOrigin, requireGestao } = await import("@/lib/billing.server");
     const ownerId = await requireGestao(context.supabase, context.userId);
+
+    const { fetchEntitlement } = await import("@/lib/entitlements.server");
+    const { assertDemoActionAllowed } = await import("@/lib/demo-policy");
+    assertDemoActionAllowed((await fetchEntitlement(context.supabase, ownerId)).isDemo, "billing");
 
     const { data: sub, error } = await context.supabase
       .from("tenant_subscriptions")
